@@ -1176,12 +1176,12 @@ function orange_restore_admin_fw_pre_restore_backup(
     $status = (string) ($job['status'] ?? '');
     $record = orange_restore_pre_backup_load_record($workRoot, $jobId);
     $labels = [
-        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING => 'بانتظار تشغيل عامل CLI',
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING => 'بانتظار بدء التنفيذ من مركز الاسترداد',
         ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING => 'جارٍ إنشاء النسخة الاحتياطية',
         ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING => 'جارٍ التحقق',
         ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY => 'النسخة الاحتياطية جاهزة وآمنة للرجوع',
         ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED => 'فشل إعداد النسخة الاحتياطية',
-        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION => 'بانتظار طلب إعداد النسخة الاحتياطية',
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION => 'بانتظار تنفيذ النسخة الاحتياطية من مركز الاسترداد',
     ];
 
     return [
@@ -1248,7 +1248,7 @@ function orange_restore_admin_fw_shadow_restore(
 
     $status = (string) ($job['status'] ?? '');
     $labels = [
-        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING => 'بانتظار تشغيل عامل CLI لقاعدة الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING => 'بانتظار بدء استعادة قاعدة الظل من مركز الاسترداد',
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING => 'جارٍ استيراد قاعدة الظل',
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING => 'جارٍ التحقق من قاعدة الظل',
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 'قاعدة الظل جاهزة (الإنتاج لم يُمس)',
@@ -1298,7 +1298,7 @@ function orange_restore_admin_fw_shadow_verification(
         ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING => 'جارٍ التحقق العميق من قاعدة الظل',
         ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 'قاعدة الظل موثّقة وجاهزة (بدون قطع إنتاج)',
         ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY => 'قاعدة الظل غير جاهزة للقطع',
-        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 'بانتظار تشغيل عامل CLI للتحقق',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 'بانتظار تحقق قاعدة الظل من مركز الاسترداد',
     ];
     $meta = orange_restore_shadow_verify_load_meta($workRoot, $jobId);
     $report = orange_restore_shadow_verify_load_report($workRoot, $jobId);
@@ -1488,7 +1488,7 @@ function orange_restore_admin_fw_shadow_files(
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING => 'جارٍ التحقق من ملفات الظل',
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY => 'ملفات الظل جاهزة (الإنتاج لم يُمس)',
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED => 'فشل استخراج ملفات الظل',
-        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 'بانتظار تشغيل عامل CLI لملفات الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 'بانتظار استخراج ملفات الظل من مركز الاسترداد',
     ];
     $meta = orange_restore_shadow_files_load_meta($workRoot, $jobId);
     $report = orange_restore_shadow_files_load_report($workRoot, $jobId);

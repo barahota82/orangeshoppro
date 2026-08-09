@@ -567,6 +567,253 @@ function orange_restore_fw_find_active_job(string $workRoot): ?array
 }
 
 /**
+ * Matrix-aligned happy-path rank for Restore Center guided journey (16 steps).
+ * Null = unknown status (fail-closed). Does not use progress% or list index.
+ *
+ * Terminal-success thresholds used by UI/tests:
+ * dry=30 plan=40 approved=50 backup=60 shadowDb=70 shadowVerify=80
+ * shadowFiles=90 smoke=100 maint=110 pca=120 import=130 uploads=140 finalize/complete=160
+ */
+function orange_restore_fw_guided_status_rank(string $status): ?int
+{
+    static $ranks = [
+        ORANGE_RESTORE_FW_STATUS_QUEUED => 10,
+        ORANGE_RESTORE_FW_STATUS_PREPARING => 10,
+        ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION => 20,
+        ORANGE_RESTORE_FW_STATUS_DRY_RUNNING => 20,
+        ORANGE_RESTORE_FW_STATUS_DRY_FAILED => 20,
+        ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED => 30,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_PRECHECK => 35,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY => 40,
+        ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL => 40,
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION => 50,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING => 55,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING => 55,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING => 55,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED => 55,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY => 60,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING => 65,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING => 65,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING => 65,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED => 65,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 70,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING => 75,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY => 75,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 80,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_RUNNING => 85,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING => 85,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED => 85,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY => 90,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING => 95,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING => 95,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED => 95,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED => 95,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY => 100,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING => 100,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY => 100,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW => 100,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED => 105,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING => 105,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE => 110,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING => 125,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING => 125,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING => 125,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED => 125,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY => 130,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING => 135,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING => 135,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING => 135,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED => 135,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY => 140,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_PENDING => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_RUNNING => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_VERIFYING => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_RUNNING => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED => 145,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY => 148,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING => 150,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING => 150,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED => 160,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED => 160,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED => 160,
+        ORANGE_RESTORE_FW_STATUS_COMPLETED => 160,
+        ORANGE_RESTORE_FW_STATUS_CANCELLED => 0,
+        ORANGE_RESTORE_FW_STATUS_FAILED => 0,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED => 0,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED => 0,
+    ];
+
+    if ($status === '') {
+        return null;
+    }
+
+    return array_key_exists($status, $ranks) ? $ranks[$status] : null;
+}
+
+/**
+ * Authoritative guided journey states for Restore Center (indices 0..15).
+ * has_* artifact flags must NOT drive terminal-success; rank + PCA flag only.
+ *
+ * @param array<string, mixed> $job
+ * @return array{
+ *   current_index:int,
+ *   states:list<string>,
+ *   unknown:bool,
+ *   rank:?int,
+ *   step_key:string,
+ *   terminal_success:bool
+ * }
+ */
+function orange_restore_fw_guided_journey_authority(string $status, array $job = []): array
+{
+    $keys = [
+        'select_package', 'create_job', 'dry_validation', 'prepare_plan', 'final_approval',
+        'pre_backup', 'shadow_restore', 'shadow_verify', 'shadow_files', 'shadow_smoke',
+        'maintenance', 'pca', 'prod_import', 'uploads', 'finalize', 'completed',
+    ];
+    $n = count($keys);
+    $states = array_fill(0, $n, 'locked');
+    $rank = orange_restore_fw_guided_status_rank($status);
+
+    if ($rank === null) {
+        $states[0] = 'blocked';
+
+        return [
+            'current_index' => 0,
+            'states' => $states,
+            'unknown' => true,
+            'rank' => null,
+            'step_key' => $keys[0],
+            'terminal_success' => false,
+        ];
+    }
+
+    // Terminal/cancelled framework statuses do not drive the live wizard.
+    if (in_array($status, orange_restore_fw_transition_terminal_statuses(), true)
+        && !in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_COMPLETED,
+        ], true)) {
+        $states[0] = 'blocked';
+
+        return [
+            'current_index' => 0,
+            'states' => $states,
+            'unknown' => false,
+            'rank' => $rank,
+            'step_key' => $keys[0],
+            'terminal_success' => false,
+        ];
+    }
+
+    $pcaDone = !empty($job['production_cutover_authorized']) || $rank >= 125;
+
+    if ($rank >= 160) {
+        $current = 15;
+    } elseif ($rank >= 148 || $rank >= 145) {
+        // Rollback / finalize branch surfaces on finalize step.
+        $current = 14;
+    } elseif ($rank >= 140) {
+        $current = 14;
+    } elseif ($rank >= 130) {
+        $current = 13;
+    } elseif ($rank >= 125) {
+        $current = 12;
+    } elseif ($rank >= 110) {
+        $current = $pcaDone ? 12 : 11;
+    } elseif ($rank >= 100) {
+        $current = 10;
+    } elseif ($rank >= 90) {
+        $current = 9;
+    } elseif ($rank >= 80) {
+        $current = 8;
+    } elseif ($rank >= 70) {
+        $current = 7;
+    } elseif ($rank >= 60) {
+        $current = 6;
+    } elseif ($rank >= 50) {
+        $current = 5;
+    } elseif ($rank >= 40) {
+        $current = 4;
+    } elseif ($rank >= 30) {
+        $current = 3;
+    } elseif ($rank >= 10) {
+        $current = 2;
+    } else {
+        $current = 0;
+    }
+
+    // Exact terminal-success statuses advance current to the *next* step (except final).
+    $terminalAdvance = [
+        ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED => 3,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY => 4,
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION => 5,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY => 6,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 7,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 8,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY => 9,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY => 10,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY => 10,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE => $pcaDone ? 12 : 11,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY => 13,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY => 14,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED => 15,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED => 15,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED => 15,
+        ORANGE_RESTORE_FW_STATUS_COMPLETED => 15,
+    ];
+    if (isset($terminalAdvance[$status])) {
+        $current = $terminalAdvance[$status];
+    }
+
+    for ($i = 0; $i < $current; $i++) {
+        $states[$i] = 'done';
+    }
+    if ($current === 15 && in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_COMPLETED,
+    ], true)) {
+        $states[15] = 'done';
+    } else {
+        $states[$current] = 'current';
+        for ($i = $current + 1; $i < $n; $i++) {
+            $states[$i] = 'locked';
+        }
+    }
+
+    // In-flight / failed → blocked marker on current (still not done).
+    if (preg_match('/_(running|verifying|pending|failed)$/', $status) === 1
+        || in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+            ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
+        ], true)) {
+        if ($states[$current] === 'current') {
+            // pending/failed stay actionable current; running/verifying → blocked
+            if (preg_match('/_(running|verifying)$/', $status) === 1
+                || $status === ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY
+                || $status === ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED) {
+                $states[$current] = 'blocked';
+            }
+        }
+    }
+
+    return [
+        'current_index' => $current,
+        'states' => $states,
+        'unknown' => false,
+        'rank' => $rank,
+        'step_key' => $keys[$current] ?? $keys[0],
+        'terminal_success' => ($states[15] ?? '') === 'done',
+    ];
+}
+
+/**
  * @param array<string, mixed> $job
  * @return array<string, mixed>
  */
@@ -770,11 +1017,20 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
                 ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
+        // Terminal-success / fail flags for journey authority (has_* remains artifact/presence only).
+        'is_pre_restore_backup_ready' => $status === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY
+            || orange_restore_fw_guided_status_rank($status) >= 60,
+        'is_pre_restore_backup_failed' => $status === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
         'pre_restore_backup_status' => (string) ($job['pre_restore_backup_status'] ?? ''),
         'shadow_restore_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
             ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
         ], true) && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'is_shadow_restore_ready' => $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY
+            || orange_restore_fw_guided_status_rank($status) >= 70,
+        'is_shadow_restore_failed' => $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+        'production_cutover_authorized' => !empty($job['production_cutover_authorized']),
+        'guided_journey' => orange_restore_fw_guided_journey_authority($status, $job),
         'has_shadow_restore' => !empty($job['shadow_restore_file'])
             || in_array($status, [
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,

@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Restore Center orchestration: schedule an approved CLI worker (detached).
+ * Restore Center orchestration: schedule an approved internal worker (detached).
  * HTTP returns immediately — does not wait for the worker.
- * Server-side stage validation + atomic claim (orchestrator layer only).
+ * Server-side stage/status fence + atomic claim (orchestrator layer only).
+ * Operator must never receive CLI/Plesk/Terminal handoff.
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
@@ -55,7 +56,7 @@ try {
     }
 
     $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
-    $result = orange_restore_center_run_worker(
+    $result = orange_restore_center_request_and_schedule(
         $projectRoot,
         $workRoot,
         $jobId,
@@ -75,13 +76,16 @@ try {
         'detached' => true,
         'scheduled' => true,
         'http_waits_for_worker' => false,
+        'cli_needed' => false,
+        'cli_command' => '',
+        'operator_action_required' => false,
         'worker' => (string) ($result['worker'] ?? $worker),
         'pid' => (int) ($result['pid'] ?? 0),
         'message' => (string) ($result['message'] ?? 'Worker scheduled.'),
         'job' => $fresh,
         'diagnostics' => is_array($result['diagnostics'] ?? null) ? $result['diagnostics'] : [
             'code' => 'ok',
-            'reason_ar' => 'تم جدولة العامل بنجاح.',
+            'reason_ar' => 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.',
         ],
         'csrf_token' => orange_backup_admin_csrf_token(),
     ]);

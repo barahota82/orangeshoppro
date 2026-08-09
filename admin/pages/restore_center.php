@@ -197,7 +197,7 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-wizard-stepnum{display:inline-flex;align-items:center;gap:8px;margin:0 0 10px;padding:4px 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;font-size:.78rem;font-weight:700;color:#c2410c}
 .rc-guide-now-kicker{margin:0 0 4px;font-size:.8rem;color:var(--rc-muted);font-weight:700;letter-spacing:.02em}
 .rc-guide-now-title{margin:0 0 10px;font-size:1.35rem;font-weight:800;color:var(--rc-ink);line-height:1.3}
-.rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.55;max-width:none}
+.rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.55;max-width:none;white-space:pre-wrap}
 .rc-guide-now-block{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.9rem;line-height:1.55}
 /* Workflow action row: Cancel LEFT · Primary RIGHT (Owner 2026-07-24) — LTR row inside RTL page */
 .rc-guide-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;width:100%;direction:ltr}
@@ -936,14 +936,20 @@ body.rc-modal-open{overflow:hidden!important}
         });
     };
 
+    /**
+     * Operator-facing status badge — Arabic labels only.
+     * RESTORE_CENTER_ORCH_RAW_STATE_VISIBLE_01: never show raw snake_case tokens in UI.
+     * Unmapped internal statuses fail closed to a safe Arabic placeholder.
+     */
     const badge = (status) => {
-        const s = String(status || '').toLowerCase();
+        const raw = String(status || '');
+        const s = raw.toLowerCase();
         let cls = 'rc-badge--muted';
         if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready' || s === 'country_shadow_verified' || s === 'ready' || s === 'country_dry_run_safe' || s === 'safe') cls = 'rc-badge--success';
         else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review' || s === 'country_shadow_warning' || s === 'country_dry_run_warning') cls = 'rc-badge--warning';
         else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked' || s === 'country_shadow_not_ready' || s === 'country_dry_run_failed') cls = 'rc-badge--failed';
         else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running' || s === 'country_shadow_verifying' || s === 'country_dry_run_running') cls = 'rc-badge--running';
-        let label = status || '—';
+        let label = '';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
         if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
         if (s === 'country_shadow_verifying') label = 'جارٍ تحقق ظل الدولة';
@@ -1009,6 +1015,14 @@ body.rc-modal-open{overflow:hidden!important}
         if (s === 'pending') label = 'معلّق';
         if (s === 'inactive') label = 'غير مفعّل';
         if (s === 'بانتظار') label = 'بانتظار';
+        // Already-Arabic / short UI labels (not internal tokens)
+        if (label === '' && raw !== '' && /[\u0600-\u06FF]/.test(raw)) label = raw;
+        if (label === '' && (s === 'ناجح' || s === 'فشل' || s === 'مكتملة' || s === 'ملغاة' || s === 'جاهز' || s === 'معلّق' || s === 'جارٍ')) label = raw;
+        // Fail closed: never leak snake_case / internal machine tokens to the operator surface.
+        if (label === '') {
+            if (s === '' || s === '—' || s === '-') label = '—';
+            else label = 'حالة غير معروضة';
+        }
         return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const statusLabelAr = (status) => {
@@ -1064,6 +1078,21 @@ body.rc-modal-open{overflow:hidden!important}
             .replace(/Application files have NOT been switched\./gi, 'ملفات التطبيق لم تُبدَّل بعد.')
             .replace(/\s{2,}/g, ' ')
             .trim();
+    };
+    /** Operator-facing job.message — never leak English dispatch / CLI jargon. */
+    const operatorJobMessage = (msg) => {
+        let s = String(msg || '');
+        if (/Worker\s+dispatch\s+failed/i.test(s) || /retry from Restore Center/i.test(s)) {
+            return 'تعذر بدء عامل التنفيذ — يمكن إعادة المحاولة من شاشة الاسترداد.';
+        }
+        if (/بدون\s*تسليم\s*CLI/i.test(s) || /\bCLI\b/i.test(s) || /no[-_ ]?cli/i.test(s)) {
+            return 'يستمر التنفيذ تلقائيًا على الخادم.';
+        }
+        s = operatorMessage(s);
+        if (/Worker\s+dispatch\s+failed/i.test(s) || /retry from Restore Center/i.test(s)) {
+            return 'تعذر بدء عامل التنفيذ — يمكن إعادة المحاولة من شاشة الاسترداد.';
+        }
+        return s;
     };
     function closeRcResultDialog() {
         const backdrop = el('rc_result_dialog_backdrop');
@@ -1290,7 +1319,7 @@ body.rc-modal-open{overflow:hidden!important}
     /** In-flight schedule keys (jobId::worker) — UI guard; server enforces atomic lock. */
     const rcScheduleInFlight = new Set();
 
-    /** Schedule approved CLI worker (detached). HTTP returns immediately; poll status via loadAll. */
+    /** Schedule approved internal worker (detached). One server call — no operator CLI/Plesk/Terminal. */
     async function runRestoreWorker(jobId, workerKey, busyText) {
         const key = String(jobId || '') + '::' + String(workerKey || '');
         if (!jobId || !workerKey) {
@@ -1300,7 +1329,7 @@ body.rc-modal-open{overflow:hidden!important}
             throw new Error('هذه المرحلة تعمل بالفعل لهذه المهمة. لن تُشغَّل مجدداً.');
         }
         rcScheduleInFlight.add(key);
-        setBusy(true, busyText || 'جاري جدولة التنفيذ على الخادم…');
+        setBusy(true, busyText || 'جاري بدء التنفيذ على الخادم…');
         try {
             const j = await apiPost('job/run-worker.php', {
                 csrf_token: state.csrf,
@@ -1310,7 +1339,7 @@ body.rc-modal-open{overflow:hidden!important}
             if (j.csrf_token) state.csrf = j.csrf_token;
             if (!j.success || !j.scheduled) {
                 const fail = new Error(
-                    (j.diagnostics && j.diagnostics.reason_ar) || j.message || 'فشل جدولة المرحلة'
+                    (j.diagnostics && j.diagnostics.reason_ar) || j.message || 'تعذر بدء عامل التنفيذ'
                 );
                 fail.code = j.code || '';
                 fail.diagnostics = j.diagnostics || null;
@@ -1322,21 +1351,23 @@ body.rc-modal-open{overflow:hidden!important}
         }
     }
 
-    /** Request metadata step then schedule the matching approved worker (detached). */
+    /**
+     * Self-contained Restore Center action: single authoritative schedule call.
+     * Workers self-request from entry statuses — never leave pending without a consumer.
+     * RESTORE_CENTER_INTERNAL_WORKER_ORCHESTRATION_REQUIRED_01
+     * RESTORE_CENTER_OPERATOR_CLI_HANDOFF_FORBIDDEN_01
+     */
     async function requestThenRunWorker(requestPath, workerKey, jobId, busyRequest, busyRun) {
-        setBusy(true, busyRequest || 'جاري التحضير…');
-        const req = await apiPost(requestPath, {
-            csrf_token: state.csrf,
-            job_id: jobId
-        });
-        if (req.csrf_token) state.csrf = req.csrf_token;
-        if (req.cli_needed === false && !String((req.job || {}).status || '').endsWith('_pending')) {
-            return req;
-        }
-        return runRestoreWorker(jobId, workerKey, busyRun || 'جاري جدولة التنفيذ على الخادم…');
+        return runRestoreWorker(
+            jobId,
+            workerKey,
+            busyRun || busyRequest || 'جاري بدء التنفيذ على الخادم…'
+        );
     }
 
-    const RC_SCHEDULED_MSG = 'تم جدولة التنفيذ على الخادم. يمكنك إغلاق المتصفح بأمان — تابع الحالة من مركز الاسترداد.';
+    const RC_SCHEDULED_MSG = 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
+    const RC_PRE_BACKUP_SCHEDULED_MSG = 'تم بدء تنفيذ النسخة الاحتياطية الإلزامية.\nيمكنك مغادرة الصفحة، وسيستمر التنفيذ على الخادم.';
+    const RC_PRE_BACKUP_SCHEDULE_FAIL_MSG = 'تعذر بدء عامل تنفيذ النسخة الاحتياطية الإلزامية.\nلم يبدأ أي تنفيذ، ويمكن إعادة المحاولة من شاشة الاسترداد.';
 
     function deriveReadiness(ov, maint) {
         const counts = (ov && ov.job_counts) || {};
@@ -1628,13 +1659,13 @@ body.rc-modal-open{overflow:hidden!important}
                 '<span class="rc-acc-meta">' +
                     '<span class="rc-acc-when" dir="ltr">' + fmtTimestampDisplay(job.created_at, 'generated_at') + '</span>' +
                     badge(job.status) + dryBadge +
-                    '<span class="rc-muted">' + esc(String(job.phase || '—')) + ' · ' + esc(String(job.progress ?? 0)) + '%</span>' +
+                    '<span class="rc-muted">' + esc(statusLabelAr(job.phase || job.status || '—')) + ' · ' + esc(String(job.progress ?? 0)) + '%</span>' +
                 '</span>' +
                 '<span class="rc-acc-actions-inline">' + viewBtn + diagBtn + '</span>' +
             '</summary>' +
             '<div class="rc-acc-body">' +
                 '<p class="rc-muted" style="margin:0 0 8px;font-size:.82rem;">الحزمة: ' + esc(pkgLabel) + '</p>' +
-                '<p style="margin:0;font-size:.86rem;">' + esc(String(job.message || '—')) + '</p>' +
+                '<p style="margin:0;font-size:.86rem;">' + esc(operatorJobMessage(job.message || '—')) + '</p>' +
             '</div>' +
             '</details>'
         );
@@ -1714,6 +1745,59 @@ body.rc-modal-open{overflow:hidden!important}
             || (prefix === 'shadow_restore' && (s === 'shadow_restore_pending' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying'))
             || (prefix === 'rollback' && s.includes('rollback') && !s.includes('finaliz'));
     }
+
+    /**
+     * Authoritative guided-step rank (mirrors orange_restore_fw_guided_status_rank).
+     * NEVER uses progress%, list index, optimistic UI, or has_* artifact presence.
+     * RESTORE_CENTER_JOURNEY_HYDRATION_STATE_AUTHORITY_01
+     * Freeze: APPROVED_CREATE_BUTTON_POSITION_CHANGED=0; APPROVED_STEP1_BEHAVIOR_CHANGED=0; APPROVED_MOBILE_ORDER_CHANGED=0
+     */
+    function guidedStatusAuthorityRank(status) {
+        const s = String(status || '').toLowerCase();
+        const R = {
+            queued: 10, preparing: 10,
+            waiting_confirmation: 20, dry_running: 20, dry_failed: 20,
+            dry_completed: 30,
+            execution_precheck: 35, execution_plan_ready: 40, awaiting_final_approval: 40,
+            approved_waiting_execution: 50,
+            pre_restore_backup_pending: 55, pre_restore_backup_running: 55,
+            pre_restore_backup_verifying: 55, pre_restore_backup_failed: 55,
+            pre_restore_backup_ready: 60,
+            shadow_restore_pending: 65, shadow_restore_running: 65,
+            shadow_restore_verifying: 65, shadow_restore_failed: 65,
+            shadow_restore_ready: 70,
+            shadow_verifying: 75, shadow_not_ready: 75,
+            shadow_verified: 80,
+            shadow_files_running: 85, shadow_files_verifying: 85, shadow_files_failed: 85,
+            shadow_files_ready: 90,
+            shadow_smoke_pending: 95, shadow_smoke_running: 95, shadow_smoke_failed: 95,
+            cutover_readiness_blocked: 95,
+            shadow_smoke_ready: 100, shadow_smoke_warning: 100,
+            cutover_readiness_ready: 100, cutover_readiness_manual_review: 100,
+            maintenance_requested: 105, maintenance_validating: 105,
+            maintenance_active: 110,
+            production_import_pending: 125, production_import_running: 125,
+            production_import_verifying: 125, production_import_failed: 125,
+            production_import_ready: 130,
+            uploads_cutover_pending: 135, uploads_cutover_running: 135,
+            uploads_cutover_verifying: 135, uploads_cutover_failed: 135,
+            uploads_cutover_ready: 140,
+            rollback_pending: 145, rollback_database_running: 145, rollback_database_verifying: 145,
+            rollback_files_running: 145, rollback_files_verifying: 145, rollback_failed: 145,
+            rollback_ready: 148,
+            restore_finalizing: 150, rollback_finalizing: 150,
+            restore_completed: 160, rollback_completed: 160, execution_completed: 160, completed: 160,
+            cancelled: 0, failed: 0, execution_cancelled: 0, execution_failed: 0
+        };
+        return Object.prototype.hasOwnProperty.call(R, s) ? R[s] : null;
+    }
+
+    /** Terminal-success thresholds — step is done only at/after these ranks. */
+    const GUIDED_DONE_RANK = {
+        dry: 30, plan: 40, approved: 50, backup: 60, shadowDb: 70,
+        shadowVerify: 80, shadowFiles: 90, smoke: 100, maint: 110,
+        pca: 120, import: 130, uploads: 140
+    };
 
     /**
      * Resolve single current guided step + one primary action (UI only).
@@ -1856,28 +1940,35 @@ body.rc-modal-open{overflow:hidden!important}
         states[0] = 'done';
         states[1] = 'done';
 
-        const dryDone = !!(job.has_dry_run_report || job.dry_run_overall_result || String(job.status || '').includes('dry_completed') || job.prepare_execution_available || job.has_execution_plan || job.final_approval_available || job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup);
-        const planDone = !!(job.has_execution_plan || job.final_approval_available || job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup);
-        const approved = !!(job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup || job.shadow_restore_requestable || job.has_shadow_restore || stIncludes(job, 'pre_restore') || stIncludes(job, 'shadow') || stIncludes(job, 'maintenance') || stIncludes(job, 'production') || stIncludes(job, 'uploads') || stIncludes(job, 'finaliz'));
-        const backupDone = !!(job.has_pre_restore_backup || job.is_pre_restore_backup_ready || job.shadow_restore_requestable || job.has_shadow_restore || stIncludes(job, 'shadow') || (job.status || '').includes('pre_restore_backup_ready'));
-        const shadowDbDone = !!(job.has_shadow_restore && (job.shadow_verification_runnable || job.has_shadow_verification || job.shadow_files_runnable || job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke))
-            || !!(job.status === 'shadow_restore_ready' || job.status === 'shadow_verified' || job.status === 'shadow_files_ready' || job.has_shadow_verification || job.has_shadow_files || job.has_shadow_smoke);
-        const shadowVerifyDone = !!(job.has_shadow_verification || job.shadow_files_runnable || job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke || job.status === 'shadow_verified' || job.status === 'shadow_files_ready');
-        const shadowFilesDone = !!(job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke || job.status === 'shadow_files_ready' || job.status === 'shadow_smoke_ready' || job.status === 'cutover_readiness_ready');
-        const smokeDone = !!(job.has_shadow_smoke || job.has_cutover_readiness || job.maintenance_requestable || job.is_maintenance_ready || job.is_maintenance_active || job.production_import_requestable);
-        const maintActive = !!(job.is_maintenance_active);
-        const maintReady = !!(job.is_maintenance_ready || job.maintenance_activatable);
-        const pcaDone = !!(job.production_import_requestable || job.has_production_import || job.is_production_import_ready || stIncludes(job, 'production_import') || stIncludes(job, 'uploads') || stIncludes(job, 'finaliz'));
-        // PCA done when import becomes requestable (or later). Import done when uploads path opens or import ready.
-        const importDone = !!(
-            job.uploads_cutover_requestable
-            || job.has_uploads_cutover
-            || job.is_uploads_cutover_ready
-            || job.finalize_requestable
-            || (job.is_production_import_ready && !job.is_production_import_failed)
-            || (job.has_production_import && !job.is_production_import_failed && (job.uploads_cutover_requestable || job.is_production_import_ready))
+        // Authority: prefer server guided_journey; else matrix rank. Never treat has_* pending as done.
+        const authRank = guidedStatusAuthorityRank(job.status);
+        const gj = (job.guided_journey && typeof job.guided_journey === 'object') ? job.guided_journey : null;
+        if (authRank === null && !(gj && gj.unknown === false)) {
+            setCurrent(2, 'حالة المهمة غير معروفة للنظام. حدّث الصفحة أو راجع التشخيص.');
+            blockReason = 'حالة غير معروفة — لن تُعرض الخطوة كمكتملة.';
+            states[2] = 'blocked';
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        const rank = (gj && typeof gj.rank === 'number') ? gj.rank : (authRank === null ? -1 : authRank);
+        const dryDone = rank >= GUIDED_DONE_RANK.dry;
+        const planDone = rank >= GUIDED_DONE_RANK.plan;
+        const approved = rank >= GUIDED_DONE_RANK.approved;
+        // Step 6 terminal-success ONLY: ready rank / is_pre_restore_backup_ready / later — NOT has_pre_restore_backup (true on pending).
+        const backupDone = !!(
+            rank >= GUIDED_DONE_RANK.backup
+            || job.is_pre_restore_backup_ready
+            || job.shadow_restore_requestable
         );
-        const uploadsDone = !!(job.is_uploads_cutover_ready || job.finalize_requestable || job.status === 'uploads_cutover_ready');
+        const shadowDbDone = rank >= GUIDED_DONE_RANK.shadowDb || !!job.is_shadow_restore_ready;
+        const shadowVerifyDone = rank >= GUIDED_DONE_RANK.shadowVerify || job.status === 'shadow_verified';
+        const shadowFilesDone = rank >= GUIDED_DONE_RANK.shadowFiles || job.status === 'shadow_files_ready';
+        const smokeDone = rank >= GUIDED_DONE_RANK.smoke;
+        const maintActive = !!(job.is_maintenance_active) || rank >= GUIDED_DONE_RANK.maint;
+        const maintReady = !!(job.is_maintenance_ready || job.maintenance_activatable);
+        // PCA: maintenance_active alone is NOT enough; need authorization flag or import-stage rank.
+        const pcaDone = !!(job.production_cutover_authorized) || rank >= GUIDED_DONE_RANK.pca;
+        const importDone = rank >= GUIDED_DONE_RANK.import || !!job.is_production_import_ready;
+        const uploadsDone = rank >= GUIDED_DONE_RANK.uploads || !!job.is_uploads_cutover_ready;
 
         if (!dryDone && job.dry_run_available) {
             setCurrent(2, 'نفّذ التحقق التشغيلي للمهمة. هذا هو الإجراء التالي الوحيد.');
@@ -1928,15 +2019,22 @@ body.rc-modal-open{overflow:hidden!important}
 
         if (!backupDone) {
             if (job.pre_restore_backup_requestable) {
-                setCurrent(5, 'نفّذ النسخة الاحتياطية الإلزامية قبل الاسترداد.');
+                setCurrent(5, 'نفّذ النسخة الاحتياطية الإلزامية قبل الاسترداد. لا تُعتبر هذه الخطوة مكتملة قبل جهوزية النسخة.');
                 primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد', true);
             } else if (job.status === 'pre_restore_backup_pending' || job.is_pre_restore_backup_failed) {
-                setCurrent(5, 'تابع تنفيذ النسخة الاحتياطية.');
+                setCurrent(5, job.is_pre_restore_backup_failed
+                    ? 'فشل إعداد النسخة الاحتياطية. أعد التنفيذ ثم حدّث الحالة.'
+                    : 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة. تابع التنفيذ أو حدّث الحالة بعد انتهاء العامل.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'pre_restore_backup' }, 'متابعة النسخة الاحتياطية', true);
             } else if (isRunningish(job, 'pre_restore_backup') || stIncludes(job, 'pre_restore_backup_running') || stIncludes(job, 'pre_restore_backup_verifying')) {
-                setCurrent(5, 'النسخة الاحتياطية جارية. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ — لا تضغط إجراءات أخرى.';
-                states[5] = 'blocked';
+                // Presentation-only: in-progress is current (orange), never failure-red "محظور".
+                // Authoritative completion still requires pre_restore_backup_ready (backupDone).
+                if (stIncludes(job, 'pre_restore_backup_verifying')) {
+                    setCurrent(5, 'اكتمل إنشاء النسخة، وجارٍ التحقق من جاهزيتها للاسترداد.');
+                } else {
+                    setCurrent(5, 'جارٍ تنفيذ النسخة الاحتياطية الإلزامية.\nستظل هذه الخطوة قيد التنفيذ حتى تصبح النسخة جاهزة.');
+                }
+                // states[5] remains 'current' from setCurrent — Step7 stays locked; no blockReason.
             } else {
                 setCurrent(5, 'بانتظار النسخة الاحتياطية الإلزامية.');
                 blockReason = 'خطوة النسخة الاحتياطية غير جاهزة للتنفيذ بعد.';
@@ -2213,7 +2311,14 @@ body.rc-modal-open{overflow:hidden!important}
                 : ('الخطوة ' + (g.current + 1) + ' من ' + GUIDED_STEPS.length);
         }
         if (el('rc_guide_kicker')) {
-            el('rc_guide_kicker').textContent = doneAll ? 'النتيجة' : (g.blockReason ? '! محظور الآن' : '▶ مطلوب الآن');
+            const runningishStep6 = !!(job && !g.blockReason && (
+                stIncludes(job, 'pre_restore_backup_running')
+                || stIncludes(job, 'pre_restore_backup_verifying')
+                || (isRunningish(job, 'pre_restore_backup') && g.current === 5)
+            ));
+            el('rc_guide_kicker').textContent = doneAll
+                ? 'النتيجة'
+                : (g.blockReason ? '! محظور الآن' : (runningishStep6 ? '▶ جارٍ التنفيذ' : '▶ مطلوب الآن'));
         }
         if (el('rc_guide_title')) el('rc_guide_title').textContent = step.title;
         if (el('rc_guide_body')) el('rc_guide_body').textContent = g.body || '';
@@ -2324,14 +2429,14 @@ body.rc-modal-open{overflow:hidden!important}
         meta.innerHTML =
             '<span><strong>المهمة</strong> <code>' + esc(job.job_id || '') + '</code></span>' +
             '<span>' + badge(job.status) + '</span>' +
-            '<span><strong>المرحلة</strong> ' + esc(String(job.phase || '—')) + '</span>' +
+            '<span><strong>المرحلة</strong> ' + esc(statusLabelAr(job.phase || job.status || '—')) + '</span>' +
             '<span><strong>التقدم</strong> ' + esc(String(job.progress ?? 0)) + '%</span>' +
-            '<span class="rc-muted">' + esc(String(job.message || '')) + '</span>';
+            '<span class="rc-muted">' + esc(operatorJobMessage(job.message || '')) + '</span>';
         // Guided workflow owns the single primary action — do not dump stage CTAs here.
         acts.innerHTML = '';
         if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(list.length);
         if (el('rc_mon_active')) el('rc_mon_active').textContent = job.job_id || '—';
-        if (el('rc_mon_phase')) el('rc_mon_phase').textContent = job.phase || '—';
+        if (el('rc_mon_phase')) el('rc_mon_phase').textContent = statusLabelAr(job.phase || job.status || '—');
         if (el('rc_mon_progress')) el('rc_mon_progress').textContent = String(job.progress ?? 0) + '%';
     }
 
@@ -2355,7 +2460,7 @@ body.rc-modal-open{overflow:hidden!important}
             el('rc_jobs_table').querySelector('tbody').innerHTML = historical.map((j) => {
                 const pkgLabel = (j.package_type || '') + (j.country_code ? ' / ' + j.country_code : '') + ' / ' + (j.package_id || '—');
                 const dryBadge = j.dry_run_overall_result ? ' ' + dryResultBadge(j.dry_run_overall_result) : '';
-                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at, 'generated_at') + '</td><td>' + badge(j.status) + dryBadge + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
+                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at, 'generated_at') + '</td><td>' + badge(j.status) + dryBadge + '</td><td>' + esc(statusLabelAr(j.phase || j.status || '—')) + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + esc(operatorJobMessage(j.message || '—')) + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
             }).join('');
         }
     }
@@ -2998,13 +3103,17 @@ body.rc-modal-open{overflow:hidden!important}
                     'job/request-pre-restore-backup.php',
                     'pre_restore_backup',
                     t.dataset.id || '',
-                    'جاري طلب إعداد النسخة الاحتياطية…',
-                    'جاري تنفيذ النسخة الاحتياطية من مركز الاسترداد…'
+                    'جاري بدء النسخة الاحتياطية الإلزامية…',
+                    'جاري بدء النسخة الاحتياطية الإلزامية…'
                 );
-                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_PRE_BACKUP_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ النسخة الاحتياطية', false);
+                const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || '';
+                showRcTerminalMessage(
+                    reason && reason.indexOf('تعمل بالفعل') !== -1 ? reason : RC_PRE_BACKUP_SCHEDULE_FAIL_MSG,
+                    false
+                );
             } finally {
                 setBusy(false);
             }

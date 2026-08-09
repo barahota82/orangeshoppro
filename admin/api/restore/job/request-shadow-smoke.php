@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orchestrator.php';
 
 restore_admin_api_require_post();
 
@@ -29,18 +30,33 @@ try {
         $jobId
     );
 
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin')) ?: 'admin';
+    $result = orange_restore_center_attach_verified_schedule(
+        $projectRoot,
+        (string) $ctx['work_root'],
+        $jobId,
+        'shadow_smoke',
+        $username,
+        $result
+    );
+
     json_response([
         'success' => true,
         'read_only_execution' => true,
         'execution_started' => false,
         'production_touched' => false,
         'production_cutover_allowed' => false,
-        'cli_needed' => (bool) ($result['cli_needed'] ?? true),
+        'cli_needed' => false,
+        'cli_command' => '',
+        'operator_action_required' => false,
+        'scheduled' => !empty($result['scheduled']),
+        'detached' => !empty($result['detached']),
         'idempotent' => (bool) ($result['idempotent'] ?? false),
         'job' => $result['job'] ?? null,
         'meta' => $result['meta'] ?? null,
+        'pid' => (int) ($result['pid'] ?? 0),
         'csrf_token' => orange_backup_admin_csrf_token(),
-        'message' => (string) ($result['message'] ?? 'Shadow smoke requested. CLI worker required.'),
+        'message' => (string) ($result['message'] ?? 'تم بدء اختبارات الجاهزية على الخادم.'),
         'warning' => 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.',
     ]);
 } catch (Throwable $e) {
@@ -52,10 +68,14 @@ try {
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'shadow_smoke_request_failed',
-        'message' => orange_restore_admin_safe_message($e),
+        'message' => $code !== '' && str_starts_with($code, 'restore_center_')
+            ? orange_restore_center_operator_reason_ar($code)
+            : orange_restore_admin_safe_message($e),
         'execution_started' => false,
         'production_touched' => false,
         'production_cutover_allowed' => false,
+        'cli_needed' => false,
+        'cli_command' => '',
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);
 }

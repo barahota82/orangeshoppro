@@ -35,6 +35,19 @@ const ORANGE_RESTORE_APPROVAL_TOKEN_FILENAME = 'approval_token.json';
  */
 function orange_restore_resolve_work_root(array $env, ?string $cliOverride = null): string
 {
+    // Test-only disposable work root (genuine-route / self-test gates). Never set in Production traffic.
+    if (isset($GLOBALS['orange_restore_test_work_root'])
+        && is_string($GLOBALS['orange_restore_test_work_root'])
+        && trim($GLOBALS['orange_restore_test_work_root']) !== '') {
+        $workRoot = orange_backup_normalize_directory_path(trim($GLOBALS['orange_restore_test_work_root']));
+        orange_backup_assert_outside_web_root($workRoot);
+        if (!is_dir($workRoot) && !@mkdir($workRoot, 0775, true) && !is_dir($workRoot)) {
+            throw new RuntimeException('orange_restore_test_work_root is not writable or cannot be created: ' . $workRoot);
+        }
+
+        return realpath($workRoot) ?: $workRoot;
+    }
+
     $backupRoot = orange_backup_resolve_root($env, $cliOverride);
     $configured = trim((string) ($env['ORANGE_RESTORE_WORK_DIR'] ?? ''));
     if ($configured !== '') {

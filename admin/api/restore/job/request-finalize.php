@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orchestrator.php';
 
 restore_admin_api_require_post();
 
@@ -29,12 +30,25 @@ try {
         $jobId
     );
 
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin')) ?: 'admin';
+    $result = orange_restore_center_attach_verified_schedule(
+        $projectRoot,
+        (string) $ctx['work_root'],
+        $jobId,
+        'finalize',
+        $username,
+        $result
+    );
+
     json_response([
         'success' => true,
         'metadata_only' => true,
         'http_never_finalize' => true,
-        'cli_needed' => (bool) ($result['cli_needed'] ?? true),
-        'cli_command' => (string) ($result['cli_command'] ?? ''),
+        'cli_needed' => false,
+        'cli_command' => '',
+        'operator_action_required' => false,
+        'scheduled' => !empty($result['scheduled']),
+        'detached' => !empty($result['detached']),
         'idempotent' => (bool) ($result['idempotent'] ?? false),
         'path' => (string) ($result['path'] ?? ''),
         'execution_started' => false,
@@ -50,9 +64,10 @@ try {
         'job' => $result['job'] ?? null,
         'meta' => $result['meta'] ?? null,
         'gates' => $result['gates'] ?? null,
+        'pid' => (int) ($result['pid'] ?? 0),
         'csrf_token' => orange_backup_admin_csrf_token(),
-        'message' => (string) ($result['message'] ?? 'Finalize Pending.'),
-        'warning' => (string) ($result['warning'] ?? 'CLI will release maintenance. Forensic artifacts retained.'),
+        'message' => (string) ($result['message'] ?? 'تم بدء إنهاء الاسترداد على الخادم.'),
+        'warning' => (string) ($result['warning'] ?? 'سيُفرج عن الصيانة عند اكتمال العامل الداخلي. تُحفظ الآثار الجنائية.'),
     ]);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
@@ -63,13 +78,17 @@ try {
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'finalize_request_failed',
-        'message' => orange_restore_admin_safe_message($e),
+        'message' => $code !== '' && str_starts_with($code, 'restore_center_')
+            ? orange_restore_center_operator_reason_ar($code)
+            : orange_restore_admin_safe_message($e),
         'execution_started' => false,
         'maintenance_released' => false,
         'restore_completed' => false,
         'rollback_completed' => false,
         'rollback_anchor_deleted' => false,
         'retention_pin_removed' => false,
+        'cli_needed' => false,
+        'cli_command' => '',
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);
 }

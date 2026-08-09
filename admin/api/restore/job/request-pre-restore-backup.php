@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orchestrator.php';
 
 restore_admin_api_require_post();
 
@@ -29,16 +30,31 @@ try {
         $jobId
     );
 
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin')) ?: 'admin';
+    $result = orange_restore_center_attach_verified_schedule(
+        $projectRoot,
+        (string) $ctx['work_root'],
+        $jobId,
+        'pre_restore_backup',
+        $username,
+        $result
+    );
+
     json_response([
         'success' => true,
         'read_only_execution' => true,
         'execution_started' => false,
-        'cli_needed' => (bool) ($result['cli_needed'] ?? true),
+        'scheduled' => !empty($result['scheduled']),
+        'detached' => !empty($result['detached']),
+        'cli_needed' => false,
+        'cli_command' => '',
+        'operator_action_required' => false,
         'idempotent' => (bool) ($result['idempotent'] ?? false),
         'job' => $result['job'] ?? null,
         'record' => $result['record'] ?? null,
+        'pid' => (int) ($result['pid'] ?? 0),
         'csrf_token' => orange_backup_admin_csrf_token(),
-        'message' => (string) ($result['message'] ?? 'Pre-restore backup requested. CLI worker required.'),
+        'message' => (string) ($result['message'] ?? 'تم بدء تنفيذ النسخة الاحتياطية الإلزامية.'),
         'warning' => 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.',
     ]);
 } catch (Throwable $e) {
@@ -50,8 +66,12 @@ try {
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'pre_restore_backup_request_failed',
-        'message' => orange_restore_admin_safe_message($e),
+        'message' => $code !== '' && str_starts_with($code, 'restore_center_')
+            ? orange_restore_center_operator_reason_ar($code)
+            : orange_restore_admin_safe_message($e),
         'execution_started' => false,
+        'cli_needed' => false,
+        'cli_command' => '',
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);
 }
