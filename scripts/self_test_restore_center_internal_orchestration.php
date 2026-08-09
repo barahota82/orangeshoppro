@@ -9,7 +9,8 @@ declare(strict_types=1);
  *   php scripts/self_test_restore_center_internal_orchestration.php
  *
  * Evidence (outside git):
- *   D:\orange_restore_internal_orchestration_evidence\
+ *   Windows: D:\orange_restore_internal_orchestration_evidence\
+ *   Other OS: sys_get_temp_dir()/orange_restore_internal_orchestration_evidence
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -70,7 +71,9 @@ function orch_rm_tree(string $dir): void
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_internal_orchestration_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_internal_orchestration_evidence'
+    : rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_restore_internal_orchestration_evidence';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
