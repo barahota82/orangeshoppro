@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Restore Center Step-1 — package selection + single upper Create action.
  *
  * Usage: php scripts/self_test_restore_center_step1_selection.php
- * Evidence: D:\orange_restore_step1_impl_evidence\
+ * Evidence: D:\orange_restore_step1_impl_evidence\ on Windows; system temp dir elsewhere.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -32,6 +32,20 @@ function r1_ok(bool $cond, string $label): void
         $fail++;
         echo "FAIL {$label}\n";
     }
+}
+
+function r1_evidence_dir(string $folder): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\' . $folder;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $folder;
+}
+
+function r1_evidence_file(string $folder, string $file): string
+{
+    return r1_evidence_dir($folder) . DIRECTORY_SEPARATOR . $file;
 }
 
 $pagePath = $projectRoot . '/admin/pages/restore_center.php';
@@ -129,21 +143,20 @@ r1_ok(str_contains($bc, 'executeBackupRun') && !str_contains($src, 'executeBacku
 r1_ok(preg_match_all('/window\.confirm\s*\(/', $src) === 2, 'confirm() cancel paths count unchanged (=2)');
 
 /* Reject prior synthetic/layout harnesses presented as actual-route proof. */
-$layoutHarness = 'D:\\orange_restore_step1_layout_evidence\\generate_layout_evidence.php';
-$implHarness = 'D:\\orange_restore_step1_impl_evidence\\generate_impl_evidence.php';
+$layoutHarness = r1_evidence_file('orange_restore_step1_layout_evidence', 'generate_layout_evidence.php');
 if (is_file($layoutHarness)) {
     $lh = (string) file_get_contents($layoutHarness);
     r1_ok(!str_contains($lh, 'Actual Production page composition') || !str_contains($lh, 'RESULT=PASS as actual-route'), 'layout harness must not be treated as actual-route gate');
     r1_ok(str_contains($lh, 'Minimal Admin shell') || str_contains($lh, 'evidence-banner') || str_contains($lh, 'Actual Production page composition'), 'detect synthetic layout harness markers for rejection path');
 }
-$mobileOrderManifest = 'D:\\orange_restore_step1_mobile_order_evidence\\restore_step1_mobile_order_manifest.json';
-$mobileOrderJourney = 'D:\\orange_restore_step1_mobile_order_evidence\\restore_step1_actual_journey_inventory.json';
+$mobileOrderManifest = r1_evidence_file('orange_restore_step1_mobile_order_evidence', 'restore_step1_mobile_order_manifest.json');
+$mobileOrderJourney = r1_evidence_file('orange_restore_step1_mobile_order_evidence', 'restore_step1_actual_journey_inventory.json');
 $actualManifest = is_file($mobileOrderManifest)
     ? $mobileOrderManifest
-    : 'D:\\orange_restore_step1_actual_route_evidence\\restore_step1_actual_route_manifest.json';
+    : r1_evidence_file('orange_restore_step1_actual_route_evidence', 'restore_step1_actual_route_manifest.json');
 $actualJourney = is_file($mobileOrderJourney)
     ? $mobileOrderJourney
-    : 'D:\\orange_restore_step1_actual_route_evidence\\restore_step1_actual_journey_inventory.json';
+    : r1_evidence_file('orange_restore_step1_actual_route_evidence', 'restore_step1_actual_journey_inventory.json');
 if (is_file($actualManifest) && is_file($actualJourney)) {
     $man = json_decode((string) file_get_contents($actualManifest), true);
     $inv = json_decode((string) file_get_contents($actualJourney), true);
@@ -169,7 +182,7 @@ if (is_file($actualManifest) && is_file($actualJourney)) {
     echo "CORE_RESTORE_STEP1_SELECTION_SKIP remains controlled by chrome unit path below\n";
 }
 
-$evidenceDir = 'D:\\orange_restore_step1_impl_evidence';
+$evidenceDir = r1_evidence_dir('orange_restore_step1_impl_evidence');
 @mkdir($evidenceDir . '/shots', 0775, true);
 @mkdir($evidenceDir . '/runtime', 0775, true);
 

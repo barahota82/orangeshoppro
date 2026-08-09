@@ -1527,8 +1527,6 @@ body.rc-modal-open{overflow:hidden!important}
         renderGuidedWorkflow();
         try { window.scrollTo(0, scrollY); } catch (err) { /* ignore */ }
         if (opts.focus !== false) {
-            const node = document.querySelector('[data-pkg-key="' + key.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]')
-                || document.querySelector('[data-rc-pkg-pick="1"][data-id="' + String(id || '').replace(/"/g, '') + '"][data-type="' + String(type || '') + '"]');
             // Prefer data-pkg-key via CSS.escape when available
             let focusNode = null;
             try {
