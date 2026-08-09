@@ -1020,7 +1020,9 @@ function orange_restore_center_run_worker(
             $workerKey
         );
         $pid = (int) ($spawned['pid'] ?? 0);
-        if ($pid <= 0 || !orange_restore_center_process_alive($pid)) {
+        // The platform-specific spawner already verifies a durable launch. On Windows,
+        // the returned PID can be a short-lived launcher while the PHP worker continues.
+        if ($pid <= 0) {
             throw new RuntimeException('restore_center_spawn_failed');
         }
 

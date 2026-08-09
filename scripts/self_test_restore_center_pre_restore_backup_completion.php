@@ -9,6 +9,10 @@ declare(strict_types=1);
  *
  * Usage:
  *   php scripts/self_test_restore_center_pre_restore_backup_completion.php
+ *
+ * Evidence (outside git):
+ *   Windows: D:\orange_restore_journey_refresh_authority_evidence\
+ *   Other OS: sys_get_temp_dir()/orange_restore_journey_refresh_authority_evidence
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -39,7 +43,9 @@ function s6_ok(bool $cond, string $label): void
     }
 }
 
-$evidenceDir = 'D:/orange_restore_journey_refresh_authority_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_journey_refresh_authority_evidence'
+    : rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_restore_journey_refresh_authority_evidence';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
