@@ -204,7 +204,7 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-guide-cancel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;order:1}
 .rc-guide-cancel:empty{display:none}
 .rc-guide-primary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;order:2;margin-inline-start:auto}
-#rc_guide_primary .rc-create-job{transform:translateY(6px)}
+#rc_guide_primary .rc-create-job{margin-top:6px}
 .rc-guide-primary .rc-btn-primary,.rc-guide-primary .btn-link.rc-btn-primary{font-size:1rem;min-height:44px;padding:10px 22px}
 .rc-guide-primary .rc-btn-primary:only-child,.rc-guide-primary .btn-link.rc-btn-primary:only-child{min-width:min(100%,280px)}
 .rc-guide-cancel .rc-fw-cancel,.rc-guide-cancel .btn-link.rc-fw-cancel{
