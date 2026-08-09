@@ -175,7 +175,12 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-modal-foot .btn-secondary,#rc_view_close,#rc_detail_close,#rc_orch_diag_close{background:#475569;color:#fff!important;border:0}
 /* True step-by-step restore wizard (Owner 2026-07-24) — presentation only */
 .rc-wizard{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:16px;margin-bottom:8px}
-@media (max-width:960px){.rc-wizard{grid-template-columns:1fr}}
+/* Mobile: current Step working content BEFORE complete 16-step journey rail (Owner RESTORE_CENTER_MOBILE_ACTIVE_STEP_BELOW_JOURNEY_RAIL_01). Desktop grid columns unchanged. */
+@media (max-width:960px){
+    .rc-wizard{grid-template-columns:1fr}
+    .rc-wizard-main{order:1}
+    .rc-wizard-rail{order:2}
+}
 .rc-wizard-rail{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:14px;padding:14px;max-height:min(78vh,720px);overflow:auto}
 .rc-wizard-rail h3{margin:0 0 4px;font-size:1rem}
 .rc-wizard-rail-hint{margin:0 0 12px;font-size:.78rem;color:var(--rc-muted);line-height:1.4}
@@ -218,10 +223,33 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-pkg-pick{border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .rc-pkg-pick+ .rc-pkg-pick{margin-top:8px}
 .rc-pkg-pick:hover{border-color:#fdba74}
+.rc-pkg-pick:focus{outline:2px solid rgba(234,88,12,.45);outline-offset:2px}
 .rc-pkg-pick.is-selected{border-color:var(--primary,#ea580c);box-shadow:0 0 0 2px rgba(234,88,12,.15);background:#fff7ed}
-.rc-pkg-pick.is-ineligible{cursor:default;opacity:.92}
+.rc-pkg-pick.is-ineligible,.rc-pkg-pick.is-unresolved{opacity:1}
 .rc-pkg-pick-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-pkg-pick-actions{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.rc-pkg-id{direction:ltr;unicode-bidi:isolate;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;word-break:break-word}
+.rc-selected-summary{margin:12px 0 0;padding:12px 14px;border:1px solid #fdba74;border-radius:12px;background:#fff7ed}
+.rc-selected-summary h4{margin:0 0 10px;font-size:.92rem;font-weight:700;color:var(--rc-ink)}
+.rc-selected-summary-empty{margin:10px 0 0;padding:10px 12px;border:1px dashed var(--rc-border);border-radius:10px;background:var(--rc-soft);color:var(--rc-muted);font-size:.88rem;line-height:1.5}
+.rc-selected-summary dl{margin:0;display:grid;gap:0}
+.rc-selected-summary .rc-sel-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #ffedd5;font-size:.88rem}
+.rc-selected-summary .rc-sel-row:last-child{border-bottom:0}
+.rc-selected-summary dt{margin:0;color:var(--rc-muted);font-weight:600}
+.rc-selected-summary dd{margin:0;font-weight:650;color:var(--rc-ink);text-align:left;max-width:100%;overflow-wrap:anywhere}
+.rc-selected-summary dd.rc-ltr{direction:ltr;unicode-bidi:isolate;font-family:ui-monospace,Consolas,monospace;font-size:.82rem}
+.rc-selected-summary-note{margin:10px 0 0;font-size:.84rem;line-height:1.5;color:#9a3412}
+.rc-result-dialog-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5400;padding:16px;box-sizing:border-box}
+.rc-result-dialog-backdrop.is-open{display:flex}
+.rc-result-dialog{background:#fff;border-radius:12px;max-width:min(760px,100%);width:100%;max-height:min(90vh,calc(100vh - 32px));display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);overflow:hidden;min-height:0;box-sizing:border-box}
+.rc-result-dialog-head{padding:18px 18px 0;flex:0 0 auto}
+.rc-result-dialog-head h3{margin:0 0 10px;font-size:1.05rem;overflow-wrap:anywhere}
+.rc-result-dialog-body{padding:0 18px;overflow:auto;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
+.rc-result-dialog-foot{padding:12px 18px 18px;flex:0 0 auto;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-start;gap:8px}
+.rc-result-dialog-summary{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;font-size:.92rem;line-height:1.55;margin:0 0 4px}
+.rc-result-dialog--ok .rc-result-dialog-summary{color:#166534}
+.rc-result-dialog--fail .rc-result-dialog-summary{color:#991b1b}
+.rc-result-dialog--fail .rc-result-dialog-head h3{color:#991b1b}
 /* Step 1 package list modes — mirror Backup Center history footer (Owner 2026-07-24) */
 .rc-mode-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:650;border:1px solid var(--rc-border);background:var(--rc-soft,#fff7ed);color:var(--rc-muted)}
 .rc-mode-pill.is-active{border-color:var(--primary,#ea580c);color:var(--primary,#ea580c);background:rgba(234,88,12,.1)}
@@ -239,7 +267,6 @@ body.rc-modal-open{overflow:hidden!important}
 
 <div class="rc-v2" id="rc_app">
     <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
-    <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
     <header class="rc-header">
         <div class="rc-header-main">
@@ -261,18 +288,20 @@ body.rc-modal-open{overflow:hidden!important}
     </header>
 
     <div class="rc-wizard" id="rc_guided_root">
-        <aside class="rc-wizard-rail" aria-label="رحلة الاسترداد">
+        <aside class="rc-wizard-rail" id="rc_journey_rail" aria-label="رحلة الاسترداد">
             <h3>رحلة الاسترداد</h3>
             <p class="rc-wizard-rail-hint">✔ مكتمل · ▶ مطلوب الآن · 🔒 مقفل · ! محظور</p>
             <ol class="rc-guide-steps" id="rc_guide_steps"></ol>
         </aside>
-        <div class="rc-wizard-main">
+        <div class="rc-wizard-main" id="rc_main_content_column">
             <section class="rc-wizard-hero" id="rc_guide_now" aria-live="polite">
                 <div class="rc-wizard-stepnum" id="rc_wizard_stepnum">الخطوة —</div>
                 <p class="rc-guide-now-kicker" id="rc_guide_kicker">▶ مطلوب الآن</p>
                 <h2 class="rc-guide-now-title" id="rc_guide_title">جاري تحديد الخطوة التالية…</h2>
                 <p class="rc-guide-now-body" id="rc_guide_body"></p>
+                <div id="rc_selected_summary" class="rc-selected-summary" hidden aria-live="polite"></div>
                 <div class="rc-guide-now-block" id="rc_guide_block" hidden></div>
+                <div class="rc-guide-now-block" id="rc_journey_inline" hidden aria-live="polite"></div>
                 <div class="rc-guide-actions" id="rc_guide_actions" dir="ltr">
                     <div class="rc-guide-cancel" id="rc_guide_cancel"></div>
                     <div class="rc-guide-primary" id="rc_guide_primary"></div>
@@ -613,6 +642,19 @@ body.rc-modal-open{overflow:hidden!important}
     </div>
 </div>
 
+<?php /* Step-1 / message-surface: centered Close-only dialog — no X / backdrop / Escape dismiss */ ?>
+<div id="rc_result_dialog_backdrop" class="rc-result-dialog-backdrop" aria-hidden="true" data-rc-result-dialog="1">
+    <div id="rc_result_dialog" class="rc-result-dialog" role="dialog" aria-modal="true" aria-labelledby="rc_result_dialog_title" tabindex="-1">
+        <div class="rc-result-dialog-head">
+            <h3 id="rc_result_dialog_title">نتيجة العملية</h3>
+        </div>
+        <div class="rc-result-dialog-body" id="rc_result_dialog_body"></div>
+        <div class="rc-result-dialog-foot">
+            <button type="button" class="btn-secondary" id="rc_result_dialog_close">إغلاق</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     const API_BASE = <?php echo json_encode($apiBase, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
@@ -635,11 +677,14 @@ body.rc-modal-open{overflow:hidden!important}
         lastMaintenance: null,
         openedStage: '',
         guidedAllowCreateJob: false,
+        /** @type {{ id:string, type:string, cc:string, key:string }|null} */
         selectedPackage: null,
         /** UI-only Step 1 list mode per tab: 'latest5' | 'all' */
         packageListMode: { full: 'latest5', country: 'latest5' },
         countryContextCode: COUNTRY_CONTEXT_CODE
     };
+    let rcResultDialogReturnFocus = null;
+    let rcResultDialogKeyHandler = null;
     /** Authoritative framework terminal statuses — same set as orange_restore_fw_transition_terminal_statuses(). */
     const FW_TERMINAL_STATUSES = new Set(<?php echo json_encode(array_values($fwTerminalStatuses), JSON_UNESCAPED_UNICODE); ?>);
 
@@ -659,8 +704,9 @@ body.rc-modal-open{overflow:hidden!important}
 
     /** Open/close Restore modals using Backup Center drawer sizing rules (viewport-bound + body scroll). */
     function syncRcModalScrollLock() {
-        const anyOpen = !!document.querySelector('.rc-modal-backdrop[data-rc-modal="1"][style*="flex"]');
-        document.body.classList.toggle('rc-modal-open', anyOpen);
+        const anyDrawer = !!document.querySelector('.rc-modal-backdrop[data-rc-modal="1"][style*="flex"]');
+        const resultOpen = !!(el('rc_result_dialog_backdrop') && el('rc_result_dialog_backdrop').classList.contains('is-open'));
+        document.body.classList.toggle('rc-modal-open', anyDrawer || resultOpen);
     }
     function openRcModal(backdropId) {
         const node = el(backdropId);
@@ -1018,11 +1064,92 @@ body.rc-modal-open{overflow:hidden!important}
             .replace(/\s{2,}/g, ' ')
             .trim();
     };
-    const showAlert = (msg, ok) => {
-        const box = el('rc_alert');
-        box.style.display = 'block';
-        box.innerHTML = '<div class="' + (ok ? 'alert-success' : 'alert-error') + '">' + esc(operatorMessage(msg)) + '</div>';
-    };
+    function closeRcResultDialog() {
+        const backdrop = el('rc_result_dialog_backdrop');
+        const dlg = el('rc_result_dialog');
+        if (!backdrop || !dlg) return;
+        backdrop.classList.remove('is-open');
+        backdrop.setAttribute('aria-hidden', 'true');
+        if (rcResultDialogKeyHandler) {
+            document.removeEventListener('keydown', rcResultDialogKeyHandler, true);
+            rcResultDialogKeyHandler = null;
+        }
+        const ret = rcResultDialogReturnFocus;
+        rcResultDialogReturnFocus = null;
+        syncRcModalScrollLock();
+        if (ret && typeof ret.focus === 'function' && document.contains(ret)) {
+            try { ret.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+        }
+    }
+    function openRcCenteredResultShell(opts) {
+        opts = opts || {};
+        const backdrop = el('rc_result_dialog_backdrop');
+        const dlg = el('rc_result_dialog');
+        const body = el('rc_result_dialog_body');
+        const titleEl = el('rc_result_dialog_title');
+        const closeBtn = el('rc_result_dialog_close');
+        if (!backdrop || !dlg || !body || !titleEl || !closeBtn) return;
+        titleEl.textContent = String(opts.title || 'رسالة النظام');
+        body.innerHTML = String(opts.bodyHtml || '');
+        const ok = !!opts.success;
+        const fail = opts.failure === true || (opts.failure == null && opts.success === false);
+        dlg.classList.toggle('rc-result-dialog--ok', ok);
+        dlg.classList.toggle('rc-result-dialog--fail', fail && !ok);
+        rcResultDialogReturnFocus = opts.sourceBtn && opts.sourceBtn.isConnected
+            ? opts.sourceBtn
+            : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        backdrop.classList.add('is-open');
+        backdrop.setAttribute('aria-hidden', 'false');
+        syncRcModalScrollLock();
+        if (rcResultDialogKeyHandler) {
+            document.removeEventListener('keydown', rcResultDialogKeyHandler, true);
+        }
+        rcResultDialogKeyHandler = (ev) => {
+            if (!backdrop.classList.contains('is-open')) return;
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+            }
+            if (ev.key !== 'Tab') return;
+            ev.preventDefault();
+            closeBtn.focus();
+        };
+        document.addEventListener('keydown', rcResultDialogKeyHandler, true);
+        try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+    }
+    /** CENTERED_SYSTEM_DIALOG / CENTERED_OPERATION_RESULT_DIALOG — never a top-page card. */
+    function showRcTerminalMessage(msg, ok, sourceBtn) {
+        clearRcJourneyInlineMessage();
+        const success = !!ok;
+        const text = operatorMessage(msg);
+        openRcCenteredResultShell({
+            title: success ? 'نتيجة العملية' : 'تعذر إتمام العملية',
+            bodyHtml: '<p class="rc-result-dialog-summary">' + esc(text || 'تعذر تنفيذ العملية.') + '</p>',
+            success: success,
+            failure: !success,
+            sourceBtn: sourceBtn || null
+        });
+    }
+    /** JOURNEY_STEP_INLINE_MESSAGE — soft step warnings/errors stay in the wizard hero (not centered). */
+    function showRcJourneyInlineMessage(msg) {
+        const host = el('rc_journey_inline');
+        if (!host) return;
+        const text = operatorMessage(msg);
+        if (!text) {
+            host.hidden = true;
+            host.textContent = '';
+            return;
+        }
+        host.hidden = false;
+        host.textContent = text;
+    }
+    function clearRcJourneyInlineMessage() {
+        const host = el('rc_journey_inline');
+        if (!host) return;
+        host.hidden = true;
+        host.textContent = '';
+    }
     const setBusy = (on, text) => {
         state.busy = on;
         el('rc_progress').style.display = on ? 'block' : 'none';
@@ -1279,13 +1406,47 @@ body.rc-modal-open{overflow:hidden!important}
         return html;
     }
 
-    /** Step 1: eligible packages expose create; ineligible show status only. */
+    /**
+     * Exact package identity (Owner Step-1):
+     * Full: full_disaster||<package_id>
+     * Country: country_recovery|<UPPERCASE_CC>|<package_id>
+     */
+    function normalizePackageCc(cc) {
+        return String(cc || '').trim().toUpperCase();
+    }
+    function packageKey(type, id, cc) {
+        const t = String(type || '');
+        const pid = String(id || '').trim();
+        if (t === 'country_recovery') {
+            return 'country_recovery|' + normalizePackageCc(cc) + '|' + pid;
+        }
+        return 'full_disaster||' + pid;
+    }
+    function packageEligibilityStatus(pkg) {
+        return String((pkg && (pkg.eligibility_status || pkg.restore_eligibility)) || '');
+    }
+    function canCreateForPackageType(type) {
+        if (type === 'full_disaster') return !!CAN_FULL;
+        if (type === 'country_recovery') return !!CAN_COUNTRY;
+        return false;
+    }
+    function findPackageByKey(key) {
+        const k = String(key || '');
+        const lists = [state.full || [], state.country || []];
+        for (let li = 0; li < lists.length; li++) {
+            for (let i = 0; i < lists[li].length; i++) {
+                const p = lists[li][i];
+                const t = String(p.package_type || (li === 0 ? 'full_disaster' : 'country_recovery'));
+                if (packageKey(t, p.package_id || '', p.country_code || '') === k) {
+                    return { pkg: p, type: t };
+                }
+            }
+        }
+        return null;
+    }
+    /** Cards never expose Create — upper Step-1 action only. */
     function packagePrimaryAction(pkg, type) {
-        const id = pkg.package_id || '';
-        const cc = pkg.country_code || '';
-        const eligible = (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible';
-        if (!eligible || !id) return '';
-        return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">إنشاء مهمة استرداد</button>';
+        return '';
     }
 
     /** Inspection-only helpers (not wizard primary path). */
@@ -1299,45 +1460,154 @@ body.rc-modal-open{overflow:hidden!important}
 
     function packageAccordionHtml(pkg, type) {
         const identity = String(pkg.package_id || '').trim();
+        const cc = String(pkg.country_code || '');
+        const key = packageKey(type, identity, cc);
         const whenHtml = fmtPackageWhenDisplay(pkg, type);
-        const countryBit = (!type || type === 'full_disaster')
-            ? ''
-            : (pkg.country_code ? String(pkg.country_code) + ' · ' : '');
+        const typeLabel = (type === 'country_recovery')
+            ? ('نسخة دولة' + (pkg.country_name || cc
+                ? (' — ' + (pkg.country_name ? String(pkg.country_name) : '') + (cc ? (' (' + String(cc).toUpperCase() + ')') : ''))
+                : ''))
+            : 'النسخة الشاملة';
         const idHtml = identity
-            ? '<span class="rc-pkg-id" dir="ltr" title="package_id">' + esc(countryBit + identity) + '</span>'
+            ? '<span class="rc-pkg-id" dir="ltr" title="package_id">' + esc(identity) + '</span>'
             : '';
-        const eligible = (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible';
+        const status = packageEligibilityStatus(pkg);
+        const eligible = status === 'eligible';
+        const unresolved = status === 'unknown';
         const sel = state.selectedPackage;
-        const isSelected = !!(sel && sel.id === identity && sel.type === type && eligible);
-        const createBtn = packagePrimaryAction(pkg, type);
-        // Details stay available for eligible and non-eligible (visibility ≠ eligibility).
+        const isSelected = !!(sel && sel.key === key);
+        // Details stay available for every eligibility state (visibility ≠ create permission).
         const detailBtn = identity
-            ? '<button type="button" class="btn-link rc-btn-ghost rc-pkg-detail" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(pkg.country_code || '') + '">معلومات الحزمة</button>'
+            ? '<button type="button" class="btn-link rc-btn-ghost rc-pkg-detail" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(cc) + '">معلومات الحزمة</button>'
             : '';
-        const actionsHtml = (createBtn || detailBtn)
-            ? ('<div class="rc-pkg-pick-actions">' + createBtn + detailBtn + '</div>')
+        const actionsHtml = detailBtn
+            ? ('<div class="rc-pkg-pick-actions">' + detailBtn + '</div>')
             : '';
+        const stateClass = eligible ? '' : (unresolved ? ' is-unresolved' : ' is-ineligible');
         return (
-            '<div class="rc-pkg-pick' + (isSelected ? ' is-selected' : '') + (eligible ? '' : ' is-ineligible') + '"' +
-            (eligible ? ' role="button" tabindex="0"' : ' role="group"') +
-            ' data-rc-pkg-pick="1" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(pkg.country_code || '') + '"' +
+            '<div class="rc-pkg-pick' + (isSelected ? ' is-selected' : '') + stateClass + '"' +
+            ' role="option" tabindex="0"' +
+            ' data-rc-pkg-pick="1" data-pkg-key="' + esc(key) + '" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(cc) + '"' +
             ' data-eligible="' + (eligible ? '1' : '0') + '"' +
-            ' aria-pressed="' + (isSelected ? 'true' : 'false') + '">' +
+            ' data-eligibility="' + esc(status || 'not_eligible') + '"' +
+            ' aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
                 '<div class="rc-pkg-pick-top">' +
+                    '<span class="rc-badge rc-badge--muted">' + esc(typeLabel) + '</span>' +
                     '<span class="rc-acc-when" dir="ltr">' + whenHtml + '</span>' +
                     idHtml +
                     badge(pkg.package_status || '—') +
                     eligibilityBadge(pkg) +
-                    (isSelected ? '<span class="rc-badge rc-badge--warning">مختارة</span>' : '') +
+                    (isSelected ? '<span class="rc-badge rc-badge--warning">محددة</span>' : '') +
                 '</div>' +
                 '<p class="rc-muted" style="margin:8px 0 0;font-size:.8rem;">المخطط: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · الخلفية: ' + esc(String(pkg.backend || '—')) +
                 (pkg.country_name ? (' · ' + esc(String(pkg.country_name))) : '') +
-                (eligible ? '' : (pkg.eligibility_reason_label_ar ? (' · ' + esc(String(pkg.eligibility_reason_label_ar))) : '')) +
+                ((!eligible && pkg.eligibility_reason_label_ar) ? (' · ' + esc(String(pkg.eligibility_reason_label_ar))) : '') +
                 '</p>' +
                 actionsHtml +
             '</div>'
         );
+    }
+
+    function applyPackageSelection(type, id, cc, opts) {
+        opts = opts || {};
+        clearRcJourneyInlineMessage();
+        const key = packageKey(type, id, cc);
+        const scrollY = window.scrollY || 0;
+        state.selectedPackage = {
+            id: String(id || '').trim(),
+            type: String(type || 'full_disaster'),
+            cc: normalizePackageCc(cc),
+            key: key
+        };
+        // Selection never POSTs / never creates a job (PACKAGE_SELECTION_TASK_MUTATION_COUNT = 0).
+        const kind = (state.selectedPackage.type === 'country_recovery') ? 'country' : 'full';
+        if (kind === 'full' && CAN_FULL) renderPackageList('full');
+        if (kind === 'country' && CAN_COUNTRY) renderPackageList('country');
+        renderGuidedWorkflow();
+        try { window.scrollTo(0, scrollY); } catch (err) { /* ignore */ }
+        if (opts.focus !== false) {
+            const node = document.querySelector('[data-pkg-key="' + key.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]')
+                || document.querySelector('[data-rc-pkg-pick="1"][data-id="' + String(id || '').replace(/"/g, '') + '"][data-type="' + String(type || '') + '"]');
+            // Prefer data-pkg-key via CSS.escape when available
+            let focusNode = null;
+            try {
+                focusNode = document.querySelector('[data-pkg-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+            } catch (e2) { focusNode = null; }
+            if (focusNode && typeof focusNode.focus === 'function') {
+                try { focusNode.focus({ preventScroll: true }); } catch (e3) { /* ignore */ }
+            }
+        }
+    }
+
+    function renderSelectedPackageSummary() {
+        const host = el('rc_selected_summary');
+        if (!host) return { canCreate: false };
+        const stepIsSelect = !pickActiveJob(state.jobs || []);
+        if (!stepIsSelect) {
+            host.hidden = true;
+            host.innerHTML = '';
+            return { canCreate: false };
+        }
+        const sel = state.selectedPackage;
+        if (!sel || !sel.key) {
+            host.hidden = false;
+            host.className = 'rc-selected-summary-empty';
+            host.innerHTML = '<strong>لم يتم اختيار حزمة استرداد بعد.</strong><br>اختر أي حزمة من القائمة أدناه لعرض بياناتها وحالة أهليتها، ثم أنشئ مهمة استرداد إذا كانت الحزمة مؤهلة.';
+            return { canCreate: false };
+        }
+        const found = findPackageByKey(sel.key);
+        if (!found) {
+            host.hidden = false;
+            host.className = 'rc-selected-summary-empty';
+            host.innerHTML = '<strong>لم يتم اختيار حزمة استرداد بعد.</strong><br>اختر أي حزمة من القائمة أدناه لعرض بياناتها وحالة أهليتها، ثم أنشئ مهمة استرداد إذا كانت الحزمة مؤهلة.';
+            state.selectedPackage = null;
+            return { canCreate: false };
+        }
+        const pkg = found.pkg;
+        const type = found.type;
+        const status = packageEligibilityStatus(pkg);
+        const eligible = status === 'eligible';
+        const unresolved = status === 'unknown';
+        const reason = String(pkg.eligibility_reason_label_ar || '');
+        const whenHtml = fmtPackageWhenDisplay(pkg, type);
+        let typeText = 'النسخة الشاملة';
+        let countryRow = '';
+        if (type === 'country_recovery') {
+            const cc = normalizePackageCc(pkg.country_code || sel.cc);
+            const name = String(pkg.country_name || '').trim();
+            typeText = 'نسخة دولة — ' + (name !== '' ? name : '—') + ' (' + (cc || '—') + ')';
+            countryRow = '<div class="rc-sel-row"><dt>الدولة</dt><dd>' + esc((name !== '' ? name + ' ' : '') + (cc ? '(' + cc + ')' : '—')) + '</dd></div>';
+        }
+        let statusText = 'غير مؤهلة للاسترداد';
+        let note = 'لا يمكن إنشاء مهمة استرداد من هذه الحزمة لأنها غير مؤهلة للاسترداد.';
+        if (eligible) {
+            statusText = 'مؤهلة للاسترداد';
+            note = '';
+        } else if (unresolved) {
+            statusText = 'غير محسومة';
+            note = 'لا يمكن إنشاء مهمة استرداد حتى تُحسم أهلية هذه الحزمة.';
+        }
+        const authorized = canCreateForPackageType(type);
+        let canCreate = eligible && authorized;
+        if (eligible && !authorized) {
+            note = 'لا تملك صلاحية إنشاء مهمة استرداد لهذا النوع من الحزم.';
+            canCreate = false;
+        }
+        host.hidden = false;
+        host.className = 'rc-selected-summary';
+        host.innerHTML =
+            '<h4>الحزمة المحددة</h4>' +
+            '<dl>' +
+            '<div class="rc-sel-row"><dt>نوع النسخة</dt><dd>' + esc(typeText) + '</dd></div>' +
+            countryRow +
+            '<div class="rc-sel-row"><dt>معرّف الحزمة</dt><dd class="rc-ltr" dir="ltr">' + esc(String(pkg.package_id || sel.id || '—')) + '</dd></div>' +
+            '<div class="rc-sel-row"><dt>تاريخ ووقت النسخة</dt><dd class="rc-ltr" dir="ltr">' + whenHtml + '</dd></div>' +
+            '<div class="rc-sel-row"><dt>حالة الاسترداد</dt><dd>' + esc(statusText) + '</dd></div>' +
+            ((!eligible && reason) ? ('<div class="rc-sel-row"><dt>السبب الآمن</dt><dd>' + esc(reason) + '</dd></div>') : '') +
+            '</dl>' +
+            (note ? ('<p class="rc-selected-summary-note">' + esc(note) + '</p>') : '');
+        return { canCreate: canCreate, sel: sel, pkg: pkg, type: type };
     }
 
     function jobAccordionHtml(job) {
@@ -1478,36 +1748,60 @@ body.rc-modal-open{overflow:hidden!important}
         if (!job) {
             showPackages = true;
             showJob = false;
-            // Auto-select sole eligible package so the operator has one clear next action.
+            // Normalize selection key; do not auto-create tasks. Sole eligible package may be pre-selected for convenience.
             if (!state.selectedPackage && eligible.length === 1) {
                 const p = eligible[0];
                 const pickType = (String(p.package_type || '') === 'country_recovery')
                     ? 'country_recovery'
                     : 'full_disaster';
-                state.selectedPackage = { id: String(p.package_id || ''), type: pickType, cc: String(p.country_code || '') };
+                state.selectedPackage = {
+                    id: String(p.package_id || ''),
+                    type: pickType,
+                    cc: normalizePackageCc(p.country_code || ''),
+                    key: packageKey(pickType, p.package_id || '', p.country_code || '')
+                };
+            } else if (state.selectedPackage && !state.selectedPackage.key) {
+                state.selectedPackage.key = packageKey(
+                    state.selectedPackage.type,
+                    state.selectedPackage.id,
+                    state.selectedPackage.cc
+                );
             }
-            const sel = state.selectedPackage;
-            const selOk = !!(sel && sel.id && eligible.some((p) => String(p.package_id || '') === sel.id));
 
             if (!pkgs.length) {
                 setCurrent(0, 'ابدأ من هنا: لا توجد حزم بعد. أنشئ نسخة احتياطية ثم حدّث الحالة.');
                 blockReason = 'لا حزم متاحة في السياق الحالي.';
                 states[0] = 'blocked';
-            } else if (!eligible.length) {
-                setCurrent(0, 'ابدأ من هنا: اختر حزمة مؤهلة من القائمة أدناه. لا توجد حزم مؤهلة حالياً.');
-                blockReason = 'لا توجد حزمة مؤهلة للاسترداد.';
-                states[0] = 'blocked';
-            } else if (!selOk) {
-                setCurrent(0, 'اختر حزمة مؤهلة من القائمة أدناه، ثم اضغط «إنشاء مهمة استرداد» على الحزمة أو من الزر الرئيسي بعد التحديد.');
+                primaryHtml = '';
+            } else if (!state.selectedPackage || !state.selectedPackage.key) {
+                setCurrent(0, 'اختر أي حزمة من القائمة أدناه لعرض بياناتها وحالة أهليتها، ثم أنشئ مهمة استرداد إذا كانت الحزمة مؤهلة.');
                 primaryHtml = '';
             } else {
-                // Stay on Step 1 (اختيار حزمة) — create is the primary action on this screen.
-                setCurrent(0, 'الحزمة محددة. اضغط «إنشاء مهمة استرداد» لبدء رحلة استرداد جديدة.');
-                primaryHtml = guidedBtn('rc-create-job', {
-                    'data-type': sel.type,
-                    'data-id': sel.id,
-                    'data-cc': sel.cc || ''
-                }, 'إنشاء مهمة استرداد', true);
+                const found = findPackageByKey(state.selectedPackage.key);
+                const st = found ? packageEligibilityStatus(found.pkg) : '';
+                const authorized = found ? canCreateForPackageType(found.type) : false;
+                if (found && st === 'eligible' && authorized) {
+                    setCurrent(0, 'الحزمة محددة ومؤهلة. اضغط «إنشاء مهمة استرداد» لبدء رحلة استرداد جديدة.');
+                    primaryHtml = guidedBtn('rc-create-job', {
+                        'data-type': state.selectedPackage.type,
+                        'data-id': state.selectedPackage.id,
+                        'data-cc': state.selectedPackage.cc || '',
+                        'data-pkg-key': state.selectedPackage.key
+                    }, 'إنشاء مهمة استرداد', true);
+                } else if (found && st === 'eligible' && !authorized) {
+                    setCurrent(0, 'الحزمة محددة ومؤهلة، لكن لا تتوفر صلاحية إنشاء مهمة لهذا النوع.');
+                    primaryHtml = '';
+                } else if (found && st === 'unknown') {
+                    setCurrent(0, 'الحزمة محددة وحالة أهليتها غير محسومة — راجع الملخص أدناه.');
+                    primaryHtml = '';
+                } else if (found) {
+                    setCurrent(0, 'الحزمة محددة وغير مؤهلة للاسترداد — راجع الملخص أدناه.');
+                    primaryHtml = '';
+                } else {
+                    setCurrent(0, 'اختر أي حزمة من القائمة أدناه لعرض بياناتها وحالة أهليتها، ثم أنشئ مهمة استرداد إذا كانت الحزمة مؤهلة.');
+                    primaryHtml = '';
+                    state.selectedPackage = null;
+                }
             }
             return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
         }
@@ -1956,12 +2250,25 @@ body.rc-modal-open{overflow:hidden!important}
         }
         if (el('rc_readiness_headline')) el('rc_readiness_headline').textContent = step.title;
         state.guidedAllowCreateJob = false;
+        renderSelectedPackageSummary();
         document.querySelectorAll('.rc-pkg-pick').forEach((node) => {
-            const id = node.getAttribute('data-id') || '';
-            const type = node.getAttribute('data-type') || '';
-            const on = !!(state.selectedPackage && state.selectedPackage.id === id && state.selectedPackage.type === type);
+            const key = node.getAttribute('data-pkg-key') || '';
+            const on = !!(state.selectedPackage && state.selectedPackage.key === key);
             node.classList.toggle('is-selected', on);
-            node.setAttribute('aria-pressed', on ? 'true' : 'false');
+            node.setAttribute('aria-selected', on ? 'true' : 'false');
+            // Keep badge text in sync without full rebuild when only aria toggled.
+            let badgeSel = node.querySelector('.rc-badge.rc-badge--warning');
+            if (on) {
+                if (!badgeSel || badgeSel.textContent !== 'محددة') {
+                    if (badgeSel) badgeSel.textContent = 'محددة';
+                    else {
+                        const top = node.querySelector('.rc-pkg-pick-top');
+                        if (top) top.insertAdjacentHTML('beforeend', '<span class="rc-badge rc-badge--warning">محددة</span>');
+                    }
+                }
+            } else if (badgeSel && badgeSel.textContent === 'محددة') {
+                badgeSel.remove();
+            }
         });
     }
 
@@ -2457,7 +2764,7 @@ body.rc-modal-open{overflow:hidden!important}
         try {
             const data = await apiGet('list.php');
             if (!data.read_only) {
-                showAlert('تحذير: الاستجابة ليست للقراءة فقط.', false);
+                showRcTerminalMessage('تحذير: الاستجابة ليست للقراءة فقط.', false);
             }
             renderOverview(data);
             renderMaintenance(data.maintenance || {});
@@ -2469,7 +2776,7 @@ body.rc-modal-open{overflow:hidden!important}
                 renderCertification({ available: false, message: (certErr && certErr.message) ? certErr.message : 'تعذر تحميل الشهادة' });
             }
         } catch (e) {
-            showAlert(e.message || 'تعذر التحميل', false);
+            showRcTerminalMessage(e.message || 'تعذر التحميل', false);
         } finally {
             setBusy(false);
         }
@@ -2491,7 +2798,7 @@ body.rc-modal-open{overflow:hidden!important}
             try {
                 await openOrchestratorDiagnostics(t.dataset.id || '');
             } catch (e) {
-                showAlert(e.message || 'تعذر فتح تشخيص التشغيل', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر فتح تشخيص التشغيل');
             }
             return;
         }
@@ -2520,7 +2827,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const body = j.data ? JSON.stringify(j.data, null, 2) : (j.raw_text || j.errors?.join('\n') || '');
                 openView(t.dataset.file || 'file', body);
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2536,7 +2843,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const j = await apiGet(q);
                 openView('معلومات الحزمة', JSON.stringify(j.package || {}, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2545,18 +2852,30 @@ body.rc-modal-open{overflow:hidden!important}
 
         if (t.classList.contains('rc-create-job')) {
             try {
+                const type = t.dataset.type || '';
+                const id = t.dataset.id || '';
+                const cc = t.dataset.cc || '';
+                const btnKey = t.dataset.pkgKey || packageKey(type, id, cc);
+                if (state.selectedPackage && state.selectedPackage.key && state.selectedPackage.key !== btnKey) {
+                    showRcTerminalMessage('تعذر إنشاء المهمة: الحزمة المحددة غير متطابقة مع زر الإنشاء.', false, t);
+                    return;
+                }
+                if (!canCreateForPackageType(type)) {
+                    showRcTerminalMessage('لا تملك صلاحية إنشاء مهمة استرداد لهذا النوع من الحزم.', false, t);
+                    return;
+                }
                 setBusy(true, 'جاري إنشاء المهمة…');
                 const j = await apiPost('job/create.php', {
                     csrf_token: state.csrf,
-                    package_type: t.dataset.type || '',
-                    package_id: t.dataset.id || '',
-                    country_code: t.dataset.cc || ''
+                    package_type: type,
+                    package_id: id,
+                    country_code: cc
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert('تم إنشاء المهمة وتوقفت عند انتظار التأكيد.', true);
+                showRcTerminalMessage('تم إنشاء المهمة وتوقفت عند انتظار التأكيد.', true, t);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر إنشاء المهمة', false);
+                showRcTerminalMessage(e.message || 'تعذر إنشاء المهمة', false, t);
             } finally {
                 setBusy(false);
             }
@@ -2578,13 +2897,13 @@ body.rc-modal-open{overflow:hidden!important}
                 if (j.csrf_token) state.csrf = j.csrf_token;
                 const overall = ((j.report || {}).overall_result || '').toUpperCase();
                 const overallAr = overall === 'FAIL' ? 'فشل' : (overall === 'PASS' ? 'ناجح' : (overall || 'تم'));
-                showAlert('التحقق التشغيلي: ' + overallAr, overall === 'FAIL' ? false : true);
+                showRcTerminalMessage('التحقق التشغيلي: ' + overallAr, overall === 'FAIL' ? false : true);
                 if (j.report) {
                     openView('تقرير التحقق — ' + ((j.job || {}).job_id || ''), JSON.stringify(j.report, null, 2));
                 }
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر التحقق التشغيلي', false);
+                showRcTerminalMessage(e.message || 'تعذر التحقق التشغيلي', false);
             } finally {
                 setBusy(false);
             }
@@ -2597,7 +2916,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const j = await apiGet('job/dry-report.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 openView('تقرير التحقق — ' + (t.dataset.id || ''), JSON.stringify(j.report || {}, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2610,7 +2929,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const j = await apiGet('job/view.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 openView('مهمة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.job || {}, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2625,13 +2944,13 @@ body.rc-modal-open{overflow:hidden!important}
                     job_id: t.dataset.id || ''
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert('تم إعداد الخطة — بانتظار الموافقة النهائية. لم يتم تنفيذ أي استرداد حتى الآن.', true);
+                showRcTerminalMessage('تم إعداد الخطة — بانتظار الموافقة النهائية. لم يتم تنفيذ أي استرداد حتى الآن.', true);
                 if (j.plan) {
                     openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan, null, 2));
                 }
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر إعداد الخطة', false);
+                showRcTerminalMessage(e.message || 'تعذر إعداد الخطة', false);
             } finally {
                 setBusy(false);
             }
@@ -2644,7 +2963,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const j = await apiGet('job/execution-plan.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan || {}, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2665,7 +2984,7 @@ body.rc-modal-open{overflow:hidden!important}
                     }, null, 2)
                 );
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2681,10 +3000,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب إعداد النسخة الاحتياطية…',
                     'جاري تنفيذ النسخة الاحتياطية من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ النسخة الاحتياطية', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ النسخة الاحتياطية', false);
             } finally {
                 setBusy(false);
             }
@@ -2702,7 +3021,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: j.warning || 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2718,10 +3037,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب استعادة قاعدة الظل…',
                     'جاري تنفيذ استعادة قاعدة الظل من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ استعادة الظل', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ استعادة الظل', false);
             } finally {
                 setBusy(false);
             }
@@ -2741,7 +3060,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'استعادة الظل فقط — قاعدة الإنتاج لم تُعدَّل.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2761,7 +3080,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'تحقق الظل فقط — قاعدة الإنتاج لم تُعدَّل. نفّذ التحقق من مركز الاسترداد.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2782,7 +3101,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'ملفات الظل فقط — نظام ملفات الإنتاج لم يُعدَّل. نفّذ الاستخراج من مركز الاسترداد.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2798,10 +3117,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب اختبارات الجاهزية المعزولة…',
                     'جاري تنفيذ اختبارات الجاهزية من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ اختبارات الجاهزية', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ اختبارات الجاهزية', false);
             } finally {
                 setBusy(false);
             }
@@ -2823,7 +3142,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2838,14 +3157,14 @@ body.rc-modal-open{overflow:hidden!important}
                     job_id: t.dataset.id || ''
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert((j.message || 'الصيانة جاهزة') + ' — استرداد الإنتاج لم يبدأ بعد.', true);
+                showRcTerminalMessage((j.message || 'الصيانة جاهزة') + ' — استرداد الإنتاج لم يبدأ بعد.', true);
                 if (j.challenge && j.challenge.nonce) {
                     state.maintNonce = state.maintNonce || {};
                     state.maintNonce[t.dataset.id || ''] = j.challenge.nonce;
                 }
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر طلب الصيانة', false);
+                showRcTerminalMessage(e.message || 'تعذر طلب الصيانة', false);
             } finally {
                 setBusy(false);
             }
@@ -2868,7 +3187,7 @@ body.rc-modal-open{overflow:hidden!important}
                 }
                 const password = window.prompt('كلمة مرور إعادة التحقق لتفعيل الصيانة (مطلوبة):', '');
                 if (password === null || password === '') {
-                    showAlert('recent_authentication_not_available', false);
+                    showRcTerminalMessage('recent_authentication_not_available', false);
                     return;
                 }
                 setBusy(true, 'جاري تفعيل الصيانة…');
@@ -2879,10 +3198,10 @@ body.rc-modal-open{overflow:hidden!important}
                     nonce: nonce
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert('الصيانة مفعّلة — استرداد الإنتاج لم يبدأ بعد.', true);
+                showRcTerminalMessage('الصيانة مفعّلة — استرداد الإنتاج لم يبدأ بعد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تفعيل الصيانة', false);
+                showRcTerminalMessage(e.message || 'تعذر تفعيل الصيانة', false);
             } finally {
                 setBusy(false);
             }
@@ -2904,7 +3223,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'استرداد الإنتاج لم يبدأ بعد.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2920,10 +3239,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب استيراد قاعدة الإنتاج…',
                     'جاري تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ استيراد الإنتاج', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ استيراد الإنتاج', false);
             } finally {
                 setBusy(false);
             }
@@ -2955,7 +3274,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'ملفات التطبيق لم تُبدَّل بعد.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -2971,10 +3290,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب تحويل ملفات الرفع…',
                     'جاري تنفيذ تحويل ملفات الرفع من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ تحويل الرفع', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ تحويل الرفع', false);
             } finally {
                 setBusy(false);
             }
@@ -3006,7 +3325,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'الصيانة ما زالت مفعّلة. الاسترداد لم يكتمل. التراجع لم يُنفَّذ.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -3022,10 +3341,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب التراجع الإنتاجي…',
                     'جاري تنفيذ التراجع الإنتاجي من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ التراجع', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ التراجع', false);
             } finally {
                 setBusy(false);
             }
@@ -3057,7 +3376,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: 'الصيانة ما زالت مفعّلة. الاسترداد لم يكتمل. نقطة الارتكاز محفوظة.'
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -3073,10 +3392,10 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري طلب الإنهاء…',
                     'جاري تنفيذ الإنهاء / إطلاق الصيانة من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ الإنهاء', false);
+                showRcTerminalMessage(e.message || 'تعذر تنفيذ الإنهاء', false);
             } finally {
                 setBusy(false);
             }
@@ -3091,11 +3410,11 @@ body.rc-modal-open{overflow:hidden!important}
                     worker,
                     'جاري تنفيذ المرحلة من مركز الاسترداد…'
                 );
-                showAlert(RC_SCHEDULED_MSG, true);
+                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || 'تعذر تنفيذ المرحلة';
-                showAlert(reason, false);
+                showRcTerminalMessage(reason, false);
                 if (e.code === 'restore_center_invalid_stage'
                     || e.code === 'restore_center_worker_already_running'
                     || e.code === 'restore_center_spawn_failed') {
@@ -3126,12 +3445,12 @@ body.rc-modal-open{overflow:hidden!important}
                 if (typed === null) return;
                 const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
                 if (password === null || password === '') {
-                    showAlert('recent_authentication_not_available', false);
+                    showRcTerminalMessage('recent_authentication_not_available', false);
                     return;
                 }
                 const reason = window.prompt('سبب التفويض (8 أحرف على الأقل):', '');
                 if (reason === null || String(reason).trim().length < 8) {
-                    showAlert('authorization_reason_required', false);
+                    showRcTerminalMessage('authorization_reason_required', false);
                     return;
                 }
                 setBusy(true, 'جاري اعتماد تفويض تحويل الإنتاج…');
@@ -3145,10 +3464,10 @@ body.rc-modal-open{overflow:hidden!important}
                     authorization_reason: reason
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert('تم تفويض تحويل الإنتاج. يمكن الآن تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد.', true);
+                showRcTerminalMessage('تم تفويض تحويل الإنتاج. يمكن الآن تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تفويض تحويل الإنتاج', false);
+                showRcTerminalMessage(e.message || 'تعذر تفويض تحويل الإنتاج', false);
             } finally {
                 setBusy(false);
             }
@@ -3180,7 +3499,7 @@ body.rc-modal-open{overflow:hidden!important}
                     warning: j.warning || ''
                 }, null, 2));
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showRcJourneyInlineMessage(e.message || 'تعذر العرض');
             } finally {
                 setBusy(false);
             }
@@ -3204,7 +3523,7 @@ body.rc-modal-open{overflow:hidden!important}
                 if (typed === null) return;
                 const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
                 if (password === null || password === '') {
-                    showAlert('recent_authentication_not_available', false);
+                    showRcTerminalMessage('recent_authentication_not_available', false);
                     return;
                 }
                 setBusy(true, 'جاري اعتماد الخطة…');
@@ -3217,10 +3536,10 @@ body.rc-modal-open{overflow:hidden!important}
                     password: password
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(j.message || 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.', true);
+                showRcTerminalMessage(j.message || 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر الاعتماد', false);
+                showRcTerminalMessage(e.message || 'تعذر الاعتماد', false);
             } finally {
                 setBusy(false);
             }
@@ -3236,10 +3555,10 @@ body.rc-modal-open{overflow:hidden!important}
                     job_id: t.dataset.id || ''
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert('تم إلغاء الخطة. لم يتم تنفيذ أي استرداد.', true);
+                showRcTerminalMessage('تم إلغاء الخطة. لم يتم تنفيذ أي استرداد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر إلغاء الخطة', false);
+                showRcTerminalMessage(e.message || 'تعذر إلغاء الخطة', false);
             } finally {
                 setBusy(false);
             }
@@ -3263,10 +3582,10 @@ body.rc-modal-open{overflow:hidden!important}
                 state.guidedAllowCreateJob = false;
                 resetPackageListModes();
                 await loadAll();
-                showAlert('تم إلغاء المهمة. يمكنك الآن اختيار حزمة استرداد جديدة.', true);
+                showRcTerminalMessage('تم إلغاء المهمة. يمكنك الآن اختيار حزمة استرداد جديدة.', true);
             } catch (e) {
                 // Failure: keep current job and wizard step; show API/safe reason only.
-                showAlert(e.message || 'تعذر الإلغاء', false);
+                showRcTerminalMessage(e.message || 'تعذر الإلغاء', false);
             } finally {
                 setBusy(false);
             }
@@ -3279,7 +3598,7 @@ body.rc-modal-open{overflow:hidden!important}
         const blockersEl = el('rc_country_shadow_blockers');
         if (!strip) return;
         if (!jobId) {
-            showAlert('أدخل معرّف المهمة لعرض تقرير تحقق ظل الدولة.', false);
+            showRcJourneyInlineMessage('أدخل معرّف المهمة لعرض تقرير تحقق ظل الدولة.');
             return;
         }
         try {
@@ -3312,7 +3631,7 @@ body.rc-modal-open{overflow:hidden!important}
                 warning: 'تقرير تحقق ظل الدولة — للعرض من مركز الاسترداد.'
             }, null, 2));
         } catch (e) {
-            showAlert(e.message || 'تعذر تحميل تقرير تحقق ظل الدولة', false);
+            showRcJourneyInlineMessage(e.message || 'تعذر تحميل تقرير تحقق ظل الدولة');
         } finally {
             setBusy(false);
         }
@@ -3330,7 +3649,7 @@ body.rc-modal-open{overflow:hidden!important}
         const blockersEl = el('rc_country_dry_run_blockers');
         if (!strip) return;
         if (!jobId) {
-            showAlert('أدخل معرّف المهمة لعرض تقرير محاكاة استعادة الدولة.', false);
+            showRcJourneyInlineMessage('أدخل معرّف المهمة لعرض تقرير محاكاة استعادة الدولة.');
             return;
         }
         try {
@@ -3363,7 +3682,7 @@ body.rc-modal-open{overflow:hidden!important}
                 warning: 'تقرير محاكاة استعادة الدولة — للعرض من مركز الاسترداد.'
             }, null, 2));
         } catch (e) {
-            showAlert(e.message || 'تعذر تحميل تقرير محاكاة استعادة الدولة', false);
+            showRcJourneyInlineMessage(e.message || 'تعذر تحميل تقرير محاكاة استعادة الدولة');
         } finally {
             setBusy(false);
         }
@@ -3431,28 +3750,23 @@ body.rc-modal-open{overflow:hidden!important}
         }
         const pkgPick = t.closest('[data-rc-pkg-pick="1"]');
         if (pkgPick) {
-            // Create / action buttons inside the card must not be swallowed as selection-only.
-            if (t.closest('.rc-create-job') || t.closest('button') || t.closest('a')) {
-                if (pkgPick.getAttribute('data-eligible') === '1') {
-                    state.selectedPackage = {
-                        id: pkgPick.getAttribute('data-id') || '',
-                        type: pkgPick.getAttribute('data-type') || 'full_disaster',
-                        cc: pkgPick.getAttribute('data-cc') || ''
-                    };
-                }
+            // Information / other controls keep their own handlers; still update selection for context.
+            if (t.closest('button') || t.closest('a')) {
+                applyPackageSelection(
+                    pkgPick.getAttribute('data-type') || 'full_disaster',
+                    pkgPick.getAttribute('data-id') || '',
+                    pkgPick.getAttribute('data-cc') || '',
+                    { focus: false }
+                );
                 return;
             }
             ev.preventDefault();
-            if (pkgPick.getAttribute('data-eligible') !== '1') {
-                showAlert('هذه الحزمة غير مؤهلة للاسترداد. اختر حزمة مؤهلة.', false);
-                return;
-            }
-            state.selectedPackage = {
-                id: pkgPick.getAttribute('data-id') || '',
-                type: pkgPick.getAttribute('data-type') || 'full_disaster',
-                cc: pkgPick.getAttribute('data-cc') || ''
-            };
-            renderGuidedWorkflow();
+            applyPackageSelection(
+                pkgPick.getAttribute('data-type') || 'full_disaster',
+                pkgPick.getAttribute('data-id') || '',
+                pkgPick.getAttribute('data-cc') || '',
+                { focus: true }
+            );
             return;
         }
         if (t.matches('.rc-tab') || t.classList.contains('rc-tab')) {
@@ -3488,6 +3802,39 @@ body.rc-modal-open{overflow:hidden!important}
             setPackageListMode(kind, toAll ? 'all' : 'latest5');
         }
     }, true);
+
+    // Keyboard selection: Enter / Space on any package card (eligible, ineligible, unresolved).
+    document.addEventListener('keydown', (ev) => {
+        const pkgPick = ev.target instanceof HTMLElement ? ev.target.closest('[data-rc-pkg-pick="1"]') : null;
+        if (!pkgPick) return;
+        if (ev.target instanceof HTMLElement && (ev.target.closest('button') || ev.target.closest('a') || ev.target.closest('input'))) {
+            return;
+        }
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        applyPackageSelection(
+            pkgPick.getAttribute('data-type') || 'full_disaster',
+            pkgPick.getAttribute('data-id') || '',
+            pkgPick.getAttribute('data-cc') || '',
+            { focus: true }
+        );
+    });
+
+    if (el('rc_result_dialog_close')) {
+        el('rc_result_dialog_close').addEventListener('click', (ev) => {
+            ev.preventDefault();
+            closeRcResultDialog();
+        });
+    }
+    if (el('rc_result_dialog_backdrop')) {
+        el('rc_result_dialog_backdrop').addEventListener('click', (ev) => {
+            // Intentionally ignore backdrop clicks — result dialog stays open until Close.
+            if (ev.target === el('rc_result_dialog_backdrop')) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
+        });
+    }
 
     loadAll();
 })();
