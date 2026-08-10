@@ -405,8 +405,35 @@ function orange_restore_center_worker_launch_cmd_path(string $workRoot, string $
 }
 
 /**
- * Remove a non-running launch.cmd left by a prior failed attempt so retry cannot reuse bare-php / stale content.
- * Never deletes claim/PID files. Safe when no active claim blocks schedule.
+ * True when launch.cmd is a prior bare-php / pre-fix artifact that must not be reused.
+ * Fresh absolute launches (attempt marker + php.exe, no bare "php") are kept for forensics.
+ */
+function orange_restore_center_launch_artifact_is_stale_bare(string $launchPath): bool
+{
+    if (!is_file($launchPath)) {
+        return false;
+    }
+    $body = (string) @file_get_contents($launchPath);
+    if ($body === '') {
+        return true;
+    }
+    if (preg_match('/\\"php\\"\\s+/', $body) === 1 || preg_match('/^"php"\s+/m', $body) === 1) {
+        return true;
+    }
+    if (!str_contains($body, 'orange_restore_launch_attempt=')) {
+        return true;
+    }
+    if (preg_match('/"[A-Za-z]:\\\\[^"]*php\\.exe"/i', $body) !== 1
+        && preg_match('/php\\.exe/i', $body) !== 1) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Remove a non-running bare/stale launch.cmd left by a prior failed attempt so retry cannot reuse it.
+ * Never deletes claim/PID files. Never deletes a fresh absolute regenerated launch.
  */
 function orange_restore_center_discard_stale_launch_artifact(
     string $workRoot,
@@ -415,6 +442,9 @@ function orange_restore_center_discard_stale_launch_artifact(
 ): bool {
     $launchPath = orange_restore_center_worker_launch_cmd_path($workRoot, $jobId, $workerKey);
     if (!is_file($launchPath)) {
+        return false;
+    }
+    if (!orange_restore_center_launch_artifact_is_stale_bare($launchPath)) {
         return false;
     }
     $job = null;
@@ -1182,7 +1212,7 @@ function orange_restore_center_run_worker(
             } catch (Throwable $ignoredBoot) {
                 // keep prior code
             }
-            orange_restore_fw_audit_append($workRoot, $jobId, [
+            $failAudit = [
                 'event' => 'restore_center_worker_schedule_failed',
                 'result' => 'fail',
                 'worker' => $workerKey,
@@ -1192,7 +1222,13 @@ function orange_restore_center_run_worker(
                 'job_status' => $jobStatus,
                 'operator_username' => $operatorUsername,
                 'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
-            ]);
+            ];
+            if ($code === 'restore_center_worker_executable_unavailable'
+                && function_exists('orange_backup_admin_cli_php_safe_resolve_diag')) {
+                // Categories only — no raw paths (Owner UI must stay path-free).
+                $failAudit['resolve_diag'] = orange_backup_admin_cli_php_safe_resolve_diag($projectRoot);
+            }
+            orange_restore_fw_audit_append($workRoot, $jobId, $failAudit);
             // Never leave unconsumed pending after a failed schedule attempt.
             orange_restore_center_compensate_unconsumed_pending(
                 $workRoot,
@@ -1200,7 +1236,7 @@ function orange_restore_center_run_worker(
                 $workerKey,
                 $code
             );
-            // Pre-spawn failures must not leave a prior bare-php launch.cmd for the next retry.
+            // Remove only bare/stale launch leftovers — never a fresh absolute regenerated launch.
             if ($code === 'restore_center_worker_executable_unavailable'
                 || $code === 'restore_center_spawn_failed'
                 || $code === 'restore_center_worker_bootstrap_failed') {
