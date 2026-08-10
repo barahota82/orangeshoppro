@@ -99,11 +99,6 @@ function orange_restore_pre_backup_acquire_lock(string $workRoot, string $jobId,
         $status = orange_restore_pre_backup_lock_status($workRoot);
     }
     if ($status['held'] && !$status['stale']) {
-        $heldJob = (string) (($status['payload'] ?? [])['job_id'] ?? '');
-        if ($heldJob === $jobId) {
-            return ['ok' => true, 'message' => 'lock_already_held', 'stale_cleared' => $staleCleared];
-        }
-
         return ['ok' => false, 'message' => 'pre_restore_backup_lock_active', 'stale_cleared' => $staleCleared];
     }
 
