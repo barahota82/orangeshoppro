@@ -47,6 +47,22 @@ function g_ok(bool $cond, string $label): void
     }
 }
 
+function g_skip(string $label): void
+{
+    global $skip;
+    $skip++;
+    echo "SKIP {$label}\n";
+}
+
+function g_evidence_root(string $folder): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:/' . $folder;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $folder;
+}
+
 function g_rm_tree(string $dir): void
 {
     if (!is_dir($dir)) {
@@ -59,16 +75,16 @@ function g_rm_tree(string $dir): void
         $path = $dir . DIRECTORY_SEPARATOR . $item;
         if (is_dir($path)) {
             g_rm_tree($path);
-        } else {
+        } elseif (is_file($path) || is_link($path)) {
             @unlink($path);
         }
     }
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_step6_php_cli_resolution_evidence';
+$evidenceDir = g_evidence_root('orange_restore_step6_php_cli_resolution_evidence');
 $runtimeDir = $evidenceDir . '/ISOLATED_RUNTIME_TEST/runtime_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(2));
-foreach ([$evidenceDir, $evidenceDir . '/ISOLATED_RUNTIME_TEST', $runtimeDir] as $d) {
+foreach ([$evidenceDir, $evidenceDir . '/ISOLATED_RUNTIME_TEST', $evidenceDir . '/CODE_VERIFIED', $runtimeDir] as $d) {
     if (!is_dir($d)) {
         mkdir($d, 0777, true);
     }
@@ -114,6 +130,7 @@ $makePleskLikeDir = static function (string $base, string $realPhpCli): array {
     if (!@copy($realPhpCli, $cli)) {
         throw new RuntimeException('Cannot copy real php.exe into fixture');
     }
+    @chmod($cli, 0755);
 
     return ['dir' => $dir, 'cgi' => $cgi, 'cli' => $cli];
 };
@@ -216,14 +233,6 @@ g_ok(!orange_backup_admin_cli_php_binary_is_cli('php'), 'scenario6 bare php reje
 g_ok(!orange_backup_admin_php_cli_path_is_absolute('php'), 'scenario6 bare php not absolute');
 
 /* Scenario 7: spaces in path + launch.cmd quoting uses absolute php.exe */
-$clearOverrides();
-$workRoot = $runtimeDir . '/work';
-mkdir($workRoot, 0777, true);
-$GLOBALS['orange_restore_test_work_root'] = $workRoot;
-$s7 = $makePleskLikeDir($runtimeDir . '/s7', $realPhp);
-$GLOBALS['orange_backup_test_php_binary'] = $s7['cgi'];
-$GLOBALS['orange_backup_test_env_override'] = ['ORANGE_PHP_CLI' => ''];
-
 $disposableRel = 'disposable/orch_harness_worker.php';
 $disposableAbs = $runtimeDir . '/disposable_worker.php';
 file_put_contents($disposableAbs, "<?php\ndeclare(strict_types=1);\necho \"OK\\n\";\n");
@@ -233,44 +242,56 @@ $GLOBALS['orange_restore_center_test_worker_schedulable'] = [
     'orch_harness' => [ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION],
 ];
 
-$jobId = 'PHPCLI7';
-$jobDir = orange_restore_fw_job_directory($workRoot, $jobId);
-mkdir($jobDir, 0777, true);
-file_put_contents(orange_restore_fw_job_file_path($workRoot, $jobId), json_encode([
-    'job_id' => $jobId,
-    'package_id' => 'PKG',
-    'package_type' => 'full_disaster',
-    'status' => ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
-    'phase' => ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
-    'progress' => 100,
-    'message' => 'fixture',
-    'execution_started' => false,
-    'created_at' => gmdate('c'),
-    'updated_at' => gmdate('c'),
-], JSON_UNESCAPED_UNICODE));
-
 $schedOk = false;
 $launchHasAbs = false;
 $launchHasBare = true;
 $claimAbsentOnFailPath = true;
-try {
-    $res = orange_restore_center_request_and_schedule($projectRoot, $workRoot, $jobId, 'orch_harness', 'gate');
-    $schedOk = !empty($res['scheduled']);
-    $launchPath = orange_restore_center_worker_launch_cmd_path($workRoot, $jobId, 'orch_harness');
-    $launchBody = is_file($launchPath) ? (string) file_get_contents($launchPath) : '';
-    $resolved = orange_backup_admin_resolve_cli_php_binary($projectRoot);
-    $launchHasAbs = str_contains($launchBody, '"' . $resolved . '"') || str_contains($launchBody, escapeshellarg($resolved));
-    // escapeshellarg on Windows uses "..." — also accept normalized
-    if (!$launchHasAbs && preg_match('/"[A-Za-z]:\\\\[^"]*php\\.exe"/i', $launchBody) === 1) {
-        $launchHasAbs = true;
+if (PHP_OS_FAMILY === 'Windows') {
+    $clearOverrides();
+    $workRoot = $runtimeDir . '/work';
+    mkdir($workRoot, 0777, true);
+    $GLOBALS['orange_restore_test_work_root'] = $workRoot;
+    $s7 = $makePleskLikeDir($runtimeDir . '/s7', $realPhp);
+    $GLOBALS['orange_backup_test_php_binary'] = $s7['cgi'];
+    $GLOBALS['orange_backup_test_env_override'] = ['ORANGE_PHP_CLI' => ''];
+
+    $jobId = 'PHPCLI7';
+    $jobDir = orange_restore_fw_job_directory($workRoot, $jobId);
+    mkdir($jobDir, 0777, true);
+    file_put_contents(orange_restore_fw_job_file_path($workRoot, $jobId), json_encode([
+        'job_id' => $jobId,
+        'package_id' => 'PKG',
+        'package_type' => 'full_disaster',
+        'status' => ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+        'phase' => ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+        'progress' => 100,
+        'message' => 'fixture',
+        'execution_started' => false,
+        'created_at' => gmdate('c'),
+        'updated_at' => gmdate('c'),
+    ], JSON_UNESCAPED_UNICODE));
+
+    try {
+        $res = orange_restore_center_request_and_schedule($projectRoot, $workRoot, $jobId, 'orch_harness', 'gate');
+        $schedOk = !empty($res['scheduled']);
+        $launchPath = orange_restore_center_worker_launch_cmd_path($workRoot, $jobId, 'orch_harness');
+        $launchBody = is_file($launchPath) ? (string) file_get_contents($launchPath) : '';
+        $resolved = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+        $launchHasAbs = str_contains($launchBody, '"' . $resolved . '"') || str_contains($launchBody, escapeshellarg($resolved));
+        // escapeshellarg on Windows uses "..." — also accept normalized
+        if (!$launchHasAbs && preg_match('/"[A-Za-z]:\\\\[^"]*php\\.exe"/i', $launchBody) === 1) {
+            $launchHasAbs = true;
+        }
+        $launchHasBare = (bool) preg_match('/^"php"\\s/m', $launchBody) || str_contains($launchBody, "\"php\" \"");
+        // Prefer detecting bare token only
+        $launchHasBare = (bool) preg_match('/\\"php\\"\\s+\\"/', $launchBody);
+    } catch (Throwable $ex) {
+        echo 'DEBUG_S7 ' . $ex->getMessage() . "\n";
     }
-    $launchHasBare = (bool) preg_match('/^"php"\\s/m', $launchBody) || str_contains($launchBody, "\"php\" \"");
-    // Prefer detecting bare token only
-    $launchHasBare = (bool) preg_match('/\\"php\\"\\s+\\"/', $launchBody);
-} catch (Throwable $ex) {
-    echo 'DEBUG_S7 ' . $ex->getMessage() . "\n";
+    g_ok($schedOk && $launchHasAbs && !$launchHasBare, 'scenario7 launch.cmd absolute php.exe with spaces path');
+} else {
+    g_skip('scenario7 launch.cmd absolute php.exe with spaces path (Windows-only)');
 }
-g_ok($schedOk && $launchHasAbs && !$launchHasBare, 'scenario7 launch.cmd absolute php.exe with spaces path');
 
 /* Fail-closed schedule: no claim/pending/PID when executable unavailable */
 $clearOverrides();

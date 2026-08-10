@@ -49,6 +49,22 @@ function t_ok(bool $cond, string $label): void
     }
 }
 
+function t_skip(string $label): void
+{
+    global $skip;
+    $skip++;
+    echo "SKIP {$label}\n";
+}
+
+function t_evidence_root(string $folder): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:/' . $folder;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $folder;
+}
+
 function t_rm_tree(string $dir): void
 {
     if (!is_dir($dir)) {
@@ -61,14 +77,15 @@ function t_rm_tree(string $dir): void
         $path = $dir . DIRECTORY_SEPARATOR . $item;
         if (is_dir($path)) {
             t_rm_tree($path);
-        } else {
+        } elseif (is_file($path) || is_link($path)) {
             @unlink($path);
         }
     }
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_live_step6_failure_evidence/ISOLATED_RUNTIME_TEST';
+$evidenceRoot = t_evidence_root('orange_restore_live_step6_failure_evidence');
+$evidenceDir = $evidenceRoot . DIRECTORY_SEPARATOR . 'ISOLATED_RUNTIME_TEST';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
@@ -147,9 +164,11 @@ $seed = static function (string $workRoot, string $jobId, string $status) use ($
 };
 
 $pageSrc = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
-$liveLog = 'D:/orange_restore_live_step6_failure_evidence/LIVE_PRODUCTION_READ_ONLY/job_2026-08-09_212813_c995a352/orchestrator_pre_restore_backup.log';
-$liveLaunch = 'D:/orange_restore_live_step6_failure_evidence/LIVE_PRODUCTION_READ_ONLY/job_2026-08-09_212813_c995a352/orchestrator_pre_restore_backup_launch.cmd';
-$liveJob = 'D:/orange_restore_live_step6_failure_evidence/LIVE_PRODUCTION_READ_ONLY/job_2026-08-09_212813_c995a352/job.json';
+$liveEvidenceDir = $evidenceRoot . DIRECTORY_SEPARATOR . 'LIVE_PRODUCTION_READ_ONLY'
+    . DIRECTORY_SEPARATOR . 'job_2026-08-09_212813_c995a352';
+$liveLog = $liveEvidenceDir . DIRECTORY_SEPARATOR . 'orchestrator_pre_restore_backup.log';
+$liveLaunch = $liveEvidenceDir . DIRECTORY_SEPARATOR . 'orchestrator_pre_restore_backup_launch.cmd';
+$liveJob = $liveEvidenceDir . DIRECTORY_SEPARATOR . 'job.json';
 
 /* 1. Valid request and schedule (absolute CLI + detached harness) */
 $seed($workRoot, 'EXOK1', ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION);
@@ -199,9 +218,14 @@ t_ok($spawnApiFail, '03 spawn API failure on missing script');
 
 /* 4. Immediate child bootstrap exit — live log classifier */
 $tmpLog = $tmpRoot . '/boot_fail.log';
-file_put_contents($tmpLog, (string) file_get_contents($liveLog));
-$bootCode = orange_restore_center_classify_worker_log_bootstrap($tmpLog);
-t_ok($bootCode === 'restore_center_worker_executable_unavailable', '04 live log classifies executable unavailable');
+$bootCode = '';
+if (is_file($liveLog)) {
+    file_put_contents($tmpLog, (string) file_get_contents($liveLog));
+    $bootCode = orange_restore_center_classify_worker_log_bootstrap($tmpLog);
+    t_ok($bootCode === 'restore_center_worker_executable_unavailable', '04 live log classifies executable unavailable');
+} else {
+    t_skip('04 live log classifies executable unavailable (live evidence missing)');
+}
 
 /* 5. Unwritable claim location */
 $seed($workRoot, 'EXPERM1', ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION);
@@ -332,18 +356,26 @@ $liveLaunchBody = is_file($liveLaunch) ? (string) file_get_contents($liveLaunch)
 $oldBroken = str_contains($liveLaunchBody, '"php"') && !preg_match('/"[A-Za-z]:\\\\[^"]*php\\.exe"/i', $liveLaunchBody);
 $newResolveBlocksBare = !orange_backup_admin_cli_php_binary_is_cli('php');
 // Simulate old fallback: if code still returned bare php, mutation would pass wrongly.
-$mutationSensitive = ($oldBroken && $newResolveBlocksBare) ? 1 : 0;
-t_ok($mutationSensitive === 1, '20 mutation: live bare-php launch broken; new resolver rejects bare php');
+if (is_file($liveLaunch)) {
+    $mutationSensitive = ($oldBroken && $newResolveBlocksBare) ? 1 : 0;
+    t_ok($mutationSensitive === 1, '20 mutation: live bare-php launch broken; new resolver rejects bare php');
+} else {
+    t_skip('20 mutation: live bare-php launch broken; new resolver rejects bare php (live evidence missing)');
+}
 
 /* Live job contract markers (read-only) */
 $liveJobData = is_file($liveJob) ? json_decode((string) file_get_contents($liveJob), true) : null;
-t_ok(
-    is_array($liveJobData)
-    && ($liveJobData['job_id'] ?? '') === '2026-08-09_212813_c995a352'
-    && ($liveJobData['status'] ?? '') === 'approved_waiting_execution'
-    && (int) ($liveJobData['progress'] ?? 0) === 100,
-    'live job.json status/progress contract'
-);
+if (is_file($liveJob)) {
+    t_ok(
+        is_array($liveJobData)
+        && ($liveJobData['job_id'] ?? '') === '2026-08-09_212813_c995a352'
+        && ($liveJobData['status'] ?? '') === 'approved_waiting_execution'
+        && (int) ($liveJobData['progress'] ?? 0) === 100,
+        'live job.json status/progress contract'
+    );
+} else {
+    t_skip('live job.json status/progress contract (live evidence missing)');
+}
 
 /* Schema freeze */
 $schemaSrc = (string) file_get_contents($projectRoot . '/includes/catalog_schema.php');
