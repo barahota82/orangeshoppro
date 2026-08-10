@@ -122,6 +122,7 @@ file_put_contents(\$dir . DIRECTORY_SEPARATOR . 'harness_state.json', json_encod
     'at' => gmdate('c'),
 ], JSON_UNESCAPED_UNICODE));
 echo "HARNESS_OK\\n";
+usleep(1500000);
 exit(0);
 PHP);
 $disposableWorkerRel = 'disposable/orch_harness_worker.php';
