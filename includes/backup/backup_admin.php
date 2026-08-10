@@ -1332,6 +1332,33 @@ function orange_backup_admin_cli_php_candidate_paths(string $projectRoot): array
 }
 
 /**
+ * True when $candidate is the Windows sibling php.exe of the runtime php-cgi binary
+ * (same directory). Trusted for Admin detach without requiring a web-SAPI proc_open probe
+ * (IIS/Plesk often cannot execute CLI probes from the site pool).
+ */
+function orange_backup_admin_php_cli_is_windows_cgi_sibling(string $candidate, string $phpBinary): bool
+{
+    if (PHP_OS_FAMILY !== 'Windows') {
+        return false;
+    }
+    $phpBinary = trim($phpBinary);
+    $candidate = trim($candidate);
+    if ($phpBinary === '' || $candidate === '') {
+        return false;
+    }
+    if (preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary) !== 1) {
+        return false;
+    }
+    if (preg_match('/php\.exe$/i', $candidate) !== 1 || preg_match('/php-cgi/i', $candidate) === 1) {
+        return false;
+    }
+    $binDir = strtolower(rtrim(str_replace('\\', '/', dirname($phpBinary)), '/'));
+    $candDir = strtolower(rtrim(str_replace('\\', '/', dirname($candidate)), '/'));
+
+    return $binDir !== '' && $binDir === $candDir;
+}
+
+/**
  * Resolve an approved PHP CLI executable for backup/restore subprocesses (never php-cgi / FastCGI).
  * Always returns an absolute filesystem path, or throws php_cli_binary_unavailable.
  * Never returns bare "php". Never uses PATH / where / which. Never hardcodes hosting install trees.
@@ -1339,6 +1366,7 @@ function orange_backup_admin_cli_php_candidate_paths(string $projectRoot): array
  */
 function orange_backup_admin_resolve_cli_php_binary(string $projectRoot): string
 {
+    $phpBinary = orange_backup_admin_runtime_php_binary();
     $seen = [];
     foreach (orange_backup_admin_cli_php_candidate_paths($projectRoot) as $candidate) {
         $candidate = trim((string) $candidate);
@@ -1356,7 +1384,12 @@ function orange_backup_admin_resolve_cli_php_binary(string $projectRoot): string
         if (!is_file($candidate)) {
             continue;
         }
-        if (orange_backup_admin_cli_php_binary_is_cli($candidate)) {
+        $accepted = orange_backup_admin_cli_php_binary_is_cli($candidate);
+        if (!$accepted && orange_backup_admin_php_cli_is_windows_cgi_sibling($candidate, $phpBinary)) {
+            // Deterministic Plesk/IIS layout: sibling php.exe beside php-cgi.exe.
+            $accepted = true;
+        }
+        if ($accepted) {
             $real = realpath($candidate);
 
             return is_string($real) && $real !== '' ? $real : $candidate;

@@ -404,6 +404,42 @@ function orange_restore_center_worker_launch_cmd_path(string $workRoot, string $
     return $dir . DIRECTORY_SEPARATOR . 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '_launch.cmd';
 }
 
+/**
+ * Remove a non-running launch.cmd left by a prior failed attempt so retry cannot reuse bare-php / stale content.
+ * Never deletes claim/PID files. Safe when no active claim blocks schedule.
+ */
+function orange_restore_center_discard_stale_launch_artifact(
+    string $workRoot,
+    string $jobId,
+    string $workerKey
+): bool {
+    $launchPath = orange_restore_center_worker_launch_cmd_path($workRoot, $jobId, $workerKey);
+    if (!is_file($launchPath)) {
+        return false;
+    }
+    $job = null;
+    try {
+        $job = orange_restore_fw_read($workRoot, $jobId);
+    } catch (Throwable $e) {
+        $job = null;
+    }
+    $claim = orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, is_array($job) ? $job : []);
+    if ($claim !== null && orange_restore_center_claim_blocks_schedule($claim, is_array($job) ? $job : [], $workerKey)) {
+        return false;
+    }
+    $removed = @unlink($launchPath);
+    if ($removed) {
+        orange_restore_fw_audit_append($workRoot, $jobId, [
+            'event' => 'restore_center_stale_launch_artifact_discarded',
+            'result' => 'ok',
+            'worker' => $workerKey,
+            'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
+        ]);
+    }
+
+    return $removed;
+}
+
 function orange_restore_center_process_alive(int $pid): bool
 {
     if ($pid <= 0) {
@@ -624,15 +660,25 @@ function orange_restore_center_spawn_detached_windows(
     $script = (string) $command[1];
     $jobArg = (string) $command[2];
 
+    // Atomic replacement: write temp then rename so retries never reuse a prior bare-php launch.cmd.
     $cmdBody = '@echo off' . "\r\n"
         . 'setlocal' . "\r\n"
+        . 'rem orange_restore_launch_attempt=' . gmdate('YmdHis') . "\r\n"
         . escapeshellarg($phpBinary) . ' '
         . escapeshellarg($script) . ' '
         . escapeshellarg($jobArg)
         . ' <NUL >>' . escapeshellarg($logPath) . ' 2>&1' . "\r\n"
         . 'exit /B %ERRORLEVEL%' . "\r\n";
-    if (@file_put_contents($launchCmdPath, $cmdBody) === false) {
+    $tmpLaunch = $launchCmdPath . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(3));
+    if (@file_put_contents($tmpLaunch, $cmdBody) === false) {
         throw new RuntimeException('restore_center_spawn_launch_cmd_failed');
+    }
+    if (!@rename($tmpLaunch, $launchCmdPath)) {
+        @unlink($launchCmdPath);
+        if (!@rename($tmpLaunch, $launchCmdPath)) {
+            @unlink($tmpLaunch);
+            throw new RuntimeException('restore_center_spawn_launch_cmd_failed');
+        }
     }
 
     $ps = '$ErrorActionPreference = \'Stop\'; '
@@ -1063,6 +1109,9 @@ function orange_restore_center_run_worker(
             throw new RuntimeException('restore_center_worker_already_running');
         }
 
+        // Retry must never reuse a prior failed attempt's launch.cmd (bare "php" leftover).
+        orange_restore_center_discard_stale_launch_artifact($workRoot, $jobId, $workerKey);
+
         $spawned = orange_restore_center_spawn_detached(
             [$phpBinary, $script, '--job=' . $jobId],
             $logPath,
@@ -1151,6 +1200,16 @@ function orange_restore_center_run_worker(
                 $workerKey,
                 $code
             );
+            // Pre-spawn failures must not leave a prior bare-php launch.cmd for the next retry.
+            if ($code === 'restore_center_worker_executable_unavailable'
+                || $code === 'restore_center_spawn_failed'
+                || $code === 'restore_center_worker_bootstrap_failed') {
+                try {
+                    orange_restore_center_discard_stale_launch_artifact($workRoot, $jobId, $workerKey);
+                } catch (Throwable $ignoredDiscard) {
+                    // non-fatal cleanup
+                }
+            }
         }
         if (trim($e->getMessage()) !== $code) {
             throw new RuntimeException($code, 0, $e);
