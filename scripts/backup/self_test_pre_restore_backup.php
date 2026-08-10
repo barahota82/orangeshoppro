@@ -293,7 +293,7 @@ try {
     orange_restore_fw_release_lock($workRoot, (string) $countryJob['job_id']);
 
     $req = orange_restore_pre_backup_request($workRoot, $jobId, $backupRoot, ['username' => 'superadmin', 'id' => 1]);
-    pre_backup_self_test(($req['cli_needed'] ?? false) === true, 'approved Full job can request preparation');
+    pre_backup_self_test(($req['cli_needed'] ?? true) === false, 'approved Full job can request preparation without CLI handoff');
     pre_backup_self_test(($req['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING, 'request moves to pending');
     pre_backup_self_test(($req['execution_started'] ?? true) === false, 'request keeps execution_started false');
 
@@ -302,14 +302,20 @@ try {
 
     $apiSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php');
     pre_backup_self_test(
-        !str_contains($apiSrc, 'orange_restore_pre_backup_run_cli')
-        && !str_contains($apiSrc, 'orange_backup_run_full')
+        str_contains($apiSrc, 'orange_restore_admin_fw_execute_pre_restore_backup')
+        && !str_contains($apiSrc, 'attach_verified_schedule')
+        && !str_contains($apiSrc, 'orange_backup_run_full(')
         && str_contains($apiSrc, 'restore_admin_api_require_csrf'),
-        'HTTP request does not run backup'
+        'HTTP Step6 adapter uses shared service (no orchestrator schedule)'
+    );
+    $preSrcCheck = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_pre_restore_backup.php');
+    pre_backup_self_test(
+        str_contains($preSrcCheck, 'orange_backup_execute_full_authoritative')
+        && !preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $preSrcCheck),
+        'Step6 invoke_engine uses shared Full Backup service only'
     );
 
-    $cliSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_prepare_backup.php');
-    pre_backup_self_test(str_contains($cliSrc, "PHP_SAPI !== 'cli'") && str_contains($cliSrc, '--job='), 'CLI-only gate with job id only');
+    pre_backup_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_prepare_backup.php'), 'obsolete Step6 CLI worker file deleted');
 
     $anchorSeq = 0;
     $GLOBALS['orange_pre_restore_backup_engine_override'] = static function () use ($backupRoot, &$anchorSeq): array {
@@ -343,7 +349,7 @@ try {
         return ['overall_result' => 'pass', 'recovery_score' => 95];
     };
 
-    $run = orange_restore_pre_backup_run_cli($fakeProject, $workRoot, $backupRoot, $jobId, 'tester');
+    $run = orange_restore_pre_backup_execute($fakeProject, $workRoot, $backupRoot, $jobId, 'tester');
     pre_backup_self_test(($run['ok'] ?? false) === true, 'successful Full backup anchor');
     pre_backup_self_test(($run['retention_pinned'] ?? false) === true, 'retention pin persists');
     pre_backup_self_test(($run['execution_started'] ?? true) === false, 'execution_started remains false');
@@ -352,7 +358,7 @@ try {
         'stops at pre_restore_backup_ready'
     );
 
-    $runDup = orange_restore_pre_backup_run_cli($fakeProject, $workRoot, $backupRoot, $jobId, 'tester');
+    $runDup = orange_restore_pre_backup_execute($fakeProject, $workRoot, $backupRoot, $jobId, 'tester');
     pre_backup_self_test(($runDup['idempotent'] ?? false) === true && ($runDup['ok'] ?? false) === true, 'duplicate CLI run does not create a second ready anchor');
 
     $oldId = '2020-01-01_000000';
@@ -391,7 +397,7 @@ try {
     $GLOBALS['orange_pre_restore_backup_verify_override'] = static function (): array {
         return ['ok' => false, 'errors' => ['mock verify fail'], 'manifest' => null, 'health' => null];
     };
-    $failVerify = orange_restore_pre_backup_run_cli($fakeProject, $workRoot, $backupRoot, $job2Id, 'tester');
+    $failVerify = orange_restore_pre_backup_execute($fakeProject, $workRoot, $backupRoot, $job2Id, 'tester');
     pre_backup_self_test(($failVerify['ok'] ?? true) === false && ($failVerify['code'] ?? '') === 'verify_failed', 'verification failure blocks readiness');
     pre_backup_self_test(
         (orange_restore_fw_read($workRoot, $job2Id)['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
@@ -416,7 +422,7 @@ try {
     };
     $retryReq = orange_restore_pre_backup_request($workRoot, $job2Id, $backupRoot, ['username' => 'superadmin']);
     pre_backup_self_test(($retryReq['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING, 'retry policy from failed');
-    $retryRun = orange_restore_pre_backup_run_cli($fakeProject, $workRoot, $backupRoot, $job2Id, 'tester');
+    $retryRun = orange_restore_pre_backup_execute($fakeProject, $workRoot, $backupRoot, $job2Id, 'tester');
     pre_backup_self_test(
         ($retryRun['ok'] ?? false) === true,
         'retry succeeds to ready' . (empty($retryRun['ok']) ? (' code=' . (string) ($retryRun['code'] ?? '')) : '')
@@ -434,7 +440,7 @@ try {
     $GLOBALS['orange_pre_restore_backup_drv_override'] = static function (): array {
         return ['overall_result' => 'fail', 'recovery_score' => 10];
     };
-    $drvFail = orange_restore_pre_backup_run_cli($fakeProject, $workRoot, $backupRoot, $job3Id, 'tester');
+    $drvFail = orange_restore_pre_backup_execute($fakeProject, $workRoot, $backupRoot, $job3Id, 'tester');
     pre_backup_self_test(($drvFail['code'] ?? '') === 'drv_failed', 'DRV failure blocks readiness when required');
 
     orange_restore_pre_backup_release_lock($workRoot, $job3Id);

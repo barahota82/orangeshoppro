@@ -5,14 +5,17 @@ declare(strict_types=1);
 /**
  * Phase 3B.3B3 — Mandatory Pre-Restore Backup Gate (rollback anchor only).
  *
- * Reuses:
- *   - orange_backup_run_full()           (Full Backup engine)
- *   - orange_backup_verify_full_package() (Verify source of truth)
- *   - orange_recovery_validate_package()  (DRV; required, score >= 70)
- *   - orange_backup_retention_pin_package()
+ * Authoritative Full Backup execution (Owner 2026-08-10):
+ *   - orange_backup_execute_full_authoritative()  (same path as Backup Center)
+ *     → CLI scripts/backup/run_full_backup.php → orange_backup_run_full()
+ *
+ * Restore-only adapter responsibilities after shared success:
+ *   - orange_backup_verify_full_package() / DRV / retention pin
+ *   - bind exact package identity to the Restore job
+ *   - transition to pre_restore_backup_ready
  *
  * Never restores DB/files, never cutover, never enables production maintenance,
- * never executes a restore contract / restore worker.
+ * never uses a Step-6-only launcher / run-worker / launch.cmd path.
  */
 
 require_once __DIR__ . '/restore_job_framework.php';
@@ -33,7 +36,7 @@ const ORANGE_RESTORE_PRE_BACKUP_LOCK_FILE = '.pre_restore_backup.lock';
 const ORANGE_RESTORE_PRE_BACKUP_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_PRE_BACKUP_PURPOSE = 'pre_restore_rollback_anchor';
 const ORANGE_RESTORE_PRE_BACKUP_DRV_MIN_SCORE = 70;
-const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'orange_backup_run_full';
+const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'orange_backup_execute_full_authoritative';
 
 function orange_restore_pre_backup_record_path(string $workRoot, string $jobId): string
 {
@@ -248,6 +251,16 @@ function orange_restore_pre_backup_revalidate(
     string $jobId,
     string $backupRoot
 ): array {
+    if (isset($GLOBALS['orange_pre_restore_backup_revalidate_override'])
+        && is_callable($GLOBALS['orange_pre_restore_backup_revalidate_override'])) {
+        /** @var callable $fn */
+        $fn = $GLOBALS['orange_pre_restore_backup_revalidate_override'];
+        $over = $fn($workRoot, $jobId, $backupRoot);
+        if (is_array($over)) {
+            return $over;
+        }
+    }
+
     $job = orange_restore_fw_read($workRoot, $jobId);
     $packageType = (string) ($job['package_type'] ?? '');
     if ($packageType === 'country_recovery') {
@@ -299,7 +312,7 @@ function orange_restore_pre_backup_revalidate(
 }
 
 /**
- * HTTP: request preparation only (no backup run).
+ * HTTP: mark Step-6 request metadata (no operator CLI; execution is via shared Full Backup service).
  *
  * @return array<string, mixed>
  */
@@ -346,7 +359,7 @@ function orange_restore_pre_backup_request(
             'framework_job_id' => $jobId,
             'source_package_id' => (string) ($job['package_id'] ?? ''),
             'status' => $status,
-            'cli_needed' => true,
+            'cli_needed' => false,
             'execution_started' => false,
             'ready_for_rollback' => false,
             'retention_pinned' => false,
@@ -355,10 +368,10 @@ function orange_restore_pre_backup_request(
         return [
             'job' => orange_restore_fw_public_row($job),
             'record' => orange_restore_pre_backup_public_record($record),
-            'cli_needed' => true,
+            'cli_needed' => false,
             'idempotent' => true,
             'execution_started' => false,
-            'message' => 'Pre-restore backup already requested. Run CLI worker.',
+            'message' => 'Pre-restore backup already in progress or pending execution.',
         ];
     }
 
@@ -404,8 +417,9 @@ function orange_restore_pre_backup_request(
         'identity_tag' => $identity,
         'purpose' => ORANGE_RESTORE_PRE_BACKUP_PURPOSE,
         'status' => ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
-        'cli_needed' => true,
-        'cli_command' => 'php scripts/backup/restore_prepare_backup.php --job=' . $jobId,
+        'cli_needed' => false,
+        'cli_command' => '',
+        'origin' => 'pre_restore_backup',
         'warning' => 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.',
     ];
     orange_restore_pre_backup_write_record($workRoot, $jobId, $record);
@@ -416,7 +430,7 @@ function orange_restore_pre_backup_request(
         ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
         ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_PENDING,
         10,
-        'Pre-restore backup pending — CLI worker required',
+        'Pre-restore backup pending — shared Full Backup service',
         'pre_restore_backup_requested'
     );
     $job['pre_restore_backup_file'] = ORANGE_RESTORE_PRE_BACKUP_FILE;
@@ -427,14 +441,17 @@ function orange_restore_pre_backup_request(
     return [
         'job' => orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId)),
         'record' => orange_restore_pre_backup_public_record($record),
-        'cli_needed' => true,
+        'cli_needed' => false,
         'idempotent' => false,
         'execution_started' => false,
-        'message' => 'Pre-restore backup requested. Run CLI: php scripts/backup/restore_prepare_backup.php --job=' . $jobId,
+        'message' => 'Pre-restore backup requested; shared Full Backup service will execute.',
     ];
 }
 
 /**
+ * Invoke the single authoritative Full Backup service (Backup Center path).
+ * Does not implement a second dump/package engine.
+ *
  * @return array{ok:bool,snapshot:?string,backend:?string,message:string,exit_code:int}
  */
 function orange_restore_pre_backup_invoke_engine(string $projectRoot, ?string $backupRootOverride): array
@@ -457,14 +474,24 @@ function orange_restore_pre_backup_invoke_engine(string $projectRoot, ?string $b
         ];
     }
 
-    $integration = strtolower((string) (getenv('ORANGE_PRE_RESTORE_BACKUP_INTEGRATION') ?: ''));
-    if (!in_array($integration, ['1', 'true', 'yes'], true) && PHP_SAPI === 'cli') {
-        // Ordinary self-tests / non-integration CLI must not create production backups accidentally
-        // when override is missing — callers in production set INTEGRATION or rely on real env.
-        // Production CLI entry always allows real engine (no block here when override absent).
+    // Disposable/self-test harness may inject Backup Center options through the shared service.
+    $options = [
+        // Exact package binding: never invent identity by scanning newest snapshot dir.
+        'forbid_latest_snapshot_refresh' => true,
+    ];
+    if (isset($GLOBALS['orange_backup_execute_full_authoritative_options'])
+        && is_array($GLOBALS['orange_backup_execute_full_authoritative_options'])) {
+        $options = array_merge($options, $GLOBALS['orange_backup_execute_full_authoritative_options']);
+        $options['forbid_latest_snapshot_refresh'] = true;
     }
 
-    $raw = orange_backup_run_full($projectRoot, $backupRootOverride);
+    // $backupRootOverride is intentionally unused here: the shared CLI path uses BackupRoot from env
+    // (same as Backup Center). Fixtures must use engine override, not a second dump path.
+    if ($backupRootOverride !== null && $backupRootOverride !== '') {
+        // no-op: keep signature for callers/tests; never open a parallel engine.
+    }
+
+    $raw = orange_backup_execute_full_authoritative($projectRoot, $options);
 
     return [
         'ok' => (bool) ($raw['ok'] ?? false),
@@ -510,21 +537,18 @@ function orange_restore_pre_backup_invoke_drv(string $packagePath): array
 }
 
 /**
- * CLI worker: create/verify/pin Full rollback anchor. Stops at pre_restore_backup_ready.
+ * Step-6 adapter: run shared Full Backup + verify + bind + ready.
+ * Callable from Admin HTTP and from the optional thin CLI entry (not orchestrator-launched).
  *
  * @return array<string, mixed>
  */
-function orange_restore_pre_backup_run_cli(
+function orange_restore_pre_backup_execute(
     string $projectRoot,
     string $workRoot,
     string $backupRoot,
     string $jobId,
-    string $owner = 'cli'
+    string $owner = 'admin'
 ): array {
-    if (PHP_SAPI !== 'cli') {
-        throw new RuntimeException('cli_only');
-    }
-
     $check = orange_restore_pre_backup_revalidate($workRoot, $jobId, $backupRoot);
     if (!$check['ok']) {
         throw new RuntimeException((string) $check['code']);
@@ -607,6 +631,8 @@ function orange_restore_pre_backup_run_cli(
         );
         $partial['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING;
         $partial['cli_needed'] = false;
+        $partial['origin'] = ORANGE_RESTORE_PRE_BACKUP_PURPOSE;
+        $partial['cli_command'] = '';
         orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
         orange_restore_pre_backup_heartbeat($workRoot, $jobId);
 
@@ -816,7 +842,8 @@ function orange_restore_pre_backup_run_cli(
         $partial['retention_pinned'] = !empty($partial['retention_pinned']);
         $partial['failure_code'] = $code;
         $partial['execution_started'] = false;
-        $partial['cli_needed'] = true;
+        $partial['cli_needed'] = false;
+        $partial['cli_command'] = '';
         try {
             orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
         } catch (Throwable) {

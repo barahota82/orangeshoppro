@@ -1709,12 +1709,19 @@ function orange_backup_admin_discard_captured_stdout(string $captured): void
 }
 
 /**
- * Admin API boundary for manual Full Backup — run via CLI capture; preserve engine logs on disk.
+ * Authoritative Full Backup execution service (single engine path).
+ *
+ * Used by:
+ * - Backup Center (`admin/api/backup/run-full.php` via orange_backup_admin_run_full_for_api)
+ * - Restore Center Step 6 adapter (pre-restore mandatory Full backup)
+ *
+ * Production contract: CLI capture of scripts/backup/run_full_backup.php → orange_backup_run_full().
+ * Never invoke via internal HTTP. Never invent a second dump/package engine.
  *
  * @param array<string, mixed> $options
  * @return array<string, mixed>
  */
-function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
+function orange_backup_execute_full_authoritative(string $projectRoot, array $options = []): array
 {
     $startedAt = gmdate('c');
 
@@ -1749,13 +1756,29 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
         (int) ($capture['exit_code'] ?? 1),
         (string) ($capture['stderr'] ?? '')
     );
-    $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
+    // Backup Center may refresh an omitted snapshot name; Restore Step 6 must bind only
+    // the authoritative CLI identity (never "latest directory" guess).
+    if (empty($options['forbid_latest_snapshot_refresh'])) {
+        $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
+    }
 
     return array_merge($parsed, [
         'started_at' => $startedAt,
         'finished_at' => gmdate('c'),
         'action' => 'run_full_backup',
+        'latest_snapshot_refresh_applied' => empty($options['forbid_latest_snapshot_refresh']),
     ]);
+}
+
+/**
+ * Admin API boundary for manual Full Backup — thin authorized caller of the shared service.
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
+{
+    return orange_backup_execute_full_authoritative($projectRoot, $options);
 }
 
 /**

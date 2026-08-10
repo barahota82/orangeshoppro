@@ -66,7 +66,7 @@ and exits non-zero **before** loading orchestrators or parsing credentials.
 | `restore_job_status.php` | Generic job status |
 | `restore_full_to_staging.php` | Full → staging only |
 | `restore_country_to_staging.php` | Country → staging only |
-| `restore_prepare_backup.php` | 3B pre-restore Full anchor |
+| ~~`restore_prepare_backup.php`~~ | **Removed (2026-08-10):** Step 6 uses Admin shared Full Backup service only |
 | `restore_shadow_db.php` / `verify` / `files` / `smoke` | 3B shadow path (no production cutover) |
 
 ---

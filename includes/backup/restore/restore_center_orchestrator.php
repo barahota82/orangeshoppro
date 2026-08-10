@@ -37,8 +37,9 @@ const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
  */
 function orange_restore_center_worker_pending_status_map(): array
 {
+    // Step 6 (pre_restore_backup) is NOT an orchestrator worker — it uses the shared
+    // Full Backup service via request-pre-restore-backup.php (Owner 2026-08-10).
     return [
-        'pre_restore_backup' => ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
         'shadow_db' => ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
         'shadow_smoke' => ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
         'production_import' => ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
@@ -55,7 +56,6 @@ function orange_restore_center_worker_pending_status_map(): array
 function orange_restore_center_worker_dispatch_failure_status_map(): array
 {
     return [
-        'pre_restore_backup' => ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
         'shadow_db' => ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
         'shadow_smoke' => ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
         'production_import' => ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
@@ -70,7 +70,6 @@ function orange_restore_center_worker_dispatch_failure_status_map(): array
 function orange_restore_center_worker_dispatch_failure_phase_map(): array
 {
     return [
-        'pre_restore_backup' => ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_FAILED,
         'shadow_db' => ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_FAILED,
         'shadow_smoke' => ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_FAILED,
         'production_import' => ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_FAILED,
@@ -138,8 +137,8 @@ function orange_restore_center_compensate_unconsumed_pending(
  */
 function orange_restore_center_worker_catalog(): array
 {
+    // pre_restore_backup intentionally absent — Restore Step 6 uses shared Full Backup service.
     $catalog = [
-        'pre_restore_backup' => 'scripts/backup/restore_prepare_backup.php',
         'shadow_db' => 'scripts/backup/restore_shadow_db.php',
         'shadow_verify' => 'scripts/backup/restore_shadow_verify.php',
         'shadow_files' => 'scripts/backup/restore_shadow_files.php',
@@ -171,11 +170,6 @@ function orange_restore_center_worker_catalog(): array
 function orange_restore_center_worker_schedulable_statuses_map(): array
 {
     $map = [
-        'pre_restore_backup' => [
-            ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
-            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
-            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
-        ],
         'shadow_db' => [
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
             ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
@@ -239,11 +233,6 @@ function orange_restore_center_worker_schedulable_statuses_map(): array
 function orange_restore_center_worker_inflight_statuses_map(): array
 {
     return [
-        'pre_restore_backup' => [
-            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
-            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING,
-            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING,
-        ],
         'shadow_db' => [
             ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
             ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,

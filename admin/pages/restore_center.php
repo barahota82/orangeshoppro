@@ -1088,9 +1088,35 @@ body.rc-modal-open{overflow:hidden!important}
         if (/بدون\s*تسليم\s*CLI/i.test(s) || /\bCLI\b/i.test(s) || /no[-_ ]?cli/i.test(s)) {
             return 'يستمر التنفيذ تلقائيًا على الخادم.';
         }
+        /* Step-6 shared Full Backup service — map known internal English operator notes. */
+        if (/shared\s+Full\s+Backup\s+running/i.test(s) || /shared\s+full\s+backup\s+running/i.test(s)) {
+            return 'جارٍ إنشاء النسخة الاحتياطية الكاملة عبر المحرك المعتمد.';
+        }
+        if (/shared\s+verification\s+running/i.test(s) || /verification\s+running/i.test(s)) {
+            return 'جارٍ التحقق من جاهزية النسخة الاحتياطية.';
+        }
+        if (/Pre-restore\s+Full\s+backup\s+ready/i.test(s) || /retention-?pinned/i.test(s)) {
+            return 'النسخة الاحتياطية جاهزة وآمنة للرجوع ومثبتة ضد الحذف.';
+        }
+        if (/Pre-restore\s+backup\s+pending/i.test(s) || /shared\s+Full\s+Backup\s+service/i.test(s)) {
+            return 'بانتظار تنفيذ النسخة الاحتياطية الإلزامية عبر المحرك المعتمد.';
+        }
+        if (/engine\s+failure/i.test(s)) {
+            return 'فشل محرك النسخ الاحتياطي. يمكن إعادة المحاولة من مركز الاسترداد.';
+        }
+        if (/verification\s+failure/i.test(s) || /verify\s+failed/i.test(s)) {
+            return 'فشل التحقق من الحزمة. لن تُعتمد كنسخة جاهزة.';
+        }
+        if (/binding\s+failure/i.test(s) || /package\s+bind/i.test(s)) {
+            return 'تعذر ربط الحزمة بمهمة الاسترداد. لن تُفتح الخطوة التالية.';
+        }
         s = operatorMessage(s);
         if (/Worker\s+dispatch\s+failed/i.test(s) || /retry from Restore Center/i.test(s)) {
             return 'تعذر بدء عامل التنفيذ — يمكن إعادة المحاولة من شاشة الاسترداد.';
+        }
+        /* Last resort: never show Latin-only internal notes in the operator context card. */
+        if (s !== '' && !/[\u0600-\u06FF]/.test(s) && /[A-Za-z]/.test(s)) {
+            return 'تحديث حالة مهمة الاسترداد.';
         }
         return s;
     };
@@ -1366,8 +1392,8 @@ body.rc-modal-open{overflow:hidden!important}
     }
 
     const RC_SCHEDULED_MSG = 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
-    const RC_PRE_BACKUP_SCHEDULED_MSG = 'تم بدء تنفيذ النسخة الاحتياطية الإلزامية.\nيمكنك مغادرة الصفحة، وسيستمر التنفيذ على الخادم.';
-    const RC_PRE_BACKUP_SCHEDULE_FAIL_MSG = 'تعذر بدء عامل تنفيذ النسخة الاحتياطية الإلزامية.\nلم يبدأ أي تنفيذ، ويمكن إعادة المحاولة من شاشة الاسترداد.';
+    const RC_PRE_BACKUP_OK_MSG = 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.';
+    const RC_PRE_BACKUP_FAIL_MSG = 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد.\nلم تُربط أي حزمة، ويمكن إعادة المحاولة من شاشة الاسترداد.';
 
     function deriveReadiness(ov, maint) {
         const counts = (ov && ov.job_counts) || {};
@@ -2022,11 +2048,18 @@ body.rc-modal-open{overflow:hidden!important}
                 setCurrent(5, 'نفّذ النسخة الاحتياطية الإلزامية قبل الاسترداد. لا تُعتبر هذه الخطوة مكتملة قبل جهوزية النسخة.');
                 primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد', true);
             } else if (job.status === 'pre_restore_backup_pending' || job.is_pre_restore_backup_failed) {
-                setCurrent(5, job.is_pre_restore_backup_failed
-                    ? 'فشل إعداد النسخة الاحتياطية. أعد التنفيذ ثم حدّث الحالة.'
-                    : 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة. تابع التنفيذ أو حدّث الحالة بعد انتهاء العامل.');
-                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'pre_restore_backup' }, 'متابعة النسخة الاحتياطية', true);
-            } else if (isRunningish(job, 'pre_restore_backup') || stIncludes(job, 'pre_restore_backup_running') || stIncludes(job, 'pre_restore_backup_verifying')) {
+                let failBody = 'فشل إعداد النسخة الاحتياطية. أعد التنفيذ ثم حدّث الحالة.';
+                if (job.is_pre_restore_backup_failed) {
+                    const mappedFail = operatorJobMessage(job.message || '');
+                    if (mappedFail && mappedFail !== 'تحديث حالة مهمة الاسترداد.') {
+                        failBody = mappedFail;
+                    }
+                } else {
+                    failBody = 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة. أعد التنفيذ عبر محرك Full Backup المعتمد ثم حدّث الحالة.';
+                }
+                setCurrent(5, failBody);
+                primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'متابعة النسخة الاحتياطية', true);
+            } else if (stIncludes(job, 'pre_restore_backup_running') || stIncludes(job, 'pre_restore_backup_verifying')) {
                 // Presentation-only: in-progress is current (orange), never failure-red "محظور".
                 // Authoritative completion still requires pre_restore_backup_ready (backupDone).
                 if (stIncludes(job, 'pre_restore_backup_verifying')) {
@@ -2653,8 +2686,8 @@ body.rc-modal-open{overflow:hidden!important}
         if (job.pre_restore_backup_requestable) {
             html += '<button type="button" class="btn-link rc-pre-backup-req" data-id="' + id + '">تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد</button> ';
         }
-        if (job.status === 'pre_restore_backup_pending') {
-            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="pre_restore_backup">متابعة النسخة الاحتياطية</button> ';
+        if (job.status === 'pre_restore_backup_pending' || job.is_pre_restore_backup_failed) {
+            html += '<button type="button" class="btn-link rc-pre-backup-req" data-id="' + id + '">متابعة النسخة الاحتياطية</button> ';
         }
         if (job.has_pre_restore_backup) {
             html += '<button type="button" class="btn-link rc-pre-backup-view" data-id="' + id + '">عرض حالة النسخة الاحتياطية</button> ';
@@ -3098,23 +3131,33 @@ body.rc-modal-open{overflow:hidden!important}
         }
 
         if (t.classList.contains('rc-pre-backup-req')) {
+            const jobId = t.dataset.id || '';
+            const inflightKey = String(jobId) + '::pre_restore_backup_shared';
+            if (rcScheduleInFlight.has(inflightKey)) {
+                showRcTerminalMessage('تنفيذ النسخة الاحتياطية يعمل بالفعل لهذه المهمة. لن يُبدأ تنفيذ مكرر.', false);
+                return;
+            }
+            rcScheduleInFlight.add(inflightKey);
             try {
-                await requestThenRunWorker(
-                    'job/request-pre-restore-backup.php',
-                    'pre_restore_backup',
-                    t.dataset.id || '',
-                    'جاري بدء النسخة الاحتياطية الإلزامية…',
-                    'جاري بدء النسخة الاحتياطية الإلزامية…'
-                );
-                showRcTerminalMessage(RC_PRE_BACKUP_SCHEDULED_MSG, true);
+                setBusy(true, 'جاري إنشاء النسخة الاحتياطية الإلزامية عبر محرك Full Backup المعتمد…');
+                const j = await apiPost('job/request-pre-restore-backup.php', {
+                    csrf_token: state.csrf,
+                    job_id: jobId
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                if (!j.success) {
+                    throw new Error(j.message || RC_PRE_BACKUP_FAIL_MSG);
+                }
+                showRcTerminalMessage(j.message || RC_PRE_BACKUP_OK_MSG, true);
                 await loadAll();
             } catch (e) {
-                const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || '';
+                const reason = (e && e.message) ? String(e.message) : '';
                 showRcTerminalMessage(
-                    reason && reason.indexOf('تعمل بالفعل') !== -1 ? reason : RC_PRE_BACKUP_SCHEDULE_FAIL_MSG,
+                    reason && reason.indexOf('تعمل بالفعل') !== -1 ? reason : (reason || RC_PRE_BACKUP_FAIL_MSG),
                     false
                 );
             } finally {
+                rcScheduleInFlight.delete(inflightKey);
                 setBusy(false);
             }
             return;

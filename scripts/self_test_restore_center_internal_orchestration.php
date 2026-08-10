@@ -103,10 +103,10 @@ orch_ok(!preg_match(
     '/async function requestThenRunWorker[\s\S]*?apiPost\(requestPath/',
     $pageSrc
 ), 'CORE requestThenRunWorker no longer separate request HTTP');
-orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_SCHEDULED_MSG'), 'CORE Step6 success Arabic constant');
-orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_SCHEDULE_FAIL_MSG'), 'CORE Step6 failure Arabic constant');
-orch_ok(str_contains($pageSrc, 'تم بدء تنفيذ النسخة الاحتياطية الإلزامية'), 'CORE Step6 success Arabic text');
-orch_ok(str_contains($pageSrc, 'تعذر بدء عامل تنفيذ النسخة الاحتياطية الإلزامية'), 'CORE Step6 failure Arabic text');
+orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_OK_MSG'), 'CORE Step6 success Arabic constant');
+orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_FAIL_MSG'), 'CORE Step6 failure Arabic constant');
+orch_ok(str_contains($pageSrc, 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد'), 'CORE Step6 success Arabic text');
+orch_ok(str_contains($pageSrc, 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد'), 'CORE Step6 failure Arabic text');
 orch_ok(str_contains($pageSrc, 'APPROVED_CREATE_BUTTON_POSITION_CHANGED=0'), 'FREEZE create position');
 orch_ok(str_contains($pageSrc, 'APPROVED_STEP1_BEHAVIOR_CHANGED=0'), 'FREEZE step1');
 orch_ok(str_contains($pageSrc, 'APPROVED_MOBILE_ORDER_CHANGED=0'), 'FREEZE mobile order');
@@ -167,11 +167,18 @@ if (is_file($gateGen)) {
 }
 
 $catalog = orange_restore_center_worker_catalog();
-orch_ok(count($catalog) >= 9, 'RESTORE_WORKER_CATALOG_COUNT>=9 actual=' . count($catalog));
+orch_ok(!isset($catalog['pre_restore_backup']), 'STEP6 pre_restore_backup removed from worker catalog');
+orch_ok(count($catalog) >= 8, 'RESTORE_WORKER_CATALOG_COUNT>=8 actual=' . count($catalog));
+
+$step6ReqSrc = (string) file_get_contents($projectRoot . '/admin/api/restore/job/request-pre-restore-backup.php');
+orch_ok(str_contains($step6ReqSrc, 'orange_restore_admin_fw_execute_pre_restore_backup'), 'Step6 uses shared-engine adapter');
+orch_ok(!str_contains($step6ReqSrc, 'attach_verified_schedule'), 'Step6 request does NOT schedule orchestrator');
+orch_ok(str_contains($step6ReqSrc, 'orange_backup_execute_full_authoritative')
+    || str_contains((string) file_get_contents($projectRoot . '/includes/backup/restore/restore_pre_restore_backup.php'), 'orange_backup_execute_full_authoritative'),
+    'Step6 wired to shared Full Backup service');
 
 $workerMatrix = [];
 $requestMap = [
-    'pre_restore_backup' => 'admin/api/restore/job/request-pre-restore-backup.php',
     'shadow_db' => 'admin/api/restore/job/request-shadow-restore.php',
     'shadow_verify' => '', // schedule-only
     'shadow_files' => '', // schedule-only
@@ -442,8 +449,9 @@ orch_ok($completed, '10 completed job rejected');
 
 /* Spawn failure: missing script → no false success; pending compensated via existing failed state */
 $prevCatalog = $GLOBALS['orange_restore_center_test_worker_catalog'];
-$GLOBALS['orange_restore_center_test_worker_catalog']['pre_restore_backup'] = 'scripts/backup/__missing_orch_worker__.php';
-$seedJob($workRoot, 'ORCHFAIL1', ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING);
+$GLOBALS['orange_restore_center_test_worker_catalog']['shadow_db'] = 'scripts/backup/__missing_orch_worker__.php';
+unset($GLOBALS['orange_restore_center_test_worker_absolute']['shadow_db']);
+$seedJob($workRoot, 'ORCHFAIL1', ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING);
 $spawnFail = false;
 $falseSuccess = false;
 try {
@@ -451,7 +459,7 @@ try {
         $projectRoot,
         $workRoot,
         'ORCHFAIL1',
-        'pre_restore_backup',
+        'shadow_db',
         'orch_test'
     );
     $falseSuccess = !empty($bad['scheduled']);
@@ -464,9 +472,18 @@ $afterStatus = (string) ($after['status'] ?? '');
 $GLOBALS['orange_restore_center_test_worker_catalog'] = $prevCatalog;
 orch_ok($spawnFail && !$falseSuccess, '11 spawn failure creates no false success');
 orch_ok(
-    $afterStatus === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+    $afterStatus === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
     '12 spawn failure leaves no pending-without-worker status=' . $afterStatus
 );
+
+/* Step 6 must not be schedulable via orchestrator */
+$step6Unknown = false;
+try {
+    orange_restore_center_assert_worker_key('pre_restore_backup');
+} catch (Throwable $e) {
+    $step6Unknown = trim($e->getMessage()) === 'restore_center_unknown_worker';
+}
+orch_ok($step6Unknown, '12b Step6 pre_restore_backup unknown to orchestrator');
 
 /* Dead claim handling */
 $seedJob($workRoot, 'ORCHDEAD1', ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION);
@@ -537,12 +554,18 @@ orch_ok(
 );
 orch_ok(empty($sched['cli_command']) && empty($sched['cli_needed']), '15 schedule result strips CLI fields');
 
-/* Step-6 chain classification after fix */
-$step6Class = 'C. SERVER_ATOMIC_REQUEST_AND_SCHEDULE';
+/* Step-6 chain: shared Full Backup service (not orchestrator schedule) */
+$step6Class = 'A. BACKUP_CENTER_SYNCHRONOUS_SHARED_SERVICE';
+orch_ok(
+    str_contains($pageSrc, 'job/request-pre-restore-backup.php')
+    && str_contains($step6ReqSrc, 'orange_restore_admin_fw_execute_pre_restore_backup')
+    && !str_contains($pageSrc, "data-worker': 'pre_restore_backup'"),
+    'STEP6 chain class A shared Full Backup service'
+);
 orch_ok(
     str_contains($pageSrc, 'return runRestoreWorker(')
     && str_contains($runSrc, 'orange_restore_center_request_and_schedule'),
-    'STEP6 chain class C single authoritative schedule'
+    'remaining workers still use orchestrator schedule'
 );
 
 /* Schema freeze */

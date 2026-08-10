@@ -59,7 +59,7 @@ function orange_restore_approved_non_mutation_restore_clis(): array
         'scripts/backup/restore_job_status.php',
         'scripts/backup/restore_full_to_staging.php',
         'scripts/backup/restore_country_to_staging.php',
-        'scripts/backup/restore_prepare_backup.php',
+        'scripts/backup/restore_country_shadow.php',
         'scripts/backup/restore_shadow_db.php',
         'scripts/backup/restore_shadow_verify.php',
         'scripts/backup/restore_shadow_files.php',

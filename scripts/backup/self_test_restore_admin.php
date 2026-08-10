@@ -2323,21 +2323,24 @@ restore_admin_self_test(!is_dir($projectRoot . DIRECTORY_SEPARATOR . 'admin' . D
 restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'run.php'), 'regression: no run endpoint file');
 restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'resume.php'), 'regression: no resume endpoint file');
 restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'unpin.php'), 'regression: no unpin endpoint');
-restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_prepare_backup.php'), 'pre-backup: CLI entry present');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_prepare_backup.php'), 'pre-backup: obsolete CLI worker deleted');
 restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php'), 'pre-backup: request API present');
 $preBackupLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_pre_restore_backup.php');
 restore_admin_self_test(
-    str_contains($preBackupLib, 'orange_backup_run_full')
+    str_contains($preBackupLib, 'orange_backup_execute_full_authoritative')
     && str_contains($preBackupLib, 'orange_backup_verify_full_package')
     && str_contains($preBackupLib, 'orange_recovery_validate_package')
     && str_contains($preBackupLib, 'orange_backup_retention_pin_package')
-    && !str_contains($preBackupLib, 'orange_restore_full_staging_run('),
-    'pre-backup: reuses Full/Verify/DRV/pin without staging restore'
+    && !str_contains($preBackupLib, 'orange_restore_full_staging_run(')
+    && !preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $preBackupLib),
+    'pre-backup: shared Full service + Verify/DRV/pin without staging restore'
 );
 $reqApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php');
 restore_admin_self_test(
-    !str_contains($reqApi, 'orange_restore_pre_backup_run_cli') && !str_contains($reqApi, 'orange_backup_run_full'),
-    'pre-backup: HTTP request does not run backup engine'
+    str_contains($reqApi, 'orange_restore_admin_fw_execute_pre_restore_backup')
+    && !str_contains($reqApi, 'attach_verified_schedule')
+    && !str_contains($reqApi, 'orange_backup_run_full('),
+    'pre-backup: HTTP Step6 adapter uses shared service (no orchestrator)'
 );
 
 restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_shadow_db.php'), 'shadow: CLI entry present');

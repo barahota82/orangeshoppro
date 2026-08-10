@@ -1121,7 +1121,7 @@ function orange_restore_admin_fw_maintenance_status(string $workRoot): array
 }
 
 /**
- * Request pre-restore Full backup preparation (metadata only; CLI runs the engine).
+ * Request pre-restore Full backup metadata (legacy helper; prefer execute adapter).
  *
  * @return array<string, mixed>
  */
@@ -1147,6 +1147,81 @@ function orange_restore_admin_fw_request_pre_restore_backup(
     }
 
     return orange_restore_pre_backup_request($workRoot, $jobId, $backupRoot, $admin);
+}
+
+/**
+ * Restore Step-6 adapter: validate job → shared Full Backup service → bind package → ready.
+ * Does not use run-worker / launch.cmd / Step-6 orchestrator catalog.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_execute_pre_restore_backup(
+    string $projectRoot,
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    if ($status === ORANGE_RESTORE_FW_STATUS_CANCELLED
+        || $status === 'execution_cancelled') {
+        throw new RuntimeException('restore_job_cancelled');
+    }
+    if ($status === ORANGE_RESTORE_FW_STATUS_COMPLETED
+        || $status === ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED) {
+        throw new RuntimeException('restore_job_completed');
+    }
+
+    $operator = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+    if ($operator === '') {
+        $operator = 'admin';
+    }
+
+    $exec = orange_restore_pre_backup_execute(
+        $projectRoot,
+        $workRoot,
+        $backupRoot,
+        $jobId,
+        $operator
+    );
+
+    $fresh = orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId));
+    $ok = !empty($exec['ok']);
+
+    return [
+        'ok' => $ok,
+        'success' => $ok,
+        'idempotent' => (bool) ($exec['idempotent'] ?? false),
+        'execution_started' => false,
+        'scheduled' => false,
+        'detached' => false,
+        'cli_needed' => false,
+        'cli_command' => '',
+        'operator_action_required' => false,
+        'shared_full_backup_service' => 'orange_backup_execute_full_authoritative',
+        'rollback_package_id' => (string) ($exec['rollback_package_id'] ?? ''),
+        'code' => (string) ($exec['code'] ?? ($ok ? 'pre_restore_backup_ready' : 'pre_restore_backup_failed')),
+        'job' => $fresh,
+        'record' => $exec['record'] ?? null,
+        'message' => $ok
+            ? 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.'
+            : 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد. يمكن إعادة المحاولة من مركز الاسترداد.',
+    ];
 }
 
 /**
