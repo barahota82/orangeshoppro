@@ -18,6 +18,12 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
+if (PHP_OS_FAMILY !== 'Windows') {
+    echo "SKIP Windows/Plesk php-cgi sibling resolver test\n";
+    echo "RESULT=SKIP\n";
+    exit(0);
+}
+
 $realPhp = 'C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe';
 if (!is_file($realPhp)) {
     $realPhp = PHP_BINARY;
@@ -68,7 +74,7 @@ function a3_rm_tree(string $dir): void
 
 $evidenceDir = 'D:/orange_restore_live_step6_failure_evidence';
 $runtimeDir = $evidenceDir . '/ISOLATED_RUNTIME_TEST/attempt3_sibling_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(2));
-foreach ([$evidenceDir, $evidenceDir . '/ISOLATED_RUNTIME_TEST', $runtimeDir] as $d) {
+foreach ([$evidenceDir, $evidenceDir . '/CODE_VERIFIED', $evidenceDir . '/ISOLATED_RUNTIME_TEST', $runtimeDir] as $d) {
     if (!is_dir($d)) {
         mkdir($d, 0777, true);
     }
