@@ -677,6 +677,46 @@ function orange_restore_center_powershell_quote(string $value): string
     return "'" . str_replace("'", "''", $value) . "'";
 }
 
+/**
+ * Classify detached worker log bootstrap failures (safe codes only — no path leakage).
+ */
+function orange_restore_center_classify_worker_log_bootstrap(string $logPath): string
+{
+    if ($logPath === '' || !is_file($logPath)) {
+        return '';
+    }
+    $size = (int) @filesize($logPath);
+    if ($size <= 0) {
+        return '';
+    }
+    $raw = (string) @file_get_contents($logPath);
+    if ($raw === '') {
+        return '';
+    }
+    // Windows cmd when launch binary is bare "php" / missing from PATH.
+    if (preg_match('/is not recognized as an internal or external command/i', $raw) === 1
+        || preg_match('/not recognized as an internal or external command/i', $raw) === 1
+        || preg_match('/command not found/i', $raw) === 1
+        || preg_match('/No such file or directory/i', $raw) === 1) {
+        return 'restore_center_worker_executable_unavailable';
+    }
+
+    return '';
+}
+
+/**
+ * Normalize orchestration exception codes for audit + operator surface.
+ */
+function orange_restore_center_normalize_failure_code(string $code): string
+{
+    $code = trim($code);
+    if ($code === 'php_cli_binary_unavailable') {
+        return 'restore_center_worker_executable_unavailable';
+    }
+
+    return $code !== '' ? $code : 'restore_center_spawn_failed';
+}
+
 function orange_restore_center_resolve_powershell_binary(): string
 {
     foreach (orange_backup_powershell_known_paths() as $candidate) {
@@ -765,6 +805,8 @@ function orange_restore_center_operator_reason_ar(string $code, string $jobStatu
         'restore_center_invalid_stage' => 'لا يمكن بدء هذه المرحلة الآن من مركز الاسترداد. أكمل المتطلبات السابقة أو حدّث الحالة.',
         'restore_center_worker_already_running' => 'تنفيذ هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.',
         'restore_center_spawn_failed' => 'تعذر بدء عامل التنفيذ على الخادم. لم يبدأ أي تنفيذ، ويمكن إعادة المحاولة من شاشة الاسترداد.',
+        'restore_center_worker_executable_unavailable' => 'تعذر بدء عامل التنفيذ لأن بيئة التشغيل على الخادم غير جاهزة لتشغيل العامل الداخلي. لم يبدأ أي تنفيذ، ويمكن إعادة المحاولة من شاشة الاسترداد بعد إصلاح البيئة.',
+        'php_cli_binary_unavailable' => 'تعذر بدء عامل التنفيذ لأن بيئة التشغيل على الخادم غير جاهزة لتشغيل العامل الداخلي. لم يبدأ أي تنفيذ، ويمكن إعادة المحاولة من شاشة الاسترداد بعد إصلاح البيئة.',
         'restore_center_mutex_open_failed' => 'تعذر قفل بدء المرحلة على الخادم. أعد المحاولة من مركز الاسترداد.',
         'restore_center_spawn_launch_cmd_failed' => 'تعذر تجهيز التشغيل الداخلي على الخادم. أعد المحاولة من مركز الاسترداد.',
         'restore_center_unknown_worker' => 'مرحلة تنفيذ غير معروفة في قائمة التنسيق.',
@@ -995,7 +1037,16 @@ function orange_restore_center_run_worker(
     try {
         $relative = orange_restore_center_assert_worker_key($workerKey);
         $script = orange_restore_center_resolve_worker_script($projectRoot, $relative);
-        $phpBinary = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+        try {
+            $phpBinary = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+        } catch (Throwable $resolveEx) {
+            throw new RuntimeException(
+                orange_restore_center_normalize_failure_code(trim($resolveEx->getMessage()))
+            );
+        }
+        if (!orange_backup_admin_php_cli_path_is_absolute($phpBinary) || !is_file($phpBinary)) {
+            throw new RuntimeException('restore_center_worker_executable_unavailable');
+        }
         $logPath = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
         $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, $workerKey);
 
@@ -1020,8 +1071,19 @@ function orange_restore_center_run_worker(
             $workerKey
         );
         $pid = (int) ($spawned['pid'] ?? 0);
-        if ($pid <= 0 || !orange_restore_center_process_alive($pid)) {
-            throw new RuntimeException('restore_center_spawn_failed');
+        $alive = $pid > 0 && orange_restore_center_process_alive($pid);
+        if (!$alive) {
+            // Windows launcher PID can exit while worker continues; spawn_detached already
+            // accepted a non-empty log. Re-classify bootstrap failures before generic spawn_failed.
+            $bootCode = orange_restore_center_classify_worker_log_bootstrap($logPath);
+            if ($bootCode !== '') {
+                throw new RuntimeException($bootCode);
+            }
+            $logOk = is_file($logPath) && (int) @filesize($logPath) > 0;
+            if (!$logOk) {
+                throw new RuntimeException('restore_center_spawn_failed');
+            }
+            // Log present without executable-missing markers: accept short-lived launcher PID.
         }
 
         $claim = [
@@ -1051,7 +1113,7 @@ function orange_restore_center_run_worker(
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
         ]);
     } catch (Throwable $e) {
-        $code = trim($e->getMessage());
+        $code = orange_restore_center_normalize_failure_code(trim($e->getMessage()));
         if ($code !== 'restore_center_worker_already_running') {
             try {
                 if ($jobStatus === '') {
@@ -1061,13 +1123,23 @@ function orange_restore_center_run_worker(
             } catch (Throwable $ignored) {
                 // keep prior jobStatus
             }
+            // Prefer log-derived executable failure over generic spawn_failed when present.
+            try {
+                $logPathCatch = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
+                $bootCode = orange_restore_center_classify_worker_log_bootstrap($logPathCatch);
+                if ($bootCode !== '' && ($code === 'restore_center_spawn_failed' || $code === '')) {
+                    $code = $bootCode;
+                }
+            } catch (Throwable $ignoredBoot) {
+                // keep prior code
+            }
             orange_restore_fw_audit_append($workRoot, $jobId, [
                 'event' => 'restore_center_worker_schedule_failed',
                 'result' => 'fail',
                 'worker' => $workerKey,
                 'script' => $relative,
                 'detached' => true,
-                'code' => $code !== '' ? $code : 'restore_center_spawn_failed',
+                'code' => $code,
                 'job_status' => $jobStatus,
                 'operator_username' => $operatorUsername,
                 'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
@@ -1077,8 +1149,11 @@ function orange_restore_center_run_worker(
                 $workRoot,
                 $jobId,
                 $workerKey,
-                $code !== '' ? $code : 'restore_center_spawn_failed'
+                $code
             );
+        }
+        if (trim($e->getMessage()) !== $code) {
+            throw new RuntimeException($code, 0, $e);
         }
         throw $e;
     } finally {

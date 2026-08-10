@@ -63,6 +63,9 @@ return [
     // 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
     // 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
     // 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    // اختياري فقط: مسار مطلق لـ PHP CLI (php.exe وليس php-cgi). ليس مطلوباً من المالك.
+    // الاكتشاف التلقائي: شقيق php.exe بجانب PHP_BINARY (php-cgi) أو PHP_BINDIR\\php.exe — بلا PATH/where.
+    // 'ORANGE_PHP_CLI' => 'C:\\Program Files (x86)\\Plesk\\Additional\\PleskPHP83\\php.exe',
     // اختياري — مدة الاحتفاظ بالنسخ الاحتياطية (أيام). الافتراضي 30 عند غياب المفتاح.
     // 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 

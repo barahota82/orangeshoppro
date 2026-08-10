@@ -3527,7 +3527,8 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(reason, false);
                 if (e.code === 'restore_center_invalid_stage'
                     || e.code === 'restore_center_worker_already_running'
-                    || e.code === 'restore_center_spawn_failed') {
+                    || e.code === 'restore_center_spawn_failed'
+                    || e.code === 'restore_center_worker_executable_unavailable') {
                     try {
                         await openOrchestratorDiagnostics(t.dataset.id || '');
                     } catch (ignored) { /* alert already shown */ }

@@ -108,6 +108,10 @@ try {
         $diagFull = null;
     }
 
+    $code = function_exists('orange_restore_center_normalize_failure_code')
+        ? orange_restore_center_normalize_failure_code($code)
+        : $code;
+
     $messages = [
         'restore_center_invalid_stage' => orange_restore_center_operator_reason_ar(
             'restore_center_invalid_stage',
@@ -120,6 +124,14 @@ try {
             isset($worker) ? (string) $worker : ''
         ),
         'restore_center_spawn_failed' => orange_restore_center_operator_reason_ar('restore_center_spawn_failed', $jobStatus),
+        'restore_center_worker_executable_unavailable' => orange_restore_center_operator_reason_ar(
+            'restore_center_worker_executable_unavailable',
+            $jobStatus
+        ),
+        'php_cli_binary_unavailable' => orange_restore_center_operator_reason_ar(
+            'restore_center_worker_executable_unavailable',
+            $jobStatus
+        ),
         'restore_center_mutex_open_failed' => orange_restore_center_operator_reason_ar('restore_center_mutex_open_failed'),
         'restore_center_spawn_launch_cmd_failed' => orange_restore_center_operator_reason_ar('restore_center_spawn_launch_cmd_failed'),
     ];
