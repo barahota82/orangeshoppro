@@ -17,6 +17,15 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only');
 }
 
+if (PHP_OS_FAMILY !== 'Windows') {
+    echo "SKIP Windows-only restore launch.cmd retry harness\n";
+    echo "\n=== SUMMARY ===\n";
+    echo "PASS=0\nFAIL=0\nSKIP=1\n";
+    echo "MUTATION_SENSITIVE=0\n";
+    echo "RESULT=PASS\n";
+    exit(0);
+}
+
 $projectRoot = dirname(__DIR__);
 $realPhp = 'C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe';
 if (!is_file($realPhp)) {
@@ -67,7 +76,9 @@ function s_rm_tree(string $dir): void
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_live_step6_failure_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_live_step6_failure_evidence'
+    : rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_restore_live_step6_failure_evidence';
 $runtimeDir = $evidenceDir . '/ISOLATED_RUNTIME_TEST/stale_launch_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(2));
 foreach ([$evidenceDir, $evidenceDir . '/ISOLATED_RUNTIME_TEST', $runtimeDir] as $d) {
     if (!is_dir($d)) {
