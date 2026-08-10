@@ -67,7 +67,9 @@ function s_rm_tree(string $dir): void
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_live_step6_failure_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_live_step6_failure_evidence'
+    : rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_restore_live_step6_failure_evidence';
 $runtimeDir = $evidenceDir . '/ISOLATED_RUNTIME_TEST/stale_launch_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(2));
 foreach ([$evidenceDir, $evidenceDir . '/ISOLATED_RUNTIME_TEST', $runtimeDir] as $d) {
     if (!is_dir($d)) {
