@@ -523,6 +523,7 @@ function orange_restore_center_claim_blocks_schedule(?array $claim, array $job, 
     $schedulable = $schedMap[$workerKey] ?? [];
     $pid = (int) ($claim['pid'] ?? 0);
     $alive = orange_restore_center_process_alive($pid);
+    $pidProbeReliable = !array_key_exists('pid_probe_reliable', $claim) || (bool) $claim['pid_probe_reliable'];
     $startedAt = strtotime((string) ($claim['started_at'] ?? ''));
     $age = $startedAt === false ? 0 : (time() - $startedAt);
     $inInflight = in_array($status, $inflight, true);
@@ -540,6 +541,9 @@ function orange_restore_center_claim_blocks_schedule(?array $claim, array $job, 
     if ($inInflight) {
         if ($age >= ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS) {
             return false;
+        }
+        if (!$pidProbeReliable) {
+            return true;
         }
         if (!orange_restore_center_can_probe_process_liveness()) {
             return true;
@@ -634,6 +638,7 @@ function orange_restore_center_spawn_detached_windows(
     if (@file_put_contents($launchCmdPath, $cmdBody) === false) {
         throw new RuntimeException('restore_center_spawn_launch_cmd_failed');
     }
+    $logSizeBefore = is_file($logPath) ? (int) @filesize($logPath) : 0;
 
     $ps = '$ErrorActionPreference = \'Stop\'; '
         . '$p = Start-Process -FilePath ' . orange_restore_center_powershell_quote($launchCmdPath)
@@ -657,19 +662,20 @@ function orange_restore_center_spawn_detached_windows(
     usleep(150000);
     // On Windows, Start-Process may return a short-lived launcher PID while the worker
     // cmd/php continues. Accept launch if the worker log was created/written.
-    if (!orange_restore_center_process_alive($pid)) {
-        $logStarted = is_file($logPath) && filesize($logPath) > 0;
+    $pidAlive = orange_restore_center_process_alive($pid);
+    if (!$pidAlive) {
+        $logStarted = is_file($logPath) && (int) @filesize($logPath) > $logSizeBefore;
         if (!$logStarted) {
             // Brief grace for log flush.
             usleep(200000);
-            $logStarted = is_file($logPath) && filesize($logPath) > 0;
+            $logStarted = is_file($logPath) && (int) @filesize($logPath) > $logSizeBefore;
         }
         if (!$logStarted) {
             throw new RuntimeException('restore_center_spawn_failed');
         }
     }
 
-    return ['pid' => $pid, 'launch_cmd' => $launchCmdPath];
+    return ['pid' => $pid, 'launch_cmd' => $launchCmdPath, 'pid_probe_reliable' => $pidAlive];
 }
 
 function orange_restore_center_powershell_quote(string $value): string
@@ -731,7 +737,7 @@ function orange_restore_center_resolve_powershell_binary(): string
 
 /**
  * @param list<string> $command
- * @return array{pid:int}
+ * @return array{pid:int,pid_probe_reliable?:bool}
  */
 function orange_restore_center_spawn_detached_unix(array $command, string $logPath): array
 {
@@ -756,12 +762,12 @@ function orange_restore_center_spawn_detached_unix(array $command, string $logPa
         throw new RuntimeException('restore_center_spawn_failed');
     }
 
-    return ['pid' => $pid];
+    return ['pid' => $pid, 'pid_probe_reliable' => true];
 }
 
 /**
  * @param list<string> $command
- * @return array{pid:int,launch_cmd?:string}
+ * @return array{pid:int,launch_cmd?:string,pid_probe_reliable?:bool}
  */
 function orange_restore_center_spawn_detached(
     array $command,
@@ -1071,6 +1077,7 @@ function orange_restore_center_run_worker(
             $workerKey
         );
         $pid = (int) ($spawned['pid'] ?? 0);
+        $pidProbeReliable = (bool) ($spawned['pid_probe_reliable'] ?? true);
         $alive = $pid > 0 && orange_restore_center_process_alive($pid);
         if (!$alive) {
             // Windows launcher PID can exit while worker continues; spawn_detached already
@@ -1084,6 +1091,7 @@ function orange_restore_center_run_worker(
                 throw new RuntimeException('restore_center_spawn_failed');
             }
             // Log present without executable-missing markers: accept short-lived launcher PID.
+            $pidProbeReliable = false;
         }
 
         $claim = [
@@ -1098,6 +1106,7 @@ function orange_restore_center_run_worker(
             'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             'detached' => true,
+            'pid_probe_reliable' => $pidProbeReliable,
         ];
         orange_restore_center_write_run_claim($claimPath, $claim);
 
