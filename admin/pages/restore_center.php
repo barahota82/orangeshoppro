@@ -1391,7 +1391,7 @@ body.rc-modal-open{overflow:hidden!important}
         'rc-pre-backup-req', 'rc-shadow-req', 'rc-shadow-smoke-req',
         'rc-maint-req', 'rc-maint-activate', 'rc-pca-authorize',
         'rc-prod-import-req', 'rc-uploads-cutover-req', 'rc-rollback-req',
-        'rc-finalize-req', 'rc-run-worker', 'rc-cancel', 'rc-cancel-exec'
+        'rc-finalize-req', 'rc-run-worker', 'rc-fw-cancel', 'rc-cancel-exec'
     ];
 
     function rcStageActionKey(ctrl) {
@@ -1438,6 +1438,30 @@ body.rc-modal-open{overflow:hidden!important}
 
     function endStageActionLock(key) {
         if (key) rcStageActionLocks.delete(key);
+    }
+
+    function releaseStageActionControl(ctrl) {
+        if (!ctrl) return;
+        const key = ctrl.getAttribute('data-rc-lock-key') || '';
+        endStageActionLock(key);
+        ctrl.removeAttribute('data-rc-lock-key');
+        unlockStageActionControl(ctrl);
+    }
+
+    function isStageActionNetworkAmbiguous(err, reason) {
+        const msg = String(reason || (err && err.message) || '');
+        return !!(err && (err.name === 'TypeError' || /failed to fetch|network|timeout/i.test(msg)));
+    }
+
+    async function handleStageActionFailure(ctrl, err, fallbackMessage) {
+        const reason = (err && err.message) ? String(err.message) : '';
+        if (isStageActionNetworkAmbiguous(err, reason)) {
+            await reconcileAfterStageAmbiguity(ctrl, ctrl ? (ctrl.getAttribute('data-rc-lock-key') || '') : '');
+            return;
+        }
+        showRcTerminalMessage(reason || fallbackMessage, false);
+        releaseStageActionControl(ctrl);
+        await loadAll();
     }
 
     /**
@@ -3148,10 +3172,12 @@ body.rc-modal-open{overflow:hidden!important}
                 const btnKey = t.dataset.pkgKey || packageKey(type, id, cc);
                 if (state.selectedPackage && state.selectedPackage.key && state.selectedPackage.key !== btnKey) {
                     showRcTerminalMessage('تعذر إنشاء المهمة: الحزمة المحددة غير متطابقة مع زر الإنشاء.', false, t);
+                    releaseStageActionControl(t);
                     return;
                 }
                 if (!canCreateForPackageType(type)) {
                     showRcTerminalMessage('لا تملك صلاحية إنشاء مهمة استرداد لهذا النوع من الحزم.', false, t);
+                    releaseStageActionControl(t);
                     return;
                 }
                 setBusy(true, 'جاري إنشاء المهمة…');
@@ -3165,7 +3191,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage('تم إنشاء المهمة وتوقفت عند انتظار التأكيد.', true, t);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر إنشاء المهمة', false, t);
+                await handleStageActionFailure(t, e, 'تعذر إنشاء المهمة');
             } finally {
                 setBusy(false);
             }
@@ -3193,7 +3219,7 @@ body.rc-modal-open{overflow:hidden!important}
                 }
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر التحقق التشغيلي', false);
+                await handleStageActionFailure(t, e, 'تعذر التحقق التشغيلي');
             } finally {
                 setBusy(false);
             }
@@ -3240,7 +3266,7 @@ body.rc-modal-open{overflow:hidden!important}
                 }
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر إعداد الخطة', false);
+                await handleStageActionFailure(t, e, 'تعذر إعداد الخطة');
             } finally {
                 setBusy(false);
             }
@@ -3287,7 +3313,7 @@ body.rc-modal-open{overflow:hidden!important}
             const inflightKey = String(jobId) + '::pre_restore_backup_shared';
             if (rcScheduleInFlight.has(inflightKey)) {
                 showRcTerminalMessage('تنفيذ النسخة الاحتياطية يعمل بالفعل لهذه المهمة. لن يُبدأ تنفيذ مكرر.', false);
-                endStageActionLock(lockKey);
+                releaseStageActionControl(t);
                 return;
             }
             rcScheduleInFlight.add(inflightKey);
@@ -3319,7 +3345,7 @@ body.rc-modal-open{overflow:hidden!important}
                             : operatorJobMessage(reason || RC_PRE_BACKUP_FAIL_MSG),
                         false
                     );
-                    endStageActionLock(lockKey);
+                    releaseStageActionControl(t);
                     await loadAll();
                 }
             } finally {
@@ -3362,14 +3388,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                const reason = (e && e.message) ? String(e.message) : '';
-                if (e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(reason))) {
-                    await reconcileAfterStageAmbiguity(t, t.getAttribute('data-rc-lock-key') || '');
-                } else {
-                    showRcTerminalMessage(reason || 'تعذر تنفيذ استعادة الظل', false);
-                    endStageActionLock(t.getAttribute('data-rc-lock-key') || '');
-                    await loadAll();
-                }
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ استعادة الظل');
             } finally {
                 setBusy(false);
             }
@@ -3449,7 +3468,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ اختبارات الجاهزية', false);
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ اختبارات الجاهزية');
             } finally {
                 setBusy(false);
             }
@@ -3493,7 +3512,7 @@ body.rc-modal-open{overflow:hidden!important}
                 }
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر طلب الصيانة', false);
+                await handleStageActionFailure(t, e, 'تعذر طلب الصيانة');
             } finally {
                 setBusy(false);
             }
@@ -3517,6 +3536,7 @@ body.rc-modal-open{overflow:hidden!important}
                 const password = window.prompt('كلمة مرور إعادة التحقق لتفعيل الصيانة (مطلوبة):', '');
                 if (password === null || password === '') {
                     showRcTerminalMessage('recent_authentication_not_available', false);
+                    releaseStageActionControl(t);
                     return;
                 }
                 setBusy(true, 'جاري تفعيل الصيانة…');
@@ -3530,7 +3550,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage('الصيانة مفعّلة — استرداد الإنتاج لم يبدأ بعد.', true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تفعيل الصيانة', false);
+                await handleStageActionFailure(t, e, 'تعذر تفعيل الصيانة');
             } finally {
                 setBusy(false);
             }
@@ -3571,7 +3591,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ استيراد الإنتاج', false);
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ استيراد الإنتاج');
             } finally {
                 setBusy(false);
             }
@@ -3622,7 +3642,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ تحويل الرفع', false);
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ تحويل الرفع');
             } finally {
                 setBusy(false);
             }
@@ -3673,7 +3693,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ التراجع', false);
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ التراجع');
             } finally {
                 setBusy(false);
             }
@@ -3724,7 +3744,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ الإنهاء', false);
+                await handleStageActionFailure(t, e, 'تعذر تنفيذ الإنهاء');
             } finally {
                 setBusy(false);
             }
@@ -3746,12 +3766,12 @@ body.rc-modal-open{overflow:hidden!important}
                 await loadAll();
             } catch (e) {
                 const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || 'تعذر تنفيذ المرحلة';
-                const isNetwork = !!(e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(String(reason))));
+                const isNetwork = isStageActionNetworkAmbiguous(e, reason);
                 if (isNetwork) {
                     await reconcileAfterStageAmbiguity(t, lockKey);
                 } else {
                     showRcTerminalMessage(reason, false);
-                    endStageActionLock(lockKey);
+                    releaseStageActionControl(t);
                     await loadAll();
                     if (e.code === 'restore_center_invalid_stage'
                         || e.code === 'restore_center_worker_already_running'
@@ -3782,15 +3802,20 @@ body.rc-modal-open{overflow:hidden!important}
                     'تفويض تحويل الإنتاج — أعد كتابة العبارة بالضبط.\n\nالعبارة:\n' + phrase + '\n\nالصق العبارة هنا:',
                     ''
                 );
-                if (typed === null) return;
+                if (typed === null) {
+                    releaseStageActionControl(t);
+                    return;
+                }
                 const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
                 if (password === null || password === '') {
                     showRcTerminalMessage('recent_authentication_not_available', false);
+                    releaseStageActionControl(t);
                     return;
                 }
                 const reason = window.prompt('سبب التفويض (8 أحرف على الأقل):', '');
                 if (reason === null || String(reason).trim().length < 8) {
                     showRcTerminalMessage('authorization_reason_required', false);
+                    releaseStageActionControl(t);
                     return;
                 }
                 setBusy(true, 'جاري اعتماد تفويض تحويل الإنتاج…');
@@ -3807,7 +3832,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage('تم تفويض تحويل الإنتاج. يمكن الآن تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد.', true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تفويض تحويل الإنتاج', false);
+                await handleStageActionFailure(t, e, 'تعذر تفويض تحويل الإنتاج');
             } finally {
                 setBusy(false);
             }
@@ -3860,10 +3885,14 @@ body.rc-modal-open{overflow:hidden!important}
                     'أعد كتابة العبارة بالضبط ثم أدخل كلمة مرور إعادة التحقق.\n\nالعبارة:\n' + phrase + '\n\nالصق العبارة هنا:',
                     ''
                 );
-                if (typed === null) return;
+                if (typed === null) {
+                    releaseStageActionControl(t);
+                    return;
+                }
                 const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
                 if (password === null || password === '') {
                     showRcTerminalMessage('recent_authentication_not_available', false);
+                    releaseStageActionControl(t);
                     return;
                 }
                 setBusy(true, 'جاري اعتماد الخطة…');
@@ -3879,7 +3908,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(j.message || 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.', true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر الاعتماد', false);
+                await handleStageActionFailure(t, e, 'تعذر الاعتماد');
             } finally {
                 setBusy(false);
             }
@@ -3887,7 +3916,10 @@ body.rc-modal-open{overflow:hidden!important}
         }
 
         if (t.classList.contains('rc-cancel-exec')) {
-            if (!window.confirm('إلغاء خطة الاسترداد؟ لن يُنفَّذ أي استرداد.')) return;
+            if (!window.confirm('إلغاء خطة الاسترداد؟ لن يُنفَّذ أي استرداد.')) {
+                releaseStageActionControl(t);
+                return;
+            }
             try {
                 setBusy(true, 'جاري إلغاء الخطة…');
                 const j = await apiPost('job/cancel-execution.php', {
@@ -3898,7 +3930,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage('تم إلغاء الخطة. لم يتم تنفيذ أي استرداد.', true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر إلغاء الخطة', false);
+                await handleStageActionFailure(t, e, 'تعذر إلغاء الخطة');
             } finally {
                 setBusy(false);
             }
@@ -3906,7 +3938,10 @@ body.rc-modal-open{overflow:hidden!important}
         }
 
         if (t.classList.contains('rc-fw-cancel')) {
-            if (!window.confirm('إلغاء مهمة الاسترداد؟')) return;
+            if (!window.confirm('إلغاء مهمة الاسترداد؟')) {
+                releaseStageActionControl(t);
+                return;
+            }
             try {
                 setBusy(true, 'جاري الإلغاء…');
                 const j = await apiPost('job/cancel.php', {
@@ -3925,7 +3960,7 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage('تم إلغاء المهمة. يمكنك الآن اختيار حزمة استرداد جديدة.', true);
             } catch (e) {
                 // Failure: keep current job and wizard step; show API/safe reason only.
-                showRcTerminalMessage(e.message || 'تعذر الإلغاء', false);
+                await handleStageActionFailure(t, e, 'تعذر الإلغاء');
             } finally {
                 setBusy(false);
             }

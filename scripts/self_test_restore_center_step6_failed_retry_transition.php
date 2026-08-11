@@ -108,7 +108,7 @@ function rr_seed_job(string $workRoot, string $jobId, string $status): void
     orange_restore_fw_write($workRoot, $job);
 }
 
-$evidenceDir = 'D:/orange_restore_failed_retry_and_action_lock_evidence';
+$evidenceDir = getenv('ORANGE_TEST_EVIDENCE_DIR') ?: (sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_failed_retry_and_action_lock_evidence');
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
