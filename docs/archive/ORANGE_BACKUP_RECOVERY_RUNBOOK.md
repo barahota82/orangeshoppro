@@ -735,6 +735,8 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 ## Phase 3A — Admin Backup Center
 
+**Owner P0 — read-only Backup runtime diagnostic (Owner 2026-08-11):** After Phase-1 baseline Commit `059abdba` deployed, live Full Backup failed once. Backup Center exposes a permanent non-destructive diagnostic: button «تشخيص محرك النسخ» → POST `admin/api/backup/runtime-diagnostic.php` (CSRF + `backup_view`) → helper `includes/backup/backup_runtime_diagnostic.php` → centered dialog «تشخيص محرك النسخ الاحتياطي». Reports readiness/locks/CLI/schema/last persisted attempt only. Never starts Full/Countries, never acquires/releases/deletes locks, never spawns Backup processes, never mutates Restore. Registers: `BACKUP_CENTER_PHASE1_LIVE_VALIDATION_FAILED_01`, `BACKUP_CENTER_LOCAL_PASS_NOT_PRODUCTION_PROOF_01`, `BACKUP_CENTER_RUNTIME_DIAGNOSTIC_REQUIRED_01`. **تنفيذ:** `includes/backup/backup_runtime_diagnostic.php`, `admin/api/backup/runtime-diagnostic.php`, `admin/pages/backup_center.php` (button+handler only). **اختبار:** `scripts/self_test_backup_runtime_diagnostic.php`.
+
 **Scope:** Secure admin wrapper around the **already-approved Backup Engine** (Phase 1A–1C). No restore/rollback UI, no production restore buttons, no package delete/download in this phase.
 
 ### Page

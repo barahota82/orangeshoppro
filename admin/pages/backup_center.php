@@ -324,6 +324,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             <button type="button" class="bc-btn-secondary" id="bc_run_full_btn" data-action="run_full">تشغيل Full Backup</button>
             <button type="button" class="bc-btn-secondary bc-btn-danger-soft" id="bc_run_countries_btn" data-action="run_countries">تشغيل All Recoverable Countries</button>
             <?php endif; ?>
+            <button type="button" class="bc-btn-secondary" id="bc_runtime_diagnostic_btn">تشخيص محرك النسخ</button>
             <button type="button" class="bc-btn-secondary" id="bc_refresh_btn">تحديث البيانات</button>
         </div>
         <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
@@ -492,6 +493,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         pendingAction: null,
         archiveMode: { full: false, country: false }
     };
+    let bcDiagnosticRequestInFlight = false;
     let manualActionsAvailable = true;
     let recoveryCheckRequiresWrite = true;
     let rootHealthWarning = '';
@@ -1411,6 +1413,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             }
         });
         if (el('bc_refresh_btn')) el('bc_refresh_btn').disabled = state.busy;
+        if (el('bc_runtime_diagnostic_btn')) {
+            el('bc_runtime_diagnostic_btn').disabled = state.busy || bcDiagnosticRequestInFlight;
+        }
         // Stage 4B: DRV enablement is driven by authoritative qualification state, not a blanket enable.
         document.querySelectorAll('.bc-drv').forEach((btn) => {
             if (recoveryCheckRequiresWrite && !manualActionsAvailable) {
@@ -2552,6 +2557,43 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     const RUN_COUNTRIES_OK_MSG = 'اكتمل إنشاء النسخ الاحتياطية للدول القابلة للاسترداد بنجاح.';
     const RUN_COUNTRIES_FAIL_MSG = 'تعذر إكمال إنشاء النسخ الاحتياطية للدول القابلة للاسترداد.\nيرجى مراجعة حالة النظام والمحاولة مرة أخرى.';
     let bcRunRequestInFlight = false;
+    async function runBackupRuntimeDiagnostic() {
+        const btn = el('bc_runtime_diagnostic_btn');
+        if (!btn || bcDiagnosticRequestInFlight || state.busy || bcRunRequestInFlight) {
+            return;
+        }
+        bcDiagnosticRequestInFlight = true;
+        btn.disabled = true;
+        try {
+            const res = await apiPost('runtime-diagnostic.php', {});
+            const report = String((res && res.owner_report_ar) || '').trim()
+                || 'تعذر عرض تقرير التشخيص.';
+            const bodyHtml = '<pre class="bc-pre" dir="rtl" style="white-space:pre-wrap;margin:0;max-height:min(58vh,480px);overflow:auto;">'
+                + esc(report) + '</pre>';
+            openCenteredResultShell({
+                title: 'تشخيص محرك النسخ الاحتياطي',
+                bodyHtml: bodyHtml,
+                success: true,
+                failure: false,
+                sourceBtn: btn
+            });
+        } catch (e) {
+            showSystemDialog({
+                title: 'تشخيص محرك النسخ الاحتياطي',
+                message: 'تعذر إكمال التشخيص. يرجى المحاولة مرة أخرى لاحقاً.',
+                success: false,
+                sourceBtn: btn
+            });
+        } finally {
+            bcDiagnosticRequestInFlight = false;
+            applyActionAvailability();
+        }
+    }
+    if (el('bc_runtime_diagnostic_btn')) {
+        el('bc_runtime_diagnostic_btn').addEventListener('click', () => {
+            void runBackupRuntimeDiagnostic();
+        });
+    }
     async function executeBackupRun(kind) {
         if (bcRunRequestInFlight || state.busy) {
             return;
