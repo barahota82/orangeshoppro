@@ -74,6 +74,9 @@ try {
         $safe = 'لا يمكن تنفيذ النسخة الاحتياطية لمهمة استرداد مكتملة.';
     } elseif ($code === 'pre_restore_backup_lock_active') {
         $safe = 'محرك النسخ الاحتياطي مشغول حالياً بقفل مشترك. انتظر انتهاء النسخة الجارية ثم أعد المحاولة.';
+    } elseif (str_starts_with($code, 'illegal_framework_status_transition:') || $code === 'retry_state_conflict') {
+        $safe = 'تعذر بدء إعادة المحاولة لأن حالة المهمة الحالية تتعارض مع بدء تنفيذ جديد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.';
+        $code = 'retry_state_conflict';
     }
     json_response([
         'success' => false,

@@ -102,7 +102,8 @@ r1_ok(!str_contains($src, 'مختارة'), '28. badge مختارة removed');
 r1_ok(str_contains($src, 'محددة'), '28. badge محددة present');
 r1_ok(preg_match('/function packagePrimaryAction\s*\([^)]*\)\s*\{\s*return \'\'\s*;\s*\}/', $src) === 1, '2. packagePrimaryAction returns empty');
 r1_ok(str_contains($src, "guidedBtn('rc-create-job'"), '1. upper Create via guidedBtn');
-r1_ok(substr_count($src, 'rc-create-job') <= 3, 'create class references bounded (upper + listener)');
+// Upper Create + click listener + shared stage-action lock allowlist (Owner 2026-08-11).
+r1_ok(substr_count($src, 'rc-create-job') <= 4, 'create class references bounded (upper + listener + action-lock allowlist)');
 r1_ok(str_contains($src, 'function packageKey'), '14/15. packageKey helper');
 r1_ok(str_contains($src, "return 'full_disaster||'") && str_contains($src, "return 'country_recovery|'"), '14/15. exact Full/Country key shapes');
 r1_ok(str_contains($src, 'function applyPackageSelection'), 'selection helper');

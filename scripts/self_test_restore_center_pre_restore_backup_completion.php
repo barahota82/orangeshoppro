@@ -111,7 +111,11 @@ s6_ok((int) $readyAuth['current_index'] === 6, 'ready advances to shadow current
 s6_ok(($readyAuth['states'][5] ?? '') === 'done', 'ready marks step6 done');
 
 s6_ok(!preg_match('/backupDone\s*=\s*!!\(\s*job\.has_pre_restore_backup/', $pageSrc), 'page backupDone ignores has_*');
-s6_ok(str_contains($pageSrc, 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة'), 'Arabic pending non-completion copy');
+s6_ok(
+    str_contains($pageSrc, 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة')
+    || str_contains($pageSrc, 'طُلبت النسخة الاحتياطية وما زالت قيد التنفيذ'),
+    'Arabic pending non-completion copy'
+);
 
 s6_ok(str_contains($pageSrc, "if (s === 'pre_restore_backup_pending') label = 'بانتظار تنفيذ النسخة الاحتياطية'"), 'Arabic label pending');
 s6_ok(str_contains($pageSrc, "if (s === 'pre_restore_backup_ready') label = 'النسخة الاحتياطية جاهزة وآمنة للرجوع'"), 'Arabic label ready');

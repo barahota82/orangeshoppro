@@ -193,9 +193,105 @@ function orange_restore_pre_backup_write_record(string $workRoot, string $jobId,
  * @param array<string, mixed> $record
  * @return array<string, mixed>
  */
+/**
+ * Owner-safe failure category for public/API surfaces (raw transition tokens stay in Audit/record only).
+ */
+function orange_restore_pre_backup_public_failure_code(string $code): string
+{
+    $code = trim($code);
+    if ($code === '') {
+        return '';
+    }
+    if (str_starts_with($code, 'illegal_framework_status_transition:')) {
+        return 'retry_state_conflict';
+    }
+
+    return $code;
+}
+
+/**
+ * Seal prior attempt metadata into attempts[] without Schema migration.
+ *
+ * @param array<string, mixed> $existing
+ * @return list<array<string, mixed>>
+ */
+function orange_restore_pre_backup_seal_attempts(array $existing): array
+{
+    $attempts = [];
+    if (isset($existing['attempts']) && is_array($existing['attempts'])) {
+        foreach ($existing['attempts'] as $row) {
+            if (is_array($row)) {
+                $attempts[] = $row;
+            }
+        }
+    }
+    $status = (string) ($existing['status'] ?? '');
+    $failure = (string) ($existing['failure_code'] ?? '');
+    $pkg = (string) ($existing['rollback_package_id'] ?? '');
+    $needsSeal = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
+    ], true) || $failure !== '';
+    if (!$needsSeal) {
+        return $attempts;
+    }
+    $last = $attempts !== [] ? $attempts[count($attempts) - 1] : null;
+    $lastFinished = is_array($last) ? (string) ($last['finished_at'] ?? '') : '';
+    $lastResult = is_array($last) ? (string) ($last['result'] ?? '') : '';
+    if (is_array($last) && $lastFinished !== '' && $lastResult !== '') {
+        return $attempts;
+    }
+    $result = $status === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY ? 'PASS' : 'FAIL';
+    $sealed = [
+        'sequence' => count($attempts) + 1,
+        'requested_at' => (string) ($existing['created_at'] ?? ''),
+        'pending_at' => (string) ($existing['pending_at'] ?? $existing['created_at'] ?? ''),
+        'running_at' => (string) ($existing['running_at'] ?? ''),
+        'finished_at' => (string) ($existing['finished_at'] ?? gmdate('Y-m-d\TH:i:s\Z')),
+        'engine_invoked' => !empty($existing['engine_invoked']) || $pkg !== '' || $failure === 'backup_engine_failed',
+        'result' => $result,
+        'failure_category' => orange_restore_pre_backup_public_failure_code($failure),
+        'failure_code_protected' => $failure,
+        'package_id' => $pkg,
+    ];
+    if (is_array($last) && $lastFinished === '') {
+        $attempts[count($attempts) - 1] = array_merge($last, $sealed, [
+            'sequence' => (int) ($last['sequence'] ?? $sealed['sequence']),
+        ]);
+    } else {
+        $attempts[] = $sealed;
+    }
+
+    return $attempts;
+}
+
+/**
+ * @param array<string, mixed> $record
+ * @return array<string, mixed>
+ */
 function orange_restore_pre_backup_public_record(array $record): array
 {
     unset($record['absolute_paths'], $record['package_path'], $record['snapshot_path'], $record['password'], $record['secrets']);
+
+    $attemptsOut = [];
+    if (isset($record['attempts']) && is_array($record['attempts'])) {
+        foreach ($record['attempts'] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $attemptsOut[] = [
+                'sequence' => (int) ($row['sequence'] ?? 0),
+                'requested_at' => (string) ($row['requested_at'] ?? ''),
+                'pending_at' => (string) ($row['pending_at'] ?? ''),
+                'running_at' => (string) ($row['running_at'] ?? ''),
+                'finished_at' => (string) ($row['finished_at'] ?? ''),
+                'engine_invoked' => (bool) ($row['engine_invoked'] ?? false),
+                'result' => (string) ($row['result'] ?? ''),
+                'failure_category' => orange_restore_pre_backup_public_failure_code((string) ($row['failure_category'] ?? $row['failure_code_protected'] ?? '')),
+                'package_id' => (string) ($row['package_id'] ?? ''),
+            ];
+        }
+    }
 
     return [
         'record_version' => (string) ($record['record_version'] ?? ''),
@@ -220,7 +316,12 @@ function orange_restore_pre_backup_public_record(array $record): array
         'purpose' => (string) ($record['purpose'] ?? ORANGE_RESTORE_PRE_BACKUP_PURPOSE),
         'status' => (string) ($record['status'] ?? ''),
         'cli_needed' => (bool) ($record['cli_needed'] ?? false),
-        'failure_code' => (string) ($record['failure_code'] ?? ''),
+        'failure_code' => orange_restore_pre_backup_public_failure_code((string) ($record['failure_code'] ?? '')),
+        'pending_at' => (string) ($record['pending_at'] ?? ''),
+        'running_at' => (string) ($record['running_at'] ?? ''),
+        'finished_at' => (string) ($record['finished_at'] ?? ''),
+        'engine_invoked' => (bool) ($record['engine_invoked'] ?? false),
+        'attempts' => $attemptsOut,
         'warning' => (string) ($record['warning'] ?? 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'),
     ];
 }
@@ -395,13 +496,28 @@ function orange_restore_pre_backup_request(
         $ts
     );
 
+    $priorAttempts = is_array($existing) ? orange_restore_pre_backup_seal_attempts($existing) : [];
+    $attemptSeq = count($priorAttempts) + 1;
+    $priorAttempts[] = [
+        'sequence' => $attemptSeq,
+        'requested_at' => $ts,
+        'pending_at' => $ts,
+        'running_at' => '',
+        'finished_at' => '',
+        'engine_invoked' => false,
+        'result' => '',
+        'failure_category' => '',
+        'failure_code_protected' => '',
+        'package_id' => '',
+    ];
+
     $record = [
         'record_version' => ORANGE_RESTORE_PRE_BACKUP_RECORD_VERSION,
         'framework_job_id' => $jobId,
         'source_package_id' => (string) ($job['package_id'] ?? ''),
         'rollback_package_id' => '',
         'rollback_package_type' => 'full',
-        'created_at' => $ts,
+        'created_at' => is_array($existing) ? (string) ($existing['created_at'] ?? $ts) : $ts,
         'created_by' => $operator,
         'backup_engine_version' => ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION,
         'schema_revision' => 0,
@@ -420,10 +536,17 @@ function orange_restore_pre_backup_request(
         'cli_needed' => false,
         'cli_command' => '',
         'origin' => 'pre_restore_backup',
+        'pending_at' => $ts,
+        'running_at' => '',
+        'finished_at' => '',
+        'engine_invoked' => false,
+        'failure_code' => '',
+        'attempts' => $priorAttempts,
         'warning' => 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.',
     ];
     orange_restore_pre_backup_write_record($workRoot, $jobId, $record);
 
+    // Explicit retry / first request: failed|approved → pending (never failed → running).
     $job = orange_restore_fw_transition(
         $workRoot,
         $jobId,
@@ -576,27 +699,52 @@ function orange_restore_pre_backup_execute(
         ];
     }
 
-    if (!in_array($status, [
-        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
-        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+    // In-flight: do not start a second engine / package / pin.
+    if (in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING,
     ], true)) {
-        if ($status === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION) {
-            // Convenience: allow CLI when request step was skipped.
-            orange_restore_pre_backup_request($workRoot, $jobId, $backupRoot, [
-                'username' => $owner,
-                'id' => 0,
-            ]);
-            $job = orange_restore_fw_read($workRoot, $jobId);
-            $status = (string) ($job['status'] ?? '');
-        } else {
-            throw new RuntimeException('invalid_status');
-        }
+        $record = $existing ?? [
+            'record_version' => ORANGE_RESTORE_PRE_BACKUP_RECORD_VERSION,
+            'framework_job_id' => $jobId,
+            'source_package_id' => (string) ($job['package_id'] ?? ''),
+            'status' => $status,
+            'execution_started' => false,
+        ];
+
+        return [
+            'ok' => true,
+            'idempotent' => true,
+            'result' => 'RUNNING',
+            'job_id' => $jobId,
+            'code' => 'pre_restore_backup_already_running',
+            'rollback_package_id' => (string) ($record['rollback_package_id'] ?? ''),
+            'verify' => (string) ($record['verify_result'] ?? ''),
+            'drv' => (string) ($record['drv_result'] ?? ''),
+            'retention_pinned' => (bool) ($record['retention_pinned'] ?? false),
+            'execution_started' => false,
+            'message' => 'Pre-restore backup already running.',
+            'record' => orange_restore_pre_backup_public_record($record),
+        ];
     }
 
-    if ($status === ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED
-        && is_array($existing)
-        && !empty($existing['ready_for_rollback'])) {
-        throw new RuntimeException('rollback_anchor_already_exists');
+    // Legal entry into execute: pending only. Failed/approved must enter pending first.
+    // RESTORE_CENTER_STEP6_FAILED_RETRY_TRANSITION_01 — forbid failed→running.
+    if (in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+    ], true)) {
+        orange_restore_pre_backup_request($workRoot, $jobId, $backupRoot, [
+            'username' => $owner,
+            'id' => 0,
+        ]);
+        $job = orange_restore_fw_read($workRoot, $jobId);
+        $status = (string) ($job['status'] ?? '');
+        $existing = orange_restore_pre_backup_load_record($workRoot, $jobId);
+    }
+
+    if ($status !== ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING) {
+        throw new RuntimeException('invalid_status');
     }
 
     $lock = orange_restore_pre_backup_acquire_lock($workRoot, $jobId, $owner);
@@ -614,12 +762,7 @@ function orange_restore_pre_backup_execute(
     ];
 
     try {
-        orange_restore_fw_audit_append($workRoot, $jobId, [
-            'event' => 'pre_restore_backup_started',
-            'result' => 'ok',
-            'owner' => $owner,
-        ]);
-
+        // Commit pending→running BEFORE any started audit or engine call.
         orange_restore_fw_transition(
             $workRoot,
             $jobId,
@@ -627,12 +770,37 @@ function orange_restore_pre_backup_execute(
             ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_RUNNING,
             35,
             'Creating mandatory Full pre-restore backup',
-            'pre_restore_backup_started'
+            'pre_restore_backup_running'
         );
+        $runTs = gmdate('Y-m-d\TH:i:s\Z');
         $partial['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING;
         $partial['cli_needed'] = false;
         $partial['origin'] = ORANGE_RESTORE_PRE_BACKUP_PURPOSE;
         $partial['cli_command'] = '';
+        $partial['running_at'] = $runTs;
+        $partial['engine_invoked'] = false;
+        if (isset($partial['attempts']) && is_array($partial['attempts']) && $partial['attempts'] !== []) {
+            $idx = count($partial['attempts']) - 1;
+            if (is_array($partial['attempts'][$idx])) {
+                $partial['attempts'][$idx]['running_at'] = $runTs;
+            }
+        }
+        orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
+
+        // Only after running is committed may we emit started + invoke the shared engine.
+        orange_restore_fw_audit_append($workRoot, $jobId, [
+            'event' => 'pre_restore_backup_started',
+            'result' => 'ok',
+            'owner' => $owner,
+            'status' => ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING,
+        ]);
+        $partial['engine_invoked'] = true;
+        if (isset($partial['attempts']) && is_array($partial['attempts']) && $partial['attempts'] !== []) {
+            $idx = count($partial['attempts']) - 1;
+            if (is_array($partial['attempts'][$idx])) {
+                $partial['attempts'][$idx]['engine_invoked'] = true;
+            }
+        }
         orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
         orange_restore_pre_backup_heartbeat($workRoot, $jobId);
 
@@ -798,9 +966,21 @@ function orange_restore_pre_backup_execute(
         $partial['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY;
         $partial['cli_needed'] = false;
         $partial['failure_code'] = '';
+        $partial['finished_at'] = gmdate('Y-m-d\TH:i:s\Z');
         $partial['created_at'] = (string) ($partial['created_at'] ?? gmdate('c'));
         $partial['created_by'] = (string) ($partial['created_by'] ?? $owner);
         $partial['warning'] = 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.';
+        if (isset($partial['attempts']) && is_array($partial['attempts']) && $partial['attempts'] !== []) {
+            $idx = count($partial['attempts']) - 1;
+            if (is_array($partial['attempts'][$idx])) {
+                $partial['attempts'][$idx]['finished_at'] = (string) $partial['finished_at'];
+                $partial['attempts'][$idx]['result'] = 'PASS';
+                $partial['attempts'][$idx]['engine_invoked'] = true;
+                $partial['attempts'][$idx]['package_id'] = $rollbackPackageId;
+                $partial['attempts'][$idx]['failure_category'] = '';
+                $partial['attempts'][$idx]['failure_code_protected'] = '';
+            }
+        }
         orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
 
         $job = orange_restore_fw_transition(
@@ -837,13 +1017,31 @@ function orange_restore_pre_backup_execute(
         if ($code === '') {
             $code = 'pre_restore_backup_failed';
         }
+        $finishTs = gmdate('Y-m-d\TH:i:s\Z');
+        $publicCode = orange_restore_pre_backup_public_failure_code($code);
+        $ownerMessage = $publicCode === 'retry_state_conflict'
+            ? 'تعذر بدء إعادة المحاولة لأن حالة المهمة الحالية تتعارض مع بدء تنفيذ جديد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.'
+            : ('Pre-restore backup failed: ' . $publicCode);
         $partial['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED;
         $partial['ready_for_rollback'] = false;
         $partial['retention_pinned'] = !empty($partial['retention_pinned']);
         $partial['failure_code'] = $code;
+        $partial['finished_at'] = $finishTs;
         $partial['execution_started'] = false;
         $partial['cli_needed'] = false;
         $partial['cli_command'] = '';
+        if (isset($partial['attempts']) && is_array($partial['attempts']) && $partial['attempts'] !== []) {
+            $idx = count($partial['attempts']) - 1;
+            if (is_array($partial['attempts'][$idx])) {
+                $partial['attempts'][$idx]['finished_at'] = $finishTs;
+                $partial['attempts'][$idx]['result'] = 'FAIL';
+                $partial['attempts'][$idx]['failure_category'] = $publicCode;
+                $partial['attempts'][$idx]['failure_code_protected'] = $code;
+                $partial['attempts'][$idx]['engine_invoked'] = !empty($partial['engine_invoked'])
+                    || !empty($partial['attempts'][$idx]['engine_invoked']);
+                $partial['attempts'][$idx]['package_id'] = (string) ($partial['rollback_package_id'] ?? '');
+            }
+        }
         try {
             orange_restore_pre_backup_write_record($workRoot, $jobId, $partial);
         } catch (Throwable) {
@@ -856,7 +1054,7 @@ function orange_restore_pre_backup_execute(
                 ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
                 ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_FAILED,
                 100,
-                'Pre-restore backup failed: ' . $code,
+                $ownerMessage,
                 'pre_restore_backup_failed'
             );
             $failedJob = orange_restore_fw_read($workRoot, $jobId);
@@ -867,6 +1065,7 @@ function orange_restore_pre_backup_execute(
                 'event' => 'pre_restore_backup_failed',
                 'result' => 'fail',
                 'code' => $code,
+                'failure_category' => $publicCode,
             ]);
         } catch (Throwable) {
             // ignore secondary failures
@@ -878,7 +1077,7 @@ function orange_restore_pre_backup_execute(
             'idempotent' => false,
             'result' => 'FAIL',
             'job_id' => $jobId,
-            'code' => $code,
+            'code' => $publicCode,
             'rollback_package_id' => (string) ($partial['rollback_package_id'] ?? ''),
             'verify' => (string) ($partial['verify_result'] ?? 'FAIL'),
             'drv' => (string) ($partial['drv_result'] ?? 'FAIL'),

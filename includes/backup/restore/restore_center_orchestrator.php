@@ -981,17 +981,69 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
     }
 
     $failures = [];
+    $step6Events = [];
+    $latestStep6 = null;
+    $step6EventNames = [
+        'pre_restore_backup_requested',
+        'pre_restore_backup_running',
+        'pre_restore_backup_started',
+        'pre_restore_backup_completed',
+        'pre_restore_backup_failed',
+        'pre_restore_backup_ready',
+    ];
     $auditPath = orange_restore_fw_audit_file_path($workRoot, $jobId);
     if (is_file($auditPath)) {
         $lines = @file($auditPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (is_array($lines)) {
-            $slice = array_slice($lines, -80);
+            $slice = array_slice($lines, -120);
             foreach (array_reverse($slice) as $line) {
                 $row = json_decode((string) $line, true);
                 if (!is_array($row)) {
                     continue;
                 }
                 $event = (string) ($row['event'] ?? '');
+                $at = (string) ($row['recorded_at'] ?? $row['at'] ?? $row['timestamp'] ?? '');
+
+                if (in_array($event, $step6EventNames, true)) {
+                    $rawCode = (string) ($row['code'] ?? '');
+                    $category = (string) ($row['failure_category'] ?? '');
+                    if ($category === '' && str_starts_with($rawCode, 'illegal_framework_status_transition:')) {
+                        $category = 'retry_state_conflict';
+                    }
+                    if ($category === '' && $rawCode !== '') {
+                        $category = function_exists('orange_restore_pre_backup_public_failure_code')
+                            ? orange_restore_pre_backup_public_failure_code($rawCode)
+                            : $rawCode;
+                    }
+                    $reasonAr = match ($event) {
+                        'pre_restore_backup_requested' => 'تم قبول طلب النسخة الاحتياطية الإلزامية ودخلت حالة الانتظار.',
+                        'pre_restore_backup_running' => 'تم اعتماد انتقال التنفيذ إلى حالة التشغيل.',
+                        'pre_restore_backup_started' => 'بدأ تنفيذ النسخة الاحتياطية عبر المحرك المعتمد.',
+                        'pre_restore_backup_completed' => 'اكتمل إنشاء الحزمة ويجري/جرى التحقق والربط.',
+                        'pre_restore_backup_ready' => 'أصبحت النسخة الاحتياطية الإلزامية جاهزة وآمنة للرجوع.',
+                        'pre_restore_backup_failed' => ($category === 'retry_state_conflict'
+                            ? 'تعذر بدء إعادة المحاولة لأن حالة المهمة الحالية تتعارض مع بدء تنفيذ جديد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.'
+                            : 'فشلت محاولة النسخة الاحتياطية الإلزامية. يمكن إعادة المحاولة من مركز الاسترداد.'),
+                        default => 'تحديث مرحلة النسخة الاحتياطية الإلزامية.',
+                    };
+                    $item = [
+                        'event' => $event,
+                        'result' => (string) ($row['result'] ?? ''),
+                        'worker' => 'pre_backup',
+                        'code' => $category !== '' ? $category : $event,
+                        'reason_ar' => $reasonAr,
+                        'at' => $at,
+                        'is_step6_attempt' => true,
+                    ];
+                    if ($latestStep6 === null) {
+                        $latestStep6 = $item;
+                    }
+                    if (count($step6Events) < 12) {
+                        $step6Events[] = $item;
+                    }
+                    continue;
+                }
+
                 if ($event !== 'restore_center_worker_schedule_failed' && $event !== 'restore_center_worker_scheduled') {
                     continue;
                 }
@@ -1004,7 +1056,9 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                     'reason_ar' => $code === 'ok'
                         ? 'تم جدولة العامل بنجاح.'
                         : orange_restore_center_operator_reason_ar($code, $status, (string) ($row['worker'] ?? '')),
-                    'at' => (string) ($row['recorded_at'] ?? $row['at'] ?? $row['timestamp'] ?? ''),
+                    'at' => $at,
+                    'is_step6_attempt' => false,
+                    'historical_only' => true,
                 ];
                 if (count($failures) >= 12) {
                     break;
@@ -1012,6 +1066,12 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             }
         }
     }
+
+    // Latest Step-6 attempt authority: never prefer stale worker-schedule failures when newer Step-6 events exist.
+    $isStep6Status = str_starts_with($status, 'pre_restore_backup_');
+    $recent = $isStep6Status || $latestStep6 !== null
+        ? array_slice(array_merge($step6Events, $failures), 0, 12)
+        : array_slice(array_merge($failures, $step6Events), 0, 12);
 
     $logSnippets = [];
     foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
@@ -1051,12 +1111,14 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         'package_type' => (string) ($job['package_type'] ?? ''),
         'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
         'workers' => $workers,
-        'recent_orchestration_events' => $failures,
+        'recent_orchestration_events' => $recent,
+        'latest_attempt_diagnostic' => $latestStep6,
         'log_tails' => $logSnippets,
         'notes_ar' => [
-            'التشخيص آمن للعرض من مركز الاسترداد فقط.',
-            'لا تُعرض مسارات الخادم المطلقة ولا الأسرار.',
-            'جدولة العامل تُرفض إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كان عامل المرحلة يعمل.',
+            'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
+            'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا رموز الانتقال الداخلية.',
+            'عند وجود محاولات حديثة للخطوة 6 تُعرض أحدث محاولة حالية؛ أحداث الجدولة القديمة تبقى تاريخية.',
+            'يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.',
         ],
     ];
 }

@@ -1218,9 +1218,11 @@ function orange_restore_admin_fw_execute_pre_restore_backup(
         'code' => (string) ($exec['code'] ?? ($ok ? 'pre_restore_backup_ready' : 'pre_restore_backup_failed')),
         'job' => $fresh,
         'record' => $exec['record'] ?? null,
-        'message' => $ok
-            ? 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.'
-            : 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد. يمكن إعادة المحاولة من مركز الاسترداد.',
+        'message' => !$ok
+            ? 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد. يمكن إعادة المحاولة من مركز الاسترداد.'
+            : ((string) ($exec['code'] ?? '') === 'pre_restore_backup_already_running'
+                ? 'النسخة الاحتياطية الإلزامية قيد التنفيذ حالياً. لن يُبدأ تنفيذ مكرر.'
+                : 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.'),
     ];
 }
 
@@ -2190,6 +2192,9 @@ function orange_restore_admin_safe_message(Throwable $e): string
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;
+    }
+    if (str_starts_with($msg, 'illegal_framework_status_transition:') || $msg === 'retry_state_conflict') {
+        return 'تعذر بدء إعادة المحاولة لأن حالة المهمة الحالية تتعارض مع بدء تنفيذ جديد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.';
     }
     if (str_contains($msg, 'permission') || str_contains($msg, 'Invalid') || str_contains($msg, 'not found')
         || str_contains($msg, 'allowlisted') || str_contains($msg, 'Method not allowed')

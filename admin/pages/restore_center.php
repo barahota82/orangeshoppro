@@ -69,6 +69,28 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:0;border-radius:var(--radius-sm,10px);background:var(--primary,#ea580c);color:#fff!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
 .rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
 .rc-btn-primary:disabled,.rc-btn-secondary:disabled,.rc-btn-ghost:disabled{opacity:.55;cursor:not-allowed}
+/* RESTORE_CENTER_ALL_STAGE_ACTION_EXECUTION_LOCK_01 — grey busy; keep dimensions; readable contrast */
+button.rc-stage-action-busy,
+.rc-btn-primary.rc-stage-action-busy,
+.rc-btn-ghost.rc-stage-action-busy,
+.rc-btn-secondary.rc-stage-action-busy,
+.btn-link.rc-stage-action-busy{
+    background:#9ca3af!important;
+    color:#1f2937!important;
+    -webkit-text-fill-color:#1f2937;
+    border:1px solid #6b7280;
+    cursor:not-allowed;
+    opacity:1;
+    pointer-events:none;
+    box-shadow:none
+}
+button.rc-stage-action-busy:hover,
+.rc-btn-primary.rc-stage-action-busy:hover,
+.btn-link.rc-stage-action-busy:hover{
+    background:#9ca3af!important;
+    color:#1f2937!important;
+    -webkit-text-fill-color:#1f2937
+}
 .rc-btn-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
 .rc-btn-secondary:hover{background:#f8fafc;border-color:#94a3b8}
 .rc-btn-ghost{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.82rem;white-space:nowrap}
@@ -1110,6 +1132,10 @@ body.rc-modal-open{overflow:hidden!important}
         if (/binding\s+failure/i.test(s) || /package\s+bind/i.test(s)) {
             return 'تعذر ربط الحزمة بمهمة الاسترداد. لن تُفتح الخطوة التالية.';
         }
+        if (/illegal_framework_status_transition/i.test(s) || /retry_state_conflict/i.test(s)
+            || /تعذر بدء إعادة المحاولة لأن حالة المهمة/i.test(s)) {
+            return 'تعذر بدء إعادة المحاولة لأن حالة المهمة الحالية تتعارض مع بدء تنفيذ جديد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.';
+        }
         s = operatorMessage(s);
         if (/Worker\s+dispatch\s+failed/i.test(s) || /retry from Restore Center/i.test(s)) {
             return 'تعذر بدء عامل التنفيذ — يمكن إعادة المحاولة من شاشة الاسترداد.';
@@ -1277,6 +1303,17 @@ body.rc-modal-open{overflow:hidden!important}
         html += '<div><dt>المهمة</dt><dd class="rc-mono">' + esc(diag.job_id || '—') + '</dd></div>';
         html += '<div><dt>الحالة</dt><dd>' + esc(statusLabelAr(diag.job_status || '—')) + '</dd></div>';
         html += '</div>';
+        const latest = diag.latest_attempt_diagnostic && typeof diag.latest_attempt_diagnostic === 'object'
+            ? diag.latest_attempt_diagnostic
+            : null;
+        if (latest) {
+            html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">أحدث محاولة للمرحلة الحالية</h4>';
+            html += '<p style="margin:0 0 8px;line-height:1.55;"><strong>'
+                + esc(stageNameAr(latest.worker || 'pre_backup')) + '</strong> — '
+                + esc(String(latest.reason_ar || 'تحديث المرحلة').replace(/illegal_framework_status_transition[^\\s]*/gi, 'تعارض حالة'))
+                + (latest.at ? ' <span class="muted">(' + esc(latest.at) + ')</span>' : '')
+                + '</p>';
+        }
         const events = Array.isArray(diag.recent_orchestration_events) ? diag.recent_orchestration_events : [];
         html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">أحداث التشغيل الأخيرة</h4>';
         if (!events.length) {
@@ -1284,13 +1321,16 @@ body.rc-modal-open{overflow:hidden!important}
         } else {
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">';
             events.forEach(function (ev) {
-                const reason = String(ev.reason_ar || '')
+                let reason = String(ev.reason_ar || '')
                     .replace(/عامل/g, 'مرحلة')
                     .replace(/CLI/gi, '')
+                    .replace(/illegal_framework_status_transition[^\s]*/gi, 'تعارض حالة')
                     .replace(/\s{2,}/g, ' ')
                     .trim();
+                const hist = ev.historical_only ? ' <span class="muted">(تاريخي)</span>' : '';
                 html += '<li><strong>' + esc(stageNameAr(ev.worker)) + '</strong> — '
                     + esc(reason || 'تعذر التنفيذ')
+                    + hist
                     + (ev.at ? ' <span class="muted">(' + esc(ev.at) + ')</span>' : '')
                     + '</li>';
             });
@@ -1334,7 +1374,7 @@ body.rc-modal-open{overflow:hidden!important}
         try {
             const j = await apiGet('job/orchestrator-diagnostics.php?id=' + encodeURIComponent(jobId));
             if (j.csrf_token) state.csrf = j.csrf_token;
-            el('rc_orch_diag_title').textContent = 'تشخيص التشغيل — ' + jobId;
+            el('rc_orch_diag_title').textContent = 'تشخيص تشغيل مراحل الاسترداد — ' + jobId;
             el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnostics(j.diagnostics || {});
             openRcModal('rc_orch_diag_modal');
         } finally {
@@ -1344,6 +1384,78 @@ body.rc-modal-open{overflow:hidden!important}
 
     /** In-flight schedule keys (jobId::worker) — UI guard; server enforces atomic lock. */
     const rcScheduleInFlight = new Set();
+    /** Stage mutation locks — RESTORE_CENTER_ACTION_DOUBLE_SUBMIT_PREVENTION_01 */
+    const rcStageActionLocks = new Set();
+    const RC_STAGE_MUTATION_CLASSES = [
+        'rc-create-job', 'rc-dry-run', 'rc-prepare-exec', 'rc-final-approve',
+        'rc-pre-backup-req', 'rc-shadow-req', 'rc-shadow-smoke-req',
+        'rc-maint-req', 'rc-maint-activate', 'rc-pca-authorize',
+        'rc-prod-import-req', 'rc-uploads-cutover-req', 'rc-rollback-req',
+        'rc-finalize-req', 'rc-run-worker', 'rc-cancel', 'rc-cancel-exec'
+    ];
+
+    function rcStageActionKey(ctrl) {
+        if (!ctrl || !ctrl.classList) return '';
+        const id = String(ctrl.getAttribute('data-id') || ctrl.getAttribute('data-job') || '');
+        const worker = String(ctrl.getAttribute('data-worker') || '');
+        let kind = '';
+        RC_STAGE_MUTATION_CLASSES.forEach(function (c) {
+            if (ctrl.classList.contains(c)) kind = c;
+        });
+        return kind ? (kind + '::' + id + '::' + worker) : '';
+    }
+
+    function lockStageActionControl(ctrl) {
+        if (!ctrl) return;
+        try { ctrl.disabled = true; } catch (e) { /* ignore */ }
+        ctrl.setAttribute('disabled', 'disabled');
+        ctrl.setAttribute('aria-disabled', 'true');
+        ctrl.setAttribute('aria-busy', 'true');
+        ctrl.setAttribute('title', 'التنفيذ جارٍ — انتظر انتهاء العملية');
+        ctrl.classList.add('rc-stage-action-busy');
+    }
+
+    function unlockStageActionControl(ctrl) {
+        if (!ctrl) return;
+        try { ctrl.disabled = false; } catch (e) { /* ignore */ }
+        ctrl.removeAttribute('disabled');
+        ctrl.removeAttribute('aria-disabled');
+        ctrl.removeAttribute('aria-busy');
+        ctrl.removeAttribute('title');
+        ctrl.classList.remove('rc-stage-action-busy');
+    }
+
+    function beginStageActionLock(ctrl) {
+        const key = rcStageActionKey(ctrl);
+        if (!key) return { ok: true, key: '' };
+        if (rcStageActionLocks.has(key) || (ctrl.disabled && ctrl.classList.contains('rc-stage-action-busy'))) {
+            return { ok: false, key: key };
+        }
+        rcStageActionLocks.add(key);
+        lockStageActionControl(ctrl);
+        return { ok: true, key: key };
+    }
+
+    function endStageActionLock(key) {
+        if (key) rcStageActionLocks.delete(key);
+    }
+
+    /**
+     * Network ambiguity: never blind re-enable. Reconcile via authoritative list/status.
+     * RESTORE_CENTER_ACTION_LOCK_SERVER_RECONCILIATION_01
+     */
+    async function reconcileAfterStageAmbiguity(ctrl, key) {
+        lockStageActionControl(ctrl);
+        try {
+            showRcJourneyInlineMessage('تعذر تأكيد نتيجة الطلب. جاري مزامنة حالة المهمة من الخادم…');
+            await loadAll();
+        } catch (e) {
+            showRcTerminalMessage('تعذر مزامنة الحالة. استخدم تحديث الحالة قبل أي إعادة محاولة.', false);
+        } finally {
+            endStageActionLock(key);
+            // Button authority comes from server re-render; do not unlock a stale node.
+        }
+    }
 
     /** Schedule approved internal worker (detached). One server call — no operator CLI/Plesk/Terminal. */
     async function runRestoreWorker(jobId, workerKey, busyText) {
@@ -1755,10 +1867,21 @@ body.rc-modal-open{overflow:hidden!important}
         { key: 'completed', title: 'اكتمل الاسترداد' }
     ];
 
-    function guidedBtn(cls, attrs, label, primary) {
+    function guidedBtn(cls, attrs, label, primary, opts) {
+        opts = opts || {};
+        const disabled = !!opts.disabled;
         const a = Object.keys(attrs || {}).map((k) => k + '="' + esc(String(attrs[k])) + '"').join(' ');
-        const c = primary ? ('btn-link rc-btn-primary ' + cls) : ('btn-link rc-btn-ghost ' + cls);
-        return '<button type="button" class="' + c + '" ' + a + '>' + esc(label) + '</button>';
+        let c = primary ? ('btn-link rc-btn-primary ' + cls) : ('btn-link rc-btn-ghost ' + cls);
+        if (disabled) c += ' rc-stage-action-busy';
+        const dis = disabled
+            ? ' disabled aria-disabled="true" aria-busy="true" title="التنفيذ جارٍ — انتظر انتهاء العملية"'
+            : '';
+        return '<button type="button" class="' + c + '" ' + a + dis + '>' + esc(label) + '</button>';
+    }
+
+    function statusLooksBusy(status, needles) {
+        const s = String(status || '').toLowerCase();
+        return (needles || []).some(function (n) { return s.indexOf(String(n).toLowerCase()) !== -1; });
     }
 
     function stIncludes(job, part) {
@@ -1945,12 +2068,14 @@ body.rc-modal-open{overflow:hidden!important}
             setCurrent(14, 'مسار التراجع نشط. نفّذ أو تابع التراجع ثم الإنهاء حسب الحالة.');
             if (job.rollback_requestable) {
                 primaryHtml = guidedBtn('rc-rollback-req', { 'data-id': id }, 'تنفيذ التراجع الإنتاجي', true);
-            } else if (job.status === 'rollback_pending' || job.is_rollback_failed) {
+            } else if (job.is_rollback_failed) {
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'rollback' }, 'متابعة التراجع', true);
+            } else if (job.status === 'rollback_pending' || (stIncludes(job, 'rollback') && !job.is_rollback_completed && !job.finalize_requestable)) {
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'rollback' }, 'متابعة التراجع', true, { disabled: true });
             } else if (job.finalize_requestable || job.status === 'rollback_finalizing') {
                 setCurrent(14, 'التراجع جاهز للإنهاء.');
                 if (job.status === 'rollback_finalizing') {
-                    primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true);
+                    primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true, { disabled: true });
                 } else {
                     primaryHtml = guidedBtn('rc-finalize-req', { 'data-id': id }, 'تنفيذ الإنهاء / إطلاق الصيانة', true);
                 }
@@ -2047,27 +2172,32 @@ body.rc-modal-open{overflow:hidden!important}
             if (job.pre_restore_backup_requestable) {
                 setCurrent(5, 'نفّذ النسخة الاحتياطية الإلزامية قبل الاسترداد. لا تُعتبر هذه الخطوة مكتملة قبل جهوزية النسخة.');
                 primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد', true);
-            } else if (job.status === 'pre_restore_backup_pending' || job.is_pre_restore_backup_failed) {
+            } else if (job.is_pre_restore_backup_failed) {
                 let failBody = 'فشل إعداد النسخة الاحتياطية. أعد التنفيذ ثم حدّث الحالة.';
-                if (job.is_pre_restore_backup_failed) {
-                    const mappedFail = operatorJobMessage(job.message || '');
-                    if (mappedFail && mappedFail !== 'تحديث حالة مهمة الاسترداد.') {
-                        failBody = mappedFail;
-                    }
-                } else {
-                    failBody = 'طُلبت النسخة الاحتياطية وما زالت غير مكتملة. أعد التنفيذ عبر محرك Full Backup المعتمد ثم حدّث الحالة.';
+                const mappedFail = operatorJobMessage(job.message || '');
+                if (mappedFail && mappedFail !== 'تحديث حالة مهمة الاسترداد.') {
+                    failBody = mappedFail;
                 }
                 setCurrent(5, failBody);
                 primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'متابعة النسخة الاحتياطية', true);
-            } else if (stIncludes(job, 'pre_restore_backup_running') || stIncludes(job, 'pre_restore_backup_verifying')) {
-                // Presentation-only: in-progress is current (orange), never failure-red "محظور".
-                // Authoritative completion still requires pre_restore_backup_ready (backupDone).
+            } else if (job.status === 'pre_restore_backup_pending'
+                || stIncludes(job, 'pre_restore_backup_running')
+                || stIncludes(job, 'pre_restore_backup_verifying')) {
+                // Server-authoritative busy: grey disabled action; Step7 remains locked.
                 if (stIncludes(job, 'pre_restore_backup_verifying')) {
                     setCurrent(5, 'اكتمل إنشاء النسخة، وجارٍ التحقق من جاهزيتها للاسترداد.');
+                } else if (job.status === 'pre_restore_backup_pending') {
+                    setCurrent(5, 'طُلبت النسخة الاحتياطية وما زالت قيد التنفيذ عبر محرك Full Backup المعتمد.');
                 } else {
                     setCurrent(5, 'جارٍ تنفيذ النسخة الاحتياطية الإلزامية.\nستظل هذه الخطوة قيد التنفيذ حتى تصبح النسخة جاهزة.');
                 }
-                // states[5] remains 'current' from setCurrent — Step7 stays locked; no blockReason.
+                primaryHtml = guidedBtn(
+                    'rc-pre-backup-req',
+                    { 'data-id': id },
+                    'متابعة النسخة الاحتياطية',
+                    true,
+                    { disabled: true }
+                );
             } else {
                 setCurrent(5, 'بانتظار النسخة الاحتياطية الإلزامية.');
                 blockReason = 'خطوة النسخة الاحتياطية غير جاهزة للتنفيذ بعد.';
@@ -2081,13 +2211,14 @@ body.rc-modal-open{overflow:hidden!important}
             if (job.shadow_restore_requestable) {
                 setCurrent(6, 'نفّذ استعادة قاعدة الظل.');
                 primaryHtml = guidedBtn('rc-shadow-req', { 'data-id': id }, 'تنفيذ استعادة قاعدة الظل', true);
-            } else if (job.status === 'shadow_restore_pending' || job.is_shadow_restore_failed) {
+            } else if (job.is_shadow_restore_failed) {
                 setCurrent(6, 'تابع استعادة قاعدة الظل.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_db' }, 'متابعة استعادة الظل', true);
-            } else if (stIncludes(job, 'shadow_restore_running') || stIncludes(job, 'shadow_restore_verifying')) {
+            } else if (job.status === 'shadow_restore_pending'
+                || stIncludes(job, 'shadow_restore_running')
+                || stIncludes(job, 'shadow_restore_verifying')) {
                 setCurrent(6, 'استعادة الظل جارية. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[6] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_db' }, 'متابعة استعادة الظل', true, { disabled: true });
             } else {
                 setCurrent(6, 'بانتظار استعادة قاعدة الظل.');
                 blockReason = 'استعادة الظل غير متاحة بعد. أكمل النسخة الاحتياطية أولاً.';
@@ -2103,8 +2234,7 @@ body.rc-modal-open{overflow:hidden!important}
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_verify' }, 'تنفيذ تحقق قاعدة الظل', true);
             } else if (job.status === 'shadow_verifying') {
                 setCurrent(7, 'تحقق الظل جارٍ. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[7] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_verify' }, 'تنفيذ تحقق قاعدة الظل', true, { disabled: true });
             } else if (job.status === 'shadow_not_ready') {
                 setCurrent(7, 'قاعدة الظل غير جاهزة.');
                 blockReason = 'التحقق أظهر أن الظل غير جاهز. راجع التقرير ثم أعد المحاولة عند التوفر.';
@@ -2125,8 +2255,7 @@ body.rc-modal-open{overflow:hidden!important}
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_files' }, 'تنفيذ استخراج ملفات الظل', true);
             } else if (stIncludes(job, 'shadow_files_running') || stIncludes(job, 'shadow_files_verifying')) {
                 setCurrent(8, 'استخراج ملفات الظل جارٍ. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[8] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_files' }, 'تنفيذ استخراج ملفات الظل', true, { disabled: true });
             } else if (job.status === 'shadow_files_failed') {
                 setCurrent(8, 'فشل استخراج ملفات الظل — أعد التنفيذ.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_files' }, 'إعادة استخراج ملفات الظل', true);
@@ -2143,13 +2272,12 @@ body.rc-modal-open{overflow:hidden!important}
             if (job.shadow_smoke_requestable) {
                 setCurrent(9, 'نفّذ اختبارات الجاهزية المعزولة.');
                 primaryHtml = guidedBtn('rc-shadow-smoke-req', { 'data-id': id }, 'تنفيذ اختبارات الجاهزية المعزولة', true);
-            } else if (job.status === 'shadow_smoke_pending' || job.status === 'shadow_smoke_failed') {
+            } else if (job.status === 'shadow_smoke_failed') {
                 setCurrent(9, 'تابع اختبارات الجاهزية.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_smoke' }, 'متابعة اختبارات الجاهزية', true);
-            } else if (stIncludes(job, 'shadow_smoke_running')) {
+            } else if (job.status === 'shadow_smoke_pending' || stIncludes(job, 'shadow_smoke_running')) {
                 setCurrent(9, 'اختبارات الجاهزية جارية. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[9] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_smoke' }, 'متابعة اختبارات الجاهزية', true, { disabled: true });
             } else {
                 setCurrent(9, 'بانتظار اختبارات الجاهزية.');
                 blockReason = 'اختبارات الجاهزية غير متاحة بعد.';
@@ -2186,13 +2314,14 @@ body.rc-modal-open{overflow:hidden!important}
             if (job.production_import_requestable) {
                 setCurrent(12, 'نفّذ استيراد قاعدة الإنتاج.');
                 primaryHtml = guidedBtn('rc-prod-import-req', { 'data-id': id }, 'تنفيذ استيراد قاعدة الإنتاج', true);
-            } else if (job.status === 'production_import_pending' || job.is_production_import_failed) {
+            } else if (job.is_production_import_failed) {
                 setCurrent(12, 'تابع استيراد الإنتاج.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'production_import' }, 'متابعة استيراد الإنتاج', true);
-            } else if (stIncludes(job, 'production_import_running') || stIncludes(job, 'production_import_verifying')) {
+            } else if (job.status === 'production_import_pending'
+                || stIncludes(job, 'production_import_running')
+                || stIncludes(job, 'production_import_verifying')) {
                 setCurrent(12, 'استيراد الإنتاج جارٍ. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[12] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'production_import' }, 'متابعة استيراد الإنتاج', true, { disabled: true });
             } else {
                 setCurrent(12, 'بانتظار استيراد قاعدة الإنتاج.');
                 blockReason = 'الاستيراد غير متاح. أكمل تفويض تحويل الإنتاج والصيانة النشطة أولاً.';
@@ -2206,13 +2335,14 @@ body.rc-modal-open{overflow:hidden!important}
             if (job.uploads_cutover_requestable) {
                 setCurrent(13, 'نفّذ تحويل ملفات الرفع.');
                 primaryHtml = guidedBtn('rc-uploads-cutover-req', { 'data-id': id }, 'تنفيذ تحويل ملفات الرفع', true);
-            } else if (job.status === 'uploads_cutover_pending' || job.is_uploads_cutover_failed) {
+            } else if (job.is_uploads_cutover_failed) {
                 setCurrent(13, 'تابع تحويل الرفع.');
                 primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'uploads_cutover' }, 'متابعة تحويل الرفع', true);
-            } else if (stIncludes(job, 'uploads_cutover_running') || stIncludes(job, 'uploads_cutover_verifying')) {
+            } else if (job.status === 'uploads_cutover_pending'
+                || stIncludes(job, 'uploads_cutover_running')
+                || stIncludes(job, 'uploads_cutover_verifying')) {
                 setCurrent(13, 'تحويل الرفع جارٍ. انتظر ثم حدّث.');
-                blockReason = 'التنفيذ جارٍ.';
-                states[13] = 'blocked';
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'uploads_cutover' }, 'متابعة تحويل الرفع', true, { disabled: true });
             } else {
                 setCurrent(13, 'بانتظار تحويل ملفات الرفع.');
                 blockReason = 'تحويل الرفع غير متاح بعد. أكمل استيراد الإنتاج أولاً.';
@@ -2227,7 +2357,7 @@ body.rc-modal-open{overflow:hidden!important}
             primaryHtml = guidedBtn('rc-finalize-req', { 'data-id': id }, 'تنفيذ الإنهاء / إطلاق الصيانة', true);
         } else if (job.status === 'restore_finalizing' || job.status === 'rollback_finalizing') {
             setCurrent(14, 'تابع الإنهاء.');
-            primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true);
+            primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true, { disabled: true });
         } else {
             setCurrent(14, 'بانتظار الإنهاء.');
             blockReason = 'الإنهاء غير متاح بعد. أكمل تحويل الرفع أولاً.';
@@ -2905,6 +3035,8 @@ body.rc-modal-open{overflow:hidden!important}
             if (!data.read_only) {
                 showRcTerminalMessage('تحذير: الاستجابة ليست للقراءة فقط.', false);
             }
+            // Server-authoritative button state after refresh/rerender.
+            rcStageActionLocks.clear();
             renderOverview(data);
             renderMaintenance(data.maintenance || {});
             renderTables(data);
@@ -2924,6 +3056,25 @@ body.rc-modal-open{overflow:hidden!important}
     document.addEventListener('click', async (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLElement)) return;
+
+        const isStageMutation = RC_STAGE_MUTATION_CLASSES.some(function (c) {
+            return t.classList.contains(c);
+        });
+        if (isStageMutation) {
+            if (t.disabled || t.getAttribute('aria-disabled') === 'true' || t.classList.contains('rc-stage-action-busy')) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+            }
+            const lock = beginStageActionLock(t);
+            if (!lock.ok) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                showRcJourneyInlineMessage('هذه المرحلة قيد التنفيذ بالفعل. لن يُرسل طلب مكرر.');
+                return;
+            }
+            t.setAttribute('data-rc-lock-key', lock.key || '');
+        }
 
         if (t.id === 'rc_refresh_btn') {
             await loadAll();
@@ -3132,12 +3283,16 @@ body.rc-modal-open{overflow:hidden!important}
 
         if (t.classList.contains('rc-pre-backup-req')) {
             const jobId = t.dataset.id || '';
+            const lockKey = t.getAttribute('data-rc-lock-key') || '';
             const inflightKey = String(jobId) + '::pre_restore_backup_shared';
             if (rcScheduleInFlight.has(inflightKey)) {
                 showRcTerminalMessage('تنفيذ النسخة الاحتياطية يعمل بالفعل لهذه المهمة. لن يُبدأ تنفيذ مكرر.', false);
+                endStageActionLock(lockKey);
                 return;
             }
             rcScheduleInFlight.add(inflightKey);
+            lockStageActionControl(t);
+            let ambiguous = false;
             try {
                 setBusy(true, 'جاري إنشاء النسخة الاحتياطية الإلزامية عبر محرك Full Backup المعتمد…');
                 const j = await apiPost('job/request-pre-restore-backup.php', {
@@ -3149,16 +3304,30 @@ body.rc-modal-open{overflow:hidden!important}
                     throw new Error(j.message || RC_PRE_BACKUP_FAIL_MSG);
                 }
                 showRcTerminalMessage(j.message || RC_PRE_BACKUP_OK_MSG, true);
+                endStageActionLock(lockKey);
                 await loadAll();
             } catch (e) {
                 const reason = (e && e.message) ? String(e.message) : '';
-                showRcTerminalMessage(
-                    reason && reason.indexOf('تعمل بالفعل') !== -1 ? reason : (reason || RC_PRE_BACKUP_FAIL_MSG),
-                    false
-                );
+                const isNetwork = !!(e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(reason)));
+                if (isNetwork) {
+                    ambiguous = true;
+                    await reconcileAfterStageAmbiguity(t, lockKey);
+                } else {
+                    showRcTerminalMessage(
+                        reason && reason.indexOf('تعمل بالفعل') !== -1
+                            ? reason
+                            : operatorJobMessage(reason || RC_PRE_BACKUP_FAIL_MSG),
+                        false
+                    );
+                    endStageActionLock(lockKey);
+                    await loadAll();
+                }
             } finally {
                 rcScheduleInFlight.delete(inflightKey);
                 setBusy(false);
+                if (!ambiguous) {
+                    // Authority after loadAll; keep busy class only if server re-rendered it.
+                }
             }
             return;
         }
@@ -3193,7 +3362,14 @@ body.rc-modal-open{overflow:hidden!important}
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showRcTerminalMessage(e.message || 'تعذر تنفيذ استعادة الظل', false);
+                const reason = (e && e.message) ? String(e.message) : '';
+                if (e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(reason))) {
+                    await reconcileAfterStageAmbiguity(t, t.getAttribute('data-rc-lock-key') || '');
+                } else {
+                    showRcTerminalMessage(reason || 'تعذر تنفيذ استعادة الظل', false);
+                    endStageActionLock(t.getAttribute('data-rc-lock-key') || '');
+                    await loadAll();
+                }
             } finally {
                 setBusy(false);
             }
@@ -3556,6 +3732,8 @@ body.rc-modal-open{overflow:hidden!important}
         }
 
         if (t.classList.contains('rc-run-worker')) {
+            const lockKey = t.getAttribute('data-rc-lock-key') || '';
+            lockStageActionControl(t);
             try {
                 const worker = t.dataset.worker || '';
                 await runRestoreWorker(
@@ -3564,17 +3742,25 @@ body.rc-modal-open{overflow:hidden!important}
                     'جاري تنفيذ المرحلة من مركز الاسترداد…'
                 );
                 showRcTerminalMessage(RC_SCHEDULED_MSG, true);
+                endStageActionLock(lockKey);
                 await loadAll();
             } catch (e) {
                 const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || 'تعذر تنفيذ المرحلة';
-                showRcTerminalMessage(reason, false);
-                if (e.code === 'restore_center_invalid_stage'
-                    || e.code === 'restore_center_worker_already_running'
-                    || e.code === 'restore_center_spawn_failed'
-                    || e.code === 'restore_center_worker_executable_unavailable') {
-                    try {
-                        await openOrchestratorDiagnostics(t.dataset.id || '');
-                    } catch (ignored) { /* alert already shown */ }
+                const isNetwork = !!(e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(String(reason))));
+                if (isNetwork) {
+                    await reconcileAfterStageAmbiguity(t, lockKey);
+                } else {
+                    showRcTerminalMessage(reason, false);
+                    endStageActionLock(lockKey);
+                    await loadAll();
+                    if (e.code === 'restore_center_invalid_stage'
+                        || e.code === 'restore_center_worker_already_running'
+                        || e.code === 'restore_center_spawn_failed'
+                        || e.code === 'restore_center_worker_executable_unavailable') {
+                        try {
+                            await openOrchestratorDiagnostics(t.dataset.id || '');
+                        } catch (ignored) { /* alert already shown */ }
+                    }
                 }
             } finally {
                 setBusy(false);
