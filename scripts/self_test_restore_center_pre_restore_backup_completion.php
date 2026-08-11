@@ -58,7 +58,7 @@ s6_ok(str_contains($reqApi, 'orange_restore_admin_fw_execute_pre_restore_backup'
 s6_ok(!str_contains($reqApi, 'attach_verified_schedule'), 'request API does not schedule orchestrator');
 s6_ok(str_contains($preSrc, 'function orange_restore_pre_backup_request'), 'request helper present');
 s6_ok(str_contains($preSrc, 'function orange_restore_pre_backup_execute'), 'execute adapter present');
-s6_ok(str_contains($preSrc, 'orange_backup_execute_full_authoritative'), 'shared Full Backup service wired');
+s6_ok(str_contains($preSrc, 'orange_backup_admin_run_full_for_api'), 'shared Full Backup service wired');
 s6_ok(!is_file($projectRoot . '/scripts/backup/restore_prepare_backup.php'), 'obsolete restore_prepare_backup.php deleted');
 s6_ok(!str_contains($preSrc, 'function orange_restore_pre_backup_run_cli'), 'run_cli alias removed');
 s6_ok(!str_contains($orchSrc, "'pre_restore_backup' => 'scripts/backup/restore_prepare_backup.php'"), 'orchestrator catalog has NO prepare backup');
@@ -210,14 +210,14 @@ $rootCause = [
         'RESTORE_CENTER_STEP6_EXACT_PACKAGE_BINDING_REQUIRED_01',
     ],
     'primary_code_cause' => 'STEP6_USED_DIVERGENT_ORCHESTRATOR_LAUNCHER_WHILE_BACKUP_CENTER_USED_SHARED_CLI_CAPTURE',
-    'completion_requires' => 'shared_orange_backup_execute_full_authoritative_then_bind_to_pre_restore_backup_ready',
+    'completion_requires' => 'shared_orange_backup_admin_run_full_for_api_then_bind_to_pre_restore_backup_ready',
     'ui_dispatch' => 'request-pre-restore-backup.php_sync_shared_service',
     'production_worker_executed' => false,
     'selected_cause_code' => 'PARALLEL_STEP6_LAUNCHER_REMOVED_SINGLE_ENGINE',
 ];
 
 $activation = [
-    'shared_service' => 'orange_backup_execute_full_authoritative',
+    'shared_service' => 'orange_backup_admin_run_full_for_api',
     'backup_center_caller' => 'orange_backup_admin_run_full_for_api',
     'restore_step6_caller' => 'orange_restore_admin_fw_execute_pre_restore_backup',
     'orchestrator_key' => null,

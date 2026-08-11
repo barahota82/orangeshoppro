@@ -81,27 +81,18 @@ $preSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/re
 $orchSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_center_orchestrator.php');
 $restoreAdminSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore_admin.php');
 
-/* 1–3 Shared service / single engine */
-eng_ok(str_contains($backupAdminSrc, 'function orange_backup_execute_full_authoritative'), 'SHARED service function defined');
-eng_ok(str_contains($backupAdminSrc, 'function orange_backup_admin_run_full_for_api'), 'Backup Center caller wrapper present');
-eng_ok(
-    (bool) preg_match(
-        '/function orange_backup_admin_run_full_for_api[\s\S]{0,400}?orange_backup_execute_full_authoritative/',
-        $backupAdminSrc
-    ),
-    'Backup Center API calls shared service'
-);
+/* 1–3 Shared service / single engine — immutable Backup Center Full callable */
+eng_ok(str_contains($backupAdminSrc, 'function orange_backup_admin_run_full_for_api'), 'SHARED Backup Center Full callable defined');
+eng_ok(!str_contains($backupAdminSrc, 'function orange_backup_execute_full_authoritative'), 'removed authoritative wrapper stays absent');
 eng_ok(str_contains($runFullApi, 'orange_backup_admin_run_full_for_api'), 'run-full.php uses admin wrapper');
-eng_ok(str_contains($preSrc, 'orange_backup_execute_full_authoritative'), 'Step6 invoke_engine uses shared service');
+eng_ok(str_contains($preSrc, 'orange_backup_admin_run_full_for_api'), 'Step6 invoke_engine uses Backup Center Full callable');
 eng_ok(!preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $preSrc), 'Step6 no direct orange_backup_run_full call');
 eng_ok(str_contains($restoreAdminSrc, 'function orange_restore_admin_fw_execute_pre_restore_backup'), 'Step6 admin adapter present');
 eng_ok(str_contains($reqApi, 'orange_restore_admin_fw_execute_pre_restore_backup'), 'request endpoint calls adapter');
 eng_ok(!str_contains($reqApi, 'attach_verified_schedule'), 'request endpoint does NOT schedule orchestrator');
 eng_ok(!str_contains($reqApi, 'pre_restore_backup\''), 'request endpoint has no worker key schedule');
 
-$engineImplCount = substr_count($backupAdminSrc, 'function orange_backup_execute_full_authoritative')
-    + (str_contains($preSrc, 'function orange_backup_run_full') ? 1 : 0);
-eng_ok(substr_count($backupAdminSrc, 'function orange_backup_execute_full_authoritative') === 1, 'FULL_BACKUP_ENGINE_IMPLEMENTATION_COUNT service=1');
+eng_ok(substr_count($backupAdminSrc, 'function orange_backup_admin_run_full_for_api') === 1, 'FULL_BACKUP_ENGINE_IMPLEMENTATION_COUNT service=1');
 eng_ok(!str_contains($preSrc, 'function orange_backup_run_full'), 'no second engine function in restore_pre');
 
 /* 4–8 Legacy launcher removal */
@@ -110,7 +101,11 @@ eng_ok(!isset($catalog['pre_restore_backup']), 'STEP6 catalog entry removed');
 eng_ok(!str_contains($orchSrc, "'pre_restore_backup' => 'scripts/backup/restore_prepare_backup.php'"), 'STEP6 catalog source line gone');
 eng_ok(!is_file($projectRoot . '/scripts/backup/restore_prepare_backup.php'), 'STEP6_LEGACY_DEAD_FILE_COUNT=0 prepare_backup deleted');
 eng_ok(!str_contains($preSrc, 'function orange_restore_pre_backup_run_cli'), 'STEP6_COMMENT_ONLY_TOMBSTONE_COUNT=0 run_cli removed');
-eng_ok(str_contains($preSrc, "'forbid_latest_snapshot_refresh' => true") || str_contains($preSrc, 'forbid_latest_snapshot_refresh'), 'LATEST_DIRECTORY_GUESS_COUNT=0 guarded');
+eng_ok(
+    (str_contains($preSrc, 'backup_package_id_missing') || str_contains($preSrc, 'without exact package identity'))
+    && !preg_match('/\borange_backup_latest_snapshot_name\s*\(/', $preSrc),
+    'LATEST_DIRECTORY_GUESS_COUNT=0 Restore-side exact bind guard'
+);
 $schedMap = orange_restore_center_worker_schedulable_statuses_map();
 eng_ok(!isset($schedMap['pre_restore_backup']), 'STEP6 schedulable map removed');
 $inflight = orange_restore_center_worker_inflight_statuses_map();
@@ -243,7 +238,7 @@ $GLOBALS['orange_pre_restore_backup_verify_override'] = static function (string 
 $GLOBALS['orange_pre_restore_backup_drv_override'] = static function (): array {
     return ['recovery_score' => 95, 'overall_result' => 'pass'];
 };
-eng_ok(function_exists('orange_backup_execute_full_authoritative'), 'SHARED_FULL_BACKUP_SERVICE_PROVEN callable');
+eng_ok(function_exists('orange_backup_admin_run_full_for_api'), 'SHARED_FULL_BACKUP_SERVICE_PROVEN callable');
 eng_ok(function_exists('orange_backup_admin_run_full_for_api'), 'Backup Center wrapper callable');
 
 $execOk = false;

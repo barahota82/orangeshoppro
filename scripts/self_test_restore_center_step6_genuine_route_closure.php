@@ -138,6 +138,28 @@ foreach ([$ev, $shots, $dataRoot . '/cookies', $dataRoot . '/sessions', $dataRoo
     }
 }
 
+// Keep detached runtime Restore Step6 adapter files aligned with main working tree
+// (task-created runtime only; Backup Center Production files are never copied).
+if (is_dir($runtimeRoot) && is_file($runtimeRoot . '/TASK_MARKER.txt')) {
+    $syncPairs = [
+        'admin/api/restore/job/request-pre-restore-backup.php',
+        'includes/backup/restore/restore_pre_restore_backup.php',
+        'includes/backup/restore_admin.php',
+        'admin/pages/restore_center.php',
+    ];
+    foreach ($syncPairs as $rel) {
+        $src = $mainRoot . '/' . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+        $dst = $runtimeRoot . '/' . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+        if (is_file($src)) {
+            $dstDir = dirname($dst);
+            if (!is_dir($dstDir)) {
+                mkdir($dstDir, 0777, true);
+            }
+            copy($src, $dst);
+        }
+    }
+}
+
 // Source gates (main Diff) — queued until after config bootstrap.
 $page = (string) file_get_contents($mainRoot . '/admin/pages/restore_center.php');
 $req = (string) file_get_contents($mainRoot . '/admin/api/restore/job/request-pre-restore-backup.php');
@@ -580,8 +602,8 @@ try {
     $boundId = (string) ($step6Json['rollback_package_id'] ?? '');
     $svc = (string) ($step6Json['shared_full_backup_service'] ?? '');
     gr_ok($ok, 'STEP6 genuine route success');
-    gr_ok($svc === 'orange_backup_execute_full_authoritative', 'STEP6_SHARED_ENGINE_CALL_COUNT=1 via genuine route');
-    $sharedEngine = ($svc === 'orange_backup_execute_full_authoritative' && $ok) ? 1 : 0;
+    gr_ok($svc === 'orange_backup_admin_run_full_for_api', 'STEP6_SHARED_ENGINE_CALL_COUNT=1 via genuine route');
+    $sharedEngine = ($svc === 'orange_backup_admin_run_full_for_api' && $ok) ? 1 : 0;
     gr_ok($boundId !== '', 'VERIFIED_DISPOSABLE_FULL_PACKAGE bound id present');
     $verifiedPkg = $boundId !== '' ? 1 : 0;
 

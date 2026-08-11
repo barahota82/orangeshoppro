@@ -5,16 +5,21 @@ declare(strict_types=1);
 /**
  * Phase 3B.3B3 — Mandatory Pre-Restore Backup Gate (rollback anchor only).
  *
- * PHASE 1 FREEZE (Owner 2026-08-11) — REMOVE IN PHASE 2:
- * Step 6 must not invoke any Backup engine until Backup Center live stability is confirmed.
- * Fail-closed guards below: no Full Backup, no worker, no package bind, no state advance.
+ * RESTORE_CENTER_STEP6_RESTORE_ONLY_ADAPTER_01 (Phase 2):
+ * Thin Restore-only adapter invokes the immutable Backup Center Full callable
+ *   orange_backup_admin_run_full_for_api()
+ *   → CLI scripts/backup/run_full_backup.php → orange_backup_run_full()
+ * unchanged (BACKUP_CENTER_IMMUTABLE_PRODUCTION_BOUNDARY_01).
  *
- * Historical shared-engine notes (frozen — do not re-enable in Phase 1):
- *   - orange_backup_execute_full_authoritative() was removed from Backup Center baseline
- *     restoration to d570e563; Phase 2 will rebuild the Step 6 adapter separately.
+ * Restore-only after shared success:
+ *   - exact package ID bind (RESTORE_STEP6_EXACT_BACKUP_RESULT_BINDING_01)
+ *   - verify / DRV / retention pin via existing Backup library helpers
+ *   - transition to pre_restore_backup_ready
  *
  * Never restores DB/files, never cutover, never enables production maintenance,
- * never uses a Step-6-only launcher / run-worker / launch.cmd path.
+ * never uses a Step-6-only launcher / run-worker / launch.cmd path,
+ * never modifies Backup Center Production files
+ * (RESTORE_STEP6_NO_BACKUP_BACKEND_MODIFICATION_01).
  */
 
 require_once __DIR__ . '/restore_job_framework.php';
@@ -35,10 +40,9 @@ const ORANGE_RESTORE_PRE_BACKUP_LOCK_FILE = '.pre_restore_backup.lock';
 const ORANGE_RESTORE_PRE_BACKUP_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_PRE_BACKUP_PURPOSE = 'pre_restore_rollback_anchor';
 const ORANGE_RESTORE_PRE_BACKUP_DRV_MIN_SCORE = 70;
-const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'phase1_frozen_no_backup_engine';
-/** PHASE 1 FREEZE — REMOVE IN PHASE 2 */
-const ORANGE_RESTORE_STEP6_PHASE1_FROZEN = true;
-const ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE = 'تم إيقاف تنفيذ الخطوة 6 مؤقتًا حتى اكتمال التحقق الحي من استقرار مركز النسخ الاحتياطي. لم يبدأ أي استرداد.';
+const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'orange_backup_admin_run_full_for_api';
+/** Phase 1 freeze cleared — Restore-only adapter re-enabled (Owner 2026-08-11 Phase 2). */
+const ORANGE_RESTORE_STEP6_PHASE1_FROZEN = false;
 
 function orange_restore_pre_backup_record_path(string $workRoot, string $jobId): string
 {
@@ -576,24 +580,87 @@ function orange_restore_pre_backup_request(
 }
 
 /**
- * Invoke the single authoritative Full Backup service (Backup Center path).
+ * Invoke the immutable Backup Center Full callable (same path as run-full.php).
  * Does not implement a second dump/package engine.
+ * Restore never invents package identity by scanning the newest snapshot directory.
  *
- * @return array{ok:bool,snapshot:?string,backend:?string,message:string,exit_code:int}
+ * @return array{ok:bool,snapshot:?string,backend:?string,message:string,exit_code:int,code?:string}
  */
 function orange_restore_pre_backup_invoke_engine(string $projectRoot, ?string $backupRootOverride): array
 {
-    // PHASE 1 FREEZE — REMOVE IN PHASE 2. No Backup engine / CLI / override path.
-    unset($projectRoot, $backupRootOverride);
+    if (isset($GLOBALS['orange_pre_restore_backup_engine_override'])
+        && is_callable($GLOBALS['orange_pre_restore_backup_engine_override'])) {
+        /** @var callable $fn */
+        $fn = $GLOBALS['orange_pre_restore_backup_engine_override'];
+        $result = $fn($projectRoot, $backupRootOverride);
+        if (!is_array($result)) {
+            return [
+                'ok' => false,
+                'snapshot' => null,
+                'backend' => null,
+                'message' => 'engine_override_invalid',
+                'exit_code' => 1,
+            ];
+        }
+
+        $snapshot = isset($result['snapshot']) && is_string($result['snapshot']) && $result['snapshot'] !== ''
+            ? (string) $result['snapshot']
+            : null;
+        $ok = (bool) ($result['ok'] ?? false);
+        if ($ok && $snapshot === null) {
+            return [
+                'ok' => false,
+                'snapshot' => null,
+                'backend' => isset($result['backend']) ? (string) $result['backend'] : null,
+                'message' => 'Full backup completed without exact package identity.',
+                'exit_code' => 1,
+                'code' => 'backup_package_id_missing',
+            ];
+        }
+
+        return [
+            'ok' => $ok && $snapshot !== null,
+            'snapshot' => $snapshot,
+            'backend' => isset($result['backend']) ? (string) $result['backend'] : null,
+            'message' => (string) ($result['message'] ?? ''),
+            'exit_code' => (int) ($result['exit_code'] ?? ($ok ? 0 : 1)),
+        ];
+    }
+
+    // $backupRootOverride unused: Backup Center CLI uses BackupRoot from env (same as UI Full).
+    // Fixtures must use engine override — never open a parallel dump path.
+    unset($backupRootOverride);
+
+    $options = [];
+    if (isset($GLOBALS['orange_backup_admin_run_full_for_api_options'])
+        && is_array($GLOBALS['orange_backup_admin_run_full_for_api_options'])) {
+        $options = $GLOBALS['orange_backup_admin_run_full_for_api_options'];
+    }
+
+    $raw = orange_backup_admin_run_full_for_api($projectRoot, $options);
+    $snapshot = isset($raw['snapshot']) && is_string($raw['snapshot']) && $raw['snapshot'] !== ''
+        ? (string) $raw['snapshot']
+        : null;
+
+    // RESTORE_STEP6_EXACT_BACKUP_RESULT_BINDING_01 — refuse success without exact package ID.
+    // Restore does not invent identity by scanning newest snapshot directories.
+    if (!empty($raw['ok']) && $snapshot === null) {
+        return [
+            'ok' => false,
+            'snapshot' => null,
+            'backend' => isset($raw['backend']) ? (is_string($raw['backend']) ? $raw['backend'] : null) : null,
+            'message' => 'Full backup completed without exact package identity.',
+            'exit_code' => 1,
+            'code' => 'backup_package_id_missing',
+        ];
+    }
 
     return [
-        'ok' => false,
-        'snapshot' => null,
-        'backend' => null,
-        'message' => ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE,
-        'exit_code' => 1,
-        'phase1_freeze' => true,
-        'code' => 'step6_temporarily_frozen',
+        'ok' => (bool) ($raw['ok'] ?? false) && $snapshot !== null,
+        'snapshot' => $snapshot,
+        'backend' => isset($raw['backend']) ? (is_string($raw['backend']) ? $raw['backend'] : null) : null,
+        'message' => (string) ($raw['message'] ?? ''),
+        'exit_code' => (int) ($raw['exit_code'] ?? (($raw['ok'] ?? false) ? 0 : 1)),
     ];
 }
 
@@ -644,27 +711,6 @@ function orange_restore_pre_backup_execute(
     string $jobId,
     string $owner = 'admin'
 ): array {
-    // PHASE 1 FREEZE — REMOVE IN PHASE 2.
-    // Fail-closed before any Backup invoke, worker schedule, package bind, or status advance.
-    unset($projectRoot, $owner);
-    if (ORANGE_RESTORE_STEP6_PHASE1_FROZEN) {
-        return [
-            'ok' => false,
-            'success' => false,
-            'idempotent' => false,
-            'execution_started' => false,
-            'scheduled' => false,
-            'detached' => false,
-            'phase1_freeze' => true,
-            'code' => 'step6_temporarily_frozen',
-            'job_id' => $jobId,
-            'message' => ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE,
-            'record' => orange_restore_pre_backup_public_record(
-                orange_restore_pre_backup_load_record($workRoot, $jobId) ?? []
-            ),
-        ];
-    }
-
     $check = orange_restore_pre_backup_revalidate($workRoot, $jobId, $backupRoot);
     if (!$check['ok']) {
         throw new RuntimeException((string) $check['code']);

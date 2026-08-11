@@ -28,6 +28,8 @@ if (!is_dir($ev)) {
 
 /** @var list<array{name:string,argv:list<string>,tracked?:bool}> $commands */
 $commands = [
+    ['name' => 'backup_blob_freeze', 'argv' => [$php, $projectRoot . '/scripts/self_test_backup_center_blob_freeze_suite.php']],
+    ['name' => 'restore_only_adapter_phase2', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_restore_only_adapter_phase2.php']],
     ['name' => 'shared_full_backup_engine', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_single_full_backup_engine.php']],
     ['name' => 'legacy_path_removal_spawn', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_executable_spawn.php']],
     ['name' => 'legacy_stale_launch_removal', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_stale_launch_retry.php']],
@@ -36,6 +38,9 @@ $commands = [
     ['name' => 'package_binding_completion', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_pre_restore_backup_completion.php']],
     ['name' => 'sync_http_contract', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_sync_http_contract.php']],
     ['name' => 'retention_pin_lifecycle', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_retention_pin_lifecycle.php']],
+    ['name' => 'failed_retry_transition', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_failed_retry_transition.php']],
+    ['name' => 'cross_surface_shared_lock', 'argv' => [$php, $projectRoot . '/scripts/self_test_backup_restore_cross_surface_shared_lock_p0.php']],
+    ['name' => 'true_baseline_recovery', 'argv' => [$php, $projectRoot . '/scripts/self_test_backup_center_true_baseline_recovery.php']],
     ['name' => 'genuine_route_closure', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_step6_genuine_route_closure.php']],
     ['name' => 'pre_restore_backup_isolated', 'argv' => [$php, $projectRoot . '/scripts/backup/self_test_pre_restore_backup.php']],
     ['name' => 'internal_orchestration', 'argv' => [$php, $projectRoot . '/scripts/self_test_restore_center_internal_orchestration.php']],

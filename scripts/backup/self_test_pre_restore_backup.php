@@ -310,7 +310,7 @@ try {
     );
     $preSrcCheck = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_pre_restore_backup.php');
     pre_backup_self_test(
-        str_contains($preSrcCheck, 'orange_backup_execute_full_authoritative')
+        str_contains($preSrcCheck, 'orange_backup_admin_run_full_for_api')
         && !preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $preSrcCheck),
         'Step6 invoke_engine uses shared Full Backup service only'
     );

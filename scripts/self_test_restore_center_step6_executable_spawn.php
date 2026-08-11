@@ -44,7 +44,7 @@ leg_ok(!isset(orange_restore_center_worker_pending_status_map()['pre_restore_bac
 leg_ok(!str_contains($req, 'attach_verified_schedule'), 'STEP6_LEGACY_RUN_WORKER_CALLER_COUNT=0');
 leg_ok(!str_contains($page, "data-worker': 'pre_restore_backup'"), 'UI no run-worker Step6');
 leg_ok(!str_contains($page, 'data-worker="pre_restore_backup"'), 'UI HTML no Step6 worker');
-leg_ok(str_contains($pre, 'orange_backup_execute_full_authoritative'), 'shared engine wired');
+leg_ok(str_contains($pre, 'orange_backup_admin_run_full_for_api'), 'shared engine wired');
 leg_ok(!preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $pre), 'no parallel in-process engine call');
 
 try {

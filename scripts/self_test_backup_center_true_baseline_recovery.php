@@ -78,8 +78,9 @@ tb_ok(str_contains((string) file_get_contents($projectRoot . '/admin/api/backup/
 tb_ok(!preg_match('/\borange_backup_admin_run_full_for_api\s*\(/', $diagSrc), '13a. diagnostic does not start Full');
 tb_ok(!preg_match('/\borange_backup_admin_run_country_batch\s*\(/', $diagSrc), '13b. diagnostic does not start Countries');
 tb_ok(!preg_match('/\bunlink\s*\(/', $diagSrc), '13c. diagnostic does not delete locks');
-tb_ok(str_contains($preSrc, 'ORANGE_RESTORE_STEP6_PHASE1_FROZEN') && str_contains($preSrc, 'true'), '13d. Step6 freeze constant retained');
-tb_ok(str_contains($reqSrc, 'step6_temporarily_frozen'), '13e. Step6 request fail-closed retained');
+tb_ok(str_contains($preSrc, 'ORANGE_RESTORE_STEP6_PHASE1_FROZEN = false'), '13d. Step6 Phase1 freeze cleared (Phase 2 adapter)');
+tb_ok(str_contains($reqSrc, 'orange_restore_admin_fw_execute_pre_restore_backup')
+    && !str_contains($reqSrc, 'step6_temporarily_frozen'), '13e. Step6 Restore-only adapter active');
 tb_ok(!preg_match('/(?:require|include|shell_exec|proc_open|system).*launch\\.cmd/i', $reqSrc . "\n" . $preSrc)
     && !str_contains($reqSrc, '_launch.cmd')
     && (substr_count($preSrc, 'launch.cmd') <= 1),

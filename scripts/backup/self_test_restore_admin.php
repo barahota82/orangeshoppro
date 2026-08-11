@@ -2327,7 +2327,7 @@ restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' 
 restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php'), 'pre-backup: request API present');
 $preBackupLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_pre_restore_backup.php');
 restore_admin_self_test(
-    str_contains($preBackupLib, 'orange_backup_execute_full_authoritative')
+    str_contains($preBackupLib, 'orange_backup_admin_run_full_for_api')
     && str_contains($preBackupLib, 'orange_backup_verify_full_package')
     && str_contains($preBackupLib, 'orange_recovery_validate_package')
     && str_contains($preBackupLib, 'orange_backup_retention_pin_package')

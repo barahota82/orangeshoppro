@@ -173,8 +173,8 @@ orch_ok(count($catalog) >= 8, 'RESTORE_WORKER_CATALOG_COUNT>=8 actual=' . count(
 $step6ReqSrc = (string) file_get_contents($projectRoot . '/admin/api/restore/job/request-pre-restore-backup.php');
 orch_ok(str_contains($step6ReqSrc, 'orange_restore_admin_fw_execute_pre_restore_backup'), 'Step6 uses shared-engine adapter');
 orch_ok(!str_contains($step6ReqSrc, 'attach_verified_schedule'), 'Step6 request does NOT schedule orchestrator');
-orch_ok(str_contains($step6ReqSrc, 'orange_backup_execute_full_authoritative')
-    || str_contains((string) file_get_contents($projectRoot . '/includes/backup/restore/restore_pre_restore_backup.php'), 'orange_backup_execute_full_authoritative'),
+orch_ok(str_contains($step6ReqSrc, 'orange_backup_admin_run_full_for_api')
+    || str_contains((string) file_get_contents($projectRoot . '/includes/backup/restore/restore_pre_restore_backup.php'), 'orange_backup_admin_run_full_for_api'),
     'Step6 wired to shared Full Backup service');
 
 $workerMatrix = [];

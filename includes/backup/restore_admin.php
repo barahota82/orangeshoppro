@@ -1213,7 +1213,7 @@ function orange_restore_admin_fw_execute_pre_restore_backup(
         'cli_needed' => false,
         'cli_command' => '',
         'operator_action_required' => false,
-        'shared_full_backup_service' => 'orange_backup_execute_full_authoritative',
+        'shared_full_backup_service' => 'orange_backup_admin_run_full_for_api',
         'rollback_package_id' => (string) ($exec['rollback_package_id'] ?? ''),
         'code' => (string) ($exec['code'] ?? ($ok ? 'pre_restore_backup_ready' : 'pre_restore_backup_failed')),
         'job' => $fresh,
