@@ -504,8 +504,8 @@ foreach ($matrices as $name => $payload) {
     );
 }
 
-echo "\nTOTAL pass={$pass} fail={$fail} skip={$skip} CORE_SKIP={$coreSkip} RAW_FAIL={$rawFail}\n";
-exit($fail === 0 && $coreSkip === 0 && $rawFail === 0 ? 0 : 1);
-
 /* True baseline contract tag */
 rd_ok(str_contains($helperSrc, 'BACKUP_CENTER_B47CBE86'), 'BC execution contract tagged in diagnostic');
+
+echo "\nTOTAL pass={$pass} fail={$fail} skip={$skip} CORE_SKIP={$coreSkip} RAW_FAIL={$rawFail}\n";
+exit($fail === 0 && $coreSkip === 0 && $rawFail === 0 ? 0 : 1);

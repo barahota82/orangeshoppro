@@ -1276,9 +1276,9 @@ function orange_restore_center_run_worker(
                 'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             ];
             if ($code === 'restore_center_worker_executable_unavailable'
-                && function_exists('orange_backup_admin_cli_php_safe_resolve_diag')) {
+                && function_exists('orange_restore_worker_cli_php_safe_resolve_diag')) {
                 // Categories only — no raw paths (Owner UI must stay path-free).
-                $failAudit['resolve_diag'] = orange_backup_admin_cli_php_safe_resolve_diag($projectRoot);
+                $failAudit['resolve_diag'] = orange_restore_worker_cli_php_safe_resolve_diag($projectRoot);
             }
             orange_restore_fw_audit_append($workRoot, $jobId, $failAudit);
             // Never leave unconsumed pending after a failed schedule attempt.

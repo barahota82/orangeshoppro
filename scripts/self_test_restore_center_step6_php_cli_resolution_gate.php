@@ -37,6 +37,8 @@ pr_ok(!str_contains($req, 'orange_restore_worker_resolve_cli_php_binary'), 'Step
 pr_ok(!str_contains($req, 'orange_restore_center_resolve'), 'Step6 request no restore resolver');
 pr_ok(str_contains($orch, 'orange_restore_worker_resolve_cli_php_binary'), 'Restore worker resolver retained for other workers');
 pr_ok(!str_contains($orch, 'orange_backup_admin_resolve_cli_php_binary'), 'RESTORE_EXECUTABLE_POLICY_LEAK_INTO_BACKUP_COUNT=0 (orch→BC)');
+pr_ok(str_contains($orch, 'orange_restore_worker_cli_php_safe_resolve_diag'), 'Restore worker resolve diagnostic retained');
+pr_ok(!str_contains($orch, 'orange_backup_admin_cli_php_safe_resolve_diag'), 'removed BC resolve diagnostic not used by Restore workers');
 pr_ok(str_contains($workerCli, 'php_cli_is_windows_cgi_sibling') || str_contains($workerCli, 'sibling'), 'Attempt-3 sibling trust retained in Restore worker contract');
 pr_ok(str_contains($admin, 'bare "php" fallback') || str_contains($admin, "return 'php';"), 'Backup Center b47cbe86 bare-php contract present');
 pr_ok(!str_contains($admin, 'php_cli_binary_unavailable'), 'Backup Center does not throw Restore absolute-unavailable');

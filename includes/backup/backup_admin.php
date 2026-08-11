@@ -1288,6 +1288,12 @@ function orange_backup_admin_cli_php_binary_is_cli(string $phpBinary): bool
     if ($phpBinary !== 'php' && (!is_file($phpBinary) || preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary))) {
         return false;
     }
+    if ($phpBinary === 'php') {
+        $path = (string) (getenv('PATH') ?: ($_ENV['PATH'] ?? $_SERVER['PATH'] ?? ''));
+        if (trim($path) === '') {
+            return false;
+        }
+    }
 
     $capture = orange_backup_run_command_capture([$phpBinary, '-r', 'echo PHP_SAPI;'], 20);
     if ((int) ($capture['exit_code'] ?? 1) !== 0) {
