@@ -100,7 +100,9 @@ function xp_write_lock(string $path, int $pid, ?string $startedAt = null): void
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }
 
-$evidenceDir = 'D:/orange_backup_restore_cross_surface_p0_evidence';
+$evidenceDir = DIRECTORY_SEPARATOR === '\\'
+    ? 'D:/orange_backup_restore_cross_surface_p0_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_backup_restore_cross_surface_p0_evidence';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
