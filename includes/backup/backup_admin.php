@@ -1230,282 +1230,62 @@ function orange_backup_admin_scheduled_tasks_readonly(int $retentionDays): array
 }
 
 /**
- * True when $path looks like an absolute filesystem executable path (not bare "php").
+ * Resolve an approved PHP CLI executable for Backup Center subprocesses (never php-cgi / FastCGI).
+ * Backup Center execution contract (Owner true baseline b47cbe86):
+ * ORANGE_PHP_CLI | PHP_BINARY (+ cgi→php sibling) | bare "php" fallback.
+ * Does not throw. Restore workers use includes/backup/restore/restore_worker_php_cli.php instead.
  */
-function orange_backup_admin_php_cli_path_is_absolute(string $path): bool
+function orange_backup_admin_resolve_cli_php_binary(string $projectRoot): string
 {
-    $path = trim($path);
-    if ($path === '') {
-        return false;
-    }
-    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1) {
-        return true;
-    }
-    if (str_starts_with($path, '\\\\') || str_starts_with($path, '/')) {
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * Runtime PHP_BINARY for resolution (test override via $GLOBALS['orange_backup_test_php_binary']).
- */
-function orange_backup_admin_runtime_php_binary(): string
-{
-    if (isset($GLOBALS['orange_backup_test_php_binary'])
-        && is_string($GLOBALS['orange_backup_test_php_binary'])) {
-        return trim($GLOBALS['orange_backup_test_php_binary']);
-    }
-    if (defined('PHP_BINARY') && is_string(PHP_BINARY)) {
-        return trim(PHP_BINARY);
-    }
-
-    return '';
-}
-
-/**
- * Runtime PHP_BINDIR for resolution (test override via $GLOBALS['orange_backup_test_php_bindir']).
- */
-function orange_backup_admin_runtime_php_bindir(): string
-{
-    if (isset($GLOBALS['orange_backup_test_php_bindir'])
-        && is_string($GLOBALS['orange_backup_test_php_bindir'])) {
-        return trim($GLOBALS['orange_backup_test_php_bindir']);
-    }
-    if (defined('PHP_BINDIR') && is_string(PHP_BINDIR)) {
-        return trim(PHP_BINDIR);
-    }
-
-    return '';
-}
-
-/**
- * Build deterministic absolute CLI candidates (Admin-only contract).
- * Allowed: ORANGE_PHP_CLI (absolute CLI), PHP_BINARY if CLI, Windows sibling php.exe beside php-cgi,
- * PHP_BINDIR/php(.exe). Forbidden: bare "php", PATH/where/which, hardcoded hosting trees, CGI-as-CLI.
- *
- * @return list<string>
- */
-function orange_backup_admin_cli_php_candidate_paths(string $projectRoot): array
-{
-    $candidates = [];
     $env = orange_backup_load_env_array($projectRoot);
-    // Test-only env override (isolated fixtures). Production uses server .env.php only.
     if (isset($GLOBALS['orange_backup_test_env_override'])
         && is_array($GLOBALS['orange_backup_test_env_override'])) {
         $env = array_merge($env, $GLOBALS['orange_backup_test_env_override']);
     }
     $configured = trim((string) ($env['ORANGE_PHP_CLI'] ?? ''));
+    $candidates = [];
     if ($configured !== '') {
         $candidates[] = $configured;
     }
-
-    $phpBinary = orange_backup_admin_runtime_php_binary();
-    if ($phpBinary !== '') {
-        $candidates[] = $phpBinary;
-        $binDir = dirname($phpBinary);
-        // Plesk/IIS: PHP_BINARY is often php-cgi.exe — prefer sibling php.exe in the same directory.
-        if (preg_match('/php-cgi(\.exe)?$/i', $phpBinary) === 1) {
-            $sibling = preg_replace('/php-cgi(\.exe)?$/i', 'php$1', $phpBinary);
+    $runtimeBinary = '';
+    if (isset($GLOBALS['orange_backup_test_php_binary'])
+        && is_string($GLOBALS['orange_backup_test_php_binary'])) {
+        $runtimeBinary = trim($GLOBALS['orange_backup_test_php_binary']);
+    } elseif (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') {
+        $runtimeBinary = trim(PHP_BINARY);
+    }
+    if ($runtimeBinary !== '') {
+        $candidates[] = $runtimeBinary;
+        if (preg_match('/php-cgi(?:\.exe)?$/i', $runtimeBinary)) {
+            $sibling = preg_replace('/php-cgi(\.exe)?$/i', 'php$1', $runtimeBinary);
             if (is_string($sibling) && $sibling !== '') {
                 $candidates[] = $sibling;
             }
         }
-        if (PHP_OS_FAMILY === 'Windows') {
-            $candidates[] = $binDir . DIRECTORY_SEPARATOR . 'php.exe';
-        } else {
-            $candidates[] = $binDir . DIRECTORY_SEPARATOR . 'php';
-        }
     }
+    $candidates[] = 'php';
 
-    $binDirConst = orange_backup_admin_runtime_php_bindir();
-    if ($binDirConst !== '') {
-        if (PHP_OS_FAMILY === 'Windows') {
-            $candidates[] = rtrim($binDirConst, "\\/") . DIRECTORY_SEPARATOR . 'php.exe';
-        } else {
-            $candidates[] = rtrim($binDirConst, '/') . '/php';
-        }
-    }
-
-    return $candidates;
-}
-
-/**
- * True when $candidate is the Windows sibling php.exe of the runtime php-cgi binary
- * (same directory). Trusted for Admin detach without requiring a web-SAPI proc_open probe
- * (IIS/Plesk often cannot execute CLI probes from the site pool).
- */
-function orange_backup_admin_php_cli_is_windows_cgi_sibling(string $candidate, string $phpBinary): bool
-{
-    if (PHP_OS_FAMILY !== 'Windows') {
-        return false;
-    }
-    $phpBinary = trim($phpBinary);
-    $candidate = trim($candidate);
-    if ($phpBinary === '' || $candidate === '') {
-        return false;
-    }
-    // Trusted source must be absolute php-cgi.exe (never user-controlled relative tokens).
-    if (!orange_backup_admin_php_cli_path_is_absolute($phpBinary)
-        || preg_match('/php-cgi\.exe$/i', $phpBinary) !== 1
-        || !is_file($phpBinary)) {
-        return false;
-    }
-    // Sibling must be absolute real file named exactly php.exe (not php-cgi, not *php.exe).
-    if (!orange_backup_admin_php_cli_path_is_absolute($candidate)
-        || strcasecmp(basename($candidate), 'php.exe') !== 0
-        || !is_file($candidate)) {
-        return false;
-    }
-    $binDir = strtolower(rtrim(str_replace('\\', '/', dirname($phpBinary)), '/'));
-    $candDir = strtolower(rtrim(str_replace('\\', '/', dirname($candidate)), '/'));
-
-    return $binDir !== '' && $binDir === $candDir;
-}
-
-/**
- * True when $candidate is an allowlisted absolute Windows php.exe (never php-cgi).
- * IIS/Plesk often blocks proc_open SAPI probes; existing php.exe on the approved candidate
- * list (ORANGE_PHP_CLI / PHP_BINARY dir / PHP_BINDIR) is trusted without PATH lookup.
- */
-function orange_backup_admin_php_cli_windows_trust_existing_php_exe(string $candidate): bool
-{
-    if (PHP_OS_FAMILY !== 'Windows') {
-        return false;
-    }
-    $candidate = trim($candidate);
-    if ($candidate === '') {
-        return false;
-    }
-    // Basename must be exactly php.exe — reject php-cgi.exe and names like myphp.exe.
-    if (strcasecmp(basename($candidate), 'php.exe') !== 0) {
-        return false;
-    }
-    if (!orange_backup_admin_php_cli_path_is_absolute($candidate) || !is_file($candidate)) {
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Operator/UI-safe resolve diagnostics (no raw filesystem paths).
- *
- * @return array<string, int|string>
- */
-function orange_backup_admin_cli_php_safe_resolve_diag(string $projectRoot): array
-{
-    $phpBinary = orange_backup_admin_runtime_php_binary();
-    $bindir = orange_backup_admin_runtime_php_bindir();
-    $kind = 'empty';
-    if ($phpBinary !== '') {
-        if (preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary) === 1) {
-            $kind = 'cgi';
-        } elseif (preg_match('/php(?:\.exe)?$/i', $phpBinary) === 1) {
-            $kind = 'cli_named';
-        } else {
-            $kind = 'other';
-        }
-    }
-    $env = [];
-    try {
-        $env = orange_backup_load_env_array($projectRoot);
-        if (isset($GLOBALS['orange_backup_test_env_override']) && is_array($GLOBALS['orange_backup_test_env_override'])) {
-            $env = array_merge($env, $GLOBALS['orange_backup_test_env_override']);
-        }
-    } catch (Throwable $e) {
-        $env = [];
-    }
-    $configured = trim((string) ($env['ORANGE_PHP_CLI'] ?? ''));
-    $candidates = 0;
-    $absoluteHits = 0;
-    $fileHits = 0;
-    $trustedHits = 0;
-    foreach (orange_backup_admin_cli_php_candidate_paths($projectRoot) as $candidate) {
-        $candidate = orange_backup_normalize_tool_path(trim((string) $candidate));
-        if ($candidate === '') {
-            continue;
-        }
-        $candidates++;
-        if (!orange_backup_admin_php_cli_path_is_absolute($candidate)) {
-            continue;
-        }
-        $absoluteHits++;
-        if (!is_file($candidate)) {
-            continue;
-        }
-        $fileHits++;
-        if (orange_backup_admin_php_cli_windows_trust_existing_php_exe($candidate)
-            || orange_backup_admin_php_cli_is_windows_cgi_sibling($candidate, $phpBinary)) {
-            $trustedHits++;
-        }
-    }
-
-    return [
-        'php_binary_kind' => $kind,
-        'php_binary_absolute' => orange_backup_admin_php_cli_path_is_absolute($phpBinary) ? 1 : 0,
-        'php_bindir_present' => $bindir !== '' ? 1 : 0,
-        'orange_php_cli_configured' => $configured !== '' ? 1 : 0,
-        'candidate_count' => $candidates,
-        'candidate_absolute_count' => $absoluteHits,
-        'candidate_file_count' => $fileHits,
-        'candidate_trusted_php_exe_count' => $trustedHits,
-    ];
-}
-
-/**
- * Resolve an approved PHP CLI executable for backup/restore subprocesses (never php-cgi / FastCGI).
- * Always returns an absolute filesystem path, or throws php_cli_binary_unavailable.
- * Never returns bare "php". Never uses PATH / where / which. Never hardcodes hosting install trees.
- * Automatic on Plesk Windows when php-cgi.exe has sibling php.exe (or PHP_BINDIR/php.exe exists).
- */
-function orange_backup_admin_resolve_cli_php_binary(string $projectRoot): string
-{
-    $phpBinary = orange_backup_admin_runtime_php_binary();
     $seen = [];
-    foreach (orange_backup_admin_cli_php_candidate_paths($projectRoot) as $candidate) {
+    foreach ($candidates as $candidate) {
         $candidate = trim((string) $candidate);
-        if ($candidate === '') {
-            continue;
-        }
-        $candidate = orange_backup_normalize_tool_path($candidate);
         if ($candidate === '' || isset($seen[$candidate])) {
             continue;
         }
         $seen[$candidate] = true;
-        if (!orange_backup_admin_php_cli_path_is_absolute($candidate)) {
+        if ($candidate !== 'php' && !is_file($candidate)) {
             continue;
         }
-        if (!is_file($candidate)) {
-            continue;
-        }
-        $accepted = orange_backup_admin_cli_php_binary_is_cli($candidate);
-        if (!$accepted && orange_backup_admin_php_cli_is_windows_cgi_sibling($candidate, $phpBinary)) {
-            // Deterministic Plesk/IIS layout: sibling php.exe beside php-cgi.exe.
-            $accepted = true;
-        }
-        if (!$accepted && orange_backup_admin_php_cli_windows_trust_existing_php_exe($candidate)) {
-            // Allowlisted absolute php.exe when SAPI probe is blocked (PHP_BINDIR / sibling dir).
-            $accepted = true;
-        }
-        if ($accepted) {
-            $real = realpath($candidate);
-
-            return is_string($real) && $real !== '' ? $real : $candidate;
+        if (orange_backup_admin_cli_php_binary_is_cli($candidate)) {
+            return $candidate;
         }
     }
 
-    throw new RuntimeException('php_cli_binary_unavailable');
+    return 'php';
 }
 
 function orange_backup_admin_cli_php_binary_is_cli(string $phpBinary): bool
 {
-    $phpBinary = trim($phpBinary);
-    if ($phpBinary === '' || preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary) === 1) {
-        return false;
-    }
-    if (!orange_backup_admin_php_cli_path_is_absolute($phpBinary) || !is_file($phpBinary)) {
+    if ($phpBinary !== 'php' && (!is_file($phpBinary) || preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary))) {
         return false;
     }
 
@@ -1516,7 +1296,6 @@ function orange_backup_admin_cli_php_binary_is_cli(string $phpBinary): bool
 
     return trim((string) ($capture['stdout'] ?? '')) === 'cli';
 }
-
 /**
  * Fixed approved CLI command for manual Full Backup (no request-derived paths).
  *

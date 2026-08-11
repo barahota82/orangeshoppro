@@ -261,6 +261,23 @@ $multi = orange_backup_runtime_diagnostic_classify(['PHP_CLI_UNAVAILABLE', 'BACK
 ]);
 rd_ok($multi === 'MULTIPLE_RUNTIME_BLOCKERS', '25. Multiple blockers classification');
 
+/* 25b. Safe Arabic blocker list visible (not generic-only) */
+$multiUi = orange_backup_runtime_diagnostic_owner_ui([
+    'classification' => 'MULTIPLE_RUNTIME_BLOCKERS',
+    'blockers' => ['PHP_CLI_UNAVAILABLE', 'FULL_RUNNER_UNAVAILABLE'],
+    'backup_root' => ['root_configured' => true, 'root_exists' => true, 'root_readable' => true, 'root_writable' => 'yes'],
+    'full_lock' => ['exists' => false],
+    'countries_lock' => ['exists' => false],
+    'process' => ['cli_resolved' => false, 'proc_open_available' => true],
+    'database' => ['database_connection_available' => true, 'schema_gate_match' => true],
+    'last_full_attempt' => ['evidence_available' => false, 'process_started' => 'unknown', 'package_created' => 'unknown'],
+    'disk' => ['category' => 'sufficient', 'human' => null],
+    'runner' => ['full' => ['command_constructable' => false]],
+]);
+rd_ok(str_contains($multiUi, 'العوائق المثبتة:'), '25b. DIAGNOSTIC_SAFE_BLOCKER_LIST_VISIBLE=1');
+rd_ok(str_contains($multiUi, '- '), '25c. proven blocker bullets present');
+rd_ok(substr_count($multiUi, 'توجد عوائق تشغيل متعددة — عالجها وفق الأولوية دون تشغيل Full.') === 0, '25d. GENERIC_MULTIPLE_ONLY_COUNT=0');
+
 /* 26. No raw path/command/secret in Owner UI */
 $r = orange_backup_runtime_diagnostic_run($projectRoot, null);
 $owner = (string) ($r['owner_report_ar'] ?? '');
@@ -489,3 +506,6 @@ foreach ($matrices as $name => $payload) {
 
 echo "\nTOTAL pass={$pass} fail={$fail} skip={$skip} CORE_SKIP={$coreSkip} RAW_FAIL={$rawFail}\n";
 exit($fail === 0 && $coreSkip === 0 && $rawFail === 0 ? 0 : 1);
+
+/* True baseline contract tag */
+rd_ok(str_contains($helperSrc, 'BACKUP_CENTER_B47CBE86'), 'BC execution contract tagged in diagnostic');

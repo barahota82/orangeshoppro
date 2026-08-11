@@ -251,7 +251,12 @@ function orange_backup_runtime_diagnostic_disk(string $backupRoot): array
  */
 function orange_backup_runtime_diagnostic_php_binary_category(string $projectRoot): array
 {
-    $runtime = orange_backup_admin_runtime_php_binary();
+    $runtime = '';
+    if (isset($GLOBALS['orange_backup_test_php_binary']) && is_string($GLOBALS['orange_backup_test_php_binary'])) {
+        $runtime = trim($GLOBALS['orange_backup_test_php_binary']);
+    } elseif (defined('PHP_BINARY') && is_string(PHP_BINARY)) {
+        $runtime = trim(PHP_BINARY);
+    }
     $kind = 'unknown';
     if ($runtime !== '') {
         if (preg_match('/php-cgi(?:\.exe)?$/i', $runtime) === 1) {
@@ -262,26 +267,49 @@ function orange_backup_runtime_diagnostic_php_binary_category(string $projectRoo
             $kind = 'CLI';
         }
     }
-    $safeDiag = orange_backup_admin_cli_php_safe_resolve_diag($projectRoot);
-    $trusted = (int) ($safeDiag['candidate_trusted_php_exe_count'] ?? 0);
-    $fileHits = (int) ($safeDiag['candidate_file_count'] ?? 0);
-    // Trust absolute existing php.exe candidates / CGI sibling without spawning a SAPI probe.
-    $cliOk = $trusted > 0 || ($fileHits > 0 && ($safeDiag['php_binary_kind'] ?? '') === 'cli_named');
-    $absoluteCandidate = ((int) ($safeDiag['candidate_absolute_count'] ?? 0) > 0) && $fileHits > 0;
+
+    $env = [];
+    try {
+        $env = orange_backup_load_env_array($projectRoot);
+        if (isset($GLOBALS['orange_backup_test_env_override']) && is_array($GLOBALS['orange_backup_test_env_override'])) {
+            $env = array_merge($env, $GLOBALS['orange_backup_test_env_override']);
+        }
+    } catch (Throwable) {
+        $env = [];
+    }
+    $configured = trim((string) ($env['ORANGE_PHP_CLI'] ?? ''));
+    $resolved = '';
+    try {
+        // Backup Center b47cbe86 contract — never throws; may return bare "php".
+        $resolved = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+    } catch (Throwable) {
+        $resolved = '';
+    }
+    $cliOk = $resolved !== '';
+    $bareFallback = $resolved === 'php';
+    $absoluteCandidate = $resolved !== '' && $resolved !== 'php' && is_file($resolved);
+    $exeCategory = 'unavailable';
+    if ($cliOk) {
+        $exeCategory = $bareFallback ? 'bare_php_fallback' : 'cli_candidate_present';
+    }
 
     return [
         'php_sapi_category' => (string) PHP_SAPI,
         'php_binary_category' => $kind,
-        'final_backup_command_executable_category' => $cliOk ? 'cli_candidate_present' : 'unavailable',
+        'final_backup_command_executable_category' => $exeCategory,
         'absolute_candidate_available' => $absoluteCandidate,
         'cli_resolved' => $cliOk,
-        'safe_resolve_diag' => $safeDiag,
+        'execution_contract' => 'BACKUP_CENTER_B47CBE86',
+        'bare_php_fallback_allowed' => true,
+        'safe_resolve_diag' => [
+            'php_binary_kind' => strtolower($kind === 'unknown' ? 'empty' : $kind),
+            'orange_php_cli_configured' => $configured !== '' ? 1 : 0,
+            'resolved_bare_php_fallback' => $bareFallback ? 1 : 0,
+            'resolved_non_empty' => $cliOk ? 1 : 0,
+            'execution_contract' => 'BACKUP_CENTER_B47CBE86',
+        ],
     ];
 }
-
-/**
- * @return list<string>
- */
 function orange_backup_runtime_diagnostic_disabled_function_categories(): array
 {
     $raw = (string) ini_get('disable_functions');
@@ -459,6 +487,46 @@ function orange_backup_runtime_diagnostic_classify(array $blockers, array $lastF
     return 'READY_FOR_CONTROLLED_FULL_ATTEMPT';
 }
 
+function orange_backup_runtime_diagnostic_blocker_label_ar(string $code): string
+{
+    $map = [
+        'FULL_LOCK_ACTIVE' => 'قفل النسخة الشاملة نشط (المالك حي).',
+        'FULL_LOCK_STALE_OR_ORPHANED' => 'قفل النسخة الشاملة يبدو يتيماً/منتهياً (بدون حذف تلقائي).',
+        'FULL_LOCK_STATE_UNKNOWN' => 'تعذر التحقق من حيوية قفل النسخة الشاملة.',
+        'COUNTRY_LOCK_ACTIVE' => 'قفل نسخ الدول نشط.',
+        'COUNTRY_LOCK_STALE_OR_ORPHANED' => 'قفل نسخ الدول يبدو يتيماً/منتهياً (بدون حذف تلقائي).',
+        'BACKUP_ROOT_NOT_READY' => 'مجلد النسخ غير جاهز (غير موجود/غير مقروء).',
+        'BACKUP_ROOT_NOT_WRITABLE' => 'مجلد النسخ غير قابل للكتابة لمستخدم موقع PHP.',
+        'LOCK_DIRECTORY_NOT_READY' => 'مجلد الأقفال غير جاهز للكتابة.',
+        'INSUFFICIENT_DISK_SPACE' => 'المساحة الحرة منخفضة أو غير كافية.',
+        'PHP_CLI_UNAVAILABLE' => 'تعذر حل منفّذ PHP CLI وفق عقد مركز النسخ.',
+        'PROCESS_EXECUTION_UNAVAILABLE' => 'تشغيل العمليات الفرعية غير متاح (مثل proc_open).',
+        'FULL_RUNNER_UNAVAILABLE' => 'مدخل تشغيل النسخة الشاملة غير جاهز.',
+        'COUNTRY_RUNNER_UNAVAILABLE' => 'مدخل تشغيل نسخ الدول غير جاهز.',
+        'DATABASE_UNAVAILABLE' => 'اتصال قاعدة البيانات غير متاح للتشخيص.',
+        'SCHEMA_GATE_MISMATCH' => 'بوابة المخطط لا تطابق 124.',
+    ];
+
+    return $map[$code] ?? ('عائق تشغيل مصنّف: ' . $code);
+}
+
+/**
+ * @param list<string> $blockers
+ * @return list<string>
+ */
+function orange_backup_runtime_diagnostic_safe_blocker_list_ar(array $blockers): array
+{
+    $out = [];
+    foreach ($blockers as $code) {
+        if (!is_string($code) || $code === '') {
+            continue;
+        }
+        $out[] = orange_backup_runtime_diagnostic_blocker_label_ar($code);
+    }
+
+    return array_values(array_unique($out));
+}
+
 function orange_backup_runtime_diagnostic_owner_ui(array $report): string
 {
     $cls = (string) ($report['classification'] ?? 'UNKNOWN_RUNTIME_BLOCKER');
@@ -469,6 +537,8 @@ function orange_backup_runtime_diagnostic_owner_ui(array $report): string
     $db = $report['database'] ?? [];
     $last = $report['last_full_attempt'] ?? [];
     $disk = $report['disk'] ?? [];
+    $blockers = is_array($report['blockers'] ?? null) ? $report['blockers'] : [];
+    $blockerLines = orange_backup_runtime_diagnostic_safe_blocker_list_ar($blockers);
 
     $yn = static function ($v): string {
         if ($v === true || $v === 'yes') {
@@ -520,7 +590,7 @@ function orange_backup_runtime_diagnostic_owner_ui(array $report): string
         'LAST_FULL_DRV_FAILED' => 'آخر Full فشل في DRV.',
         'LAST_FULL_RESPONSE_CLASSIFICATION_FAILED' => 'آخر Full فشل عند تصنيف الاستجابة.',
         'PERSISTED_FAILURE_EVIDENCE_UNAVAILABLE' => 'لا توجد أدلة محفوظة كافية لآخر محاولة — لا تُخمَّن الأسباب.',
-        'MULTIPLE_RUNTIME_BLOCKERS' => 'توجد عوائق تشغيل متعددة — عالجها وفق الأولوية دون تشغيل Full.',
+        'MULTIPLE_RUNTIME_BLOCKERS' => 'توجد عوائق تشغيل مثبتة — راجع القائمة أدناه قبل أي Full.',
         'UNKNOWN_RUNTIME_BLOCKER' => 'عائق تشغيل غير مصنّف — أوقف أي محاولة Full.',
     ];
 
@@ -555,17 +625,21 @@ function orange_backup_runtime_diagnostic_owner_ui(array $report): string
         ),
         'هل بدأ تنفيذ فعلي؟ ' . $yn($last['process_started'] ?? 'unknown'),
         'هل أُنشئت حزمة؟ ' . $yn($last['package_created'] ?? 'unknown'),
-        'التوصية التالية: ' . ($recs[$cls] ?? $recs['UNKNOWN_RUNTIME_BLOCKER']),
-        '—',
-        'هذا التشخيص للقراءة فقط. لم يُشغَّل Full أو Countries ولم يُعدَّل أي قفل.',
     ];
+    if ($blockerLines !== []) {
+        $lines[] = 'العوائق المثبتة:';
+        foreach ($blockerLines as $bl) {
+            $lines[] = '- ' . $bl;
+        }
+    } else {
+        $lines[] = 'العوائق المثبتة: لا يوجد';
+    }
+    $lines[] = 'التوصية التالية: ' . ($recs[$cls] ?? $recs['UNKNOWN_RUNTIME_BLOCKER']);
+    $lines[] = '—';
+    $lines[] = 'هذا التشخيص للقراءة فقط. لم يُشغَّل Full أو Countries ولم يُعدَّل أي قفل.';
 
     return implode("\n", $lines);
 }
-
-/**
- * @return array<string, mixed>
- */
 function orange_backup_runtime_diagnostic_run(string $projectRoot, ?PDO $pdo = null): array
 {
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
@@ -655,9 +729,10 @@ function orange_backup_runtime_diagnostic_run(string $projectRoot, ?PDO $pdo = n
     $countryReadable = is_file($countryScript) && is_readable($countryScript);
     $fullCallable = function_exists('orange_backup_admin_run_full_for_api') && function_exists('orange_backup_run_full');
     $countryCallable = function_exists('orange_backup_admin_run_country_batch');
-    // Constructability is filesystem/candidate presence only — never invoke CLI capture.
-    $fullConstructable = $fullReadable && !empty($phpInfo['cli_resolved']) && !empty($phpInfo['absolute_candidate_available']);
-    $countryConstructable = $countryReadable && !empty($phpInfo['cli_resolved']) && !empty($phpInfo['absolute_candidate_available']);
+    // Backup Center contract (b47cbe86): script readable + CLI token resolved (absolute or bare "php").
+    // Never require Restore absolute-only policy for Backup Center readiness.
+    $fullConstructable = $fullReadable && !empty($phpInfo['cli_resolved']);
+    $countryConstructable = $countryReadable && !empty($phpInfo['cli_resolved']);
 
     $dbOk = false;
     $schemaMatch = false;
@@ -830,6 +905,9 @@ function orange_backup_runtime_diagnostic_run(string $projectRoot, ?PDO $pdo = n
             'final_backup_command_executable_category' => $phpInfo['final_backup_command_executable_category'],
             'absolute_candidate_available' => (bool) $phpInfo['absolute_candidate_available'],
             'cli_resolved' => (bool) $phpInfo['cli_resolved'],
+            'execution_contract' => (string) ($phpInfo['execution_contract'] ?? 'BACKUP_CENTER_B47CBE86'),
+            'bare_php_fallback_allowed' => (bool) ($phpInfo['bare_php_fallback_allowed'] ?? true),
+            'safe_resolve_diag' => is_array($phpInfo['safe_resolve_diag'] ?? null) ? $phpInfo['safe_resolve_diag'] : [],
             'runner_script_readable' => $fullReadable,
             'proc_open_available' => $procOpen,
             'exec_available' => $execAvail,
@@ -864,6 +942,7 @@ function orange_backup_runtime_diagnostic_run(string $projectRoot, ?PDO $pdo = n
         'mutation_counters' => $mutationCounters,
         'generated_at_utc' => gmdate('c'),
     ];
+    $report['owner_blocker_list_ar'] = orange_backup_runtime_diagnostic_safe_blocker_list_ar($report['blockers']);
     $report['owner_report_ar'] = orange_backup_runtime_diagnostic_owner_ui($report);
 
     // Hard redaction sweep — never leave absolute paths / secrets in owner text.

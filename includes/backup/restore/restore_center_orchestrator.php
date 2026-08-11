@@ -22,6 +22,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../backup_environment.php';
+require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
@@ -1165,13 +1166,13 @@ function orange_restore_center_run_worker(
         $relative = orange_restore_center_assert_worker_key($workerKey);
         $script = orange_restore_center_resolve_worker_script($projectRoot, $relative);
         try {
-            $phpBinary = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+            $phpBinary = orange_restore_worker_resolve_cli_php_binary($projectRoot);
         } catch (Throwable $resolveEx) {
             throw new RuntimeException(
                 orange_restore_center_normalize_failure_code(trim($resolveEx->getMessage()))
             );
         }
-        if (!orange_backup_admin_php_cli_path_is_absolute($phpBinary) || !is_file($phpBinary)) {
+        if (!orange_restore_worker_php_cli_path_is_absolute($phpBinary) || !is_file($phpBinary)) {
             throw new RuntimeException('restore_center_worker_executable_unavailable');
         }
         $logPath = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
