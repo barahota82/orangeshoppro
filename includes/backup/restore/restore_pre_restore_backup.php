@@ -5,14 +5,13 @@ declare(strict_types=1);
 /**
  * Phase 3B.3B3 — Mandatory Pre-Restore Backup Gate (rollback anchor only).
  *
- * Authoritative Full Backup execution (Owner 2026-08-10):
- *   - orange_backup_execute_full_authoritative()  (same path as Backup Center)
- *     → CLI scripts/backup/run_full_backup.php → orange_backup_run_full()
+ * PHASE 1 FREEZE (Owner 2026-08-11) — REMOVE IN PHASE 2:
+ * Step 6 must not invoke any Backup engine until Backup Center live stability is confirmed.
+ * Fail-closed guards below: no Full Backup, no worker, no package bind, no state advance.
  *
- * Restore-only adapter responsibilities after shared success:
- *   - orange_backup_verify_full_package() / DRV / retention pin
- *   - bind exact package identity to the Restore job
- *   - transition to pre_restore_backup_ready
+ * Historical shared-engine notes (frozen — do not re-enable in Phase 1):
+ *   - orange_backup_execute_full_authoritative() was removed from Backup Center baseline
+ *     restoration to d570e563; Phase 2 will rebuild the Step 6 adapter separately.
  *
  * Never restores DB/files, never cutover, never enables production maintenance,
  * never uses a Step-6-only launcher / run-worker / launch.cmd path.
@@ -36,7 +35,10 @@ const ORANGE_RESTORE_PRE_BACKUP_LOCK_FILE = '.pre_restore_backup.lock';
 const ORANGE_RESTORE_PRE_BACKUP_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_PRE_BACKUP_PURPOSE = 'pre_restore_rollback_anchor';
 const ORANGE_RESTORE_PRE_BACKUP_DRV_MIN_SCORE = 70;
-const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'orange_backup_execute_full_authoritative';
+const ORANGE_RESTORE_PRE_BACKUP_ENGINE_VERSION = 'phase1_frozen_no_backup_engine';
+/** PHASE 1 FREEZE — REMOVE IN PHASE 2 */
+const ORANGE_RESTORE_STEP6_PHASE1_FROZEN = true;
+const ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE = 'تم إيقاف تنفيذ الخطوة 6 مؤقتًا حتى اكتمال التحقق الحي من استقرار مركز النسخ الاحتياطي. لم يبدأ أي استرداد.';
 
 function orange_restore_pre_backup_record_path(string $workRoot, string $jobId): string
 {
@@ -63,16 +65,26 @@ function orange_restore_pre_backup_lock_status(string $workRoot): array
         return ['held' => true, 'payload' => null, 'stale' => true, 'pid_alive' => null];
     }
 
+    // Restored to pre-cross-surface lock probe (d570e563-style) so Restore UI can load
+    // after Backup Center baseline recovery removed orange_backup_lock_meta_is_reclaimable().
+    $acquiredAt = strtotime((string) ($payload['acquired_at'] ?? $payload['heartbeat_at'] ?? ''));
+    $age = $acquiredAt !== false ? (time() - $acquiredAt) : PHP_INT_MAX;
     $pid = (int) ($payload['pid'] ?? 0);
-    $mtime = (int) (@filemtime($path) ?: 0);
-    // Align with Full/Country lock reclaim policy (started_at ← acquired_at).
-    $metaForReclaim = $payload;
-    if (!isset($metaForReclaim['started_at']) || (string) $metaForReclaim['started_at'] === '') {
-        $metaForReclaim['started_at'] = (string) ($payload['acquired_at'] ?? $payload['heartbeat_at'] ?? '');
+    $pidAlive = null;
+    if ($pid > 0) {
+        if (function_exists('posix_kill')) {
+            $pidAlive = @posix_kill($pid, 0);
+        } elseif (PHP_OS_FAMILY === 'Windows' && function_exists('shell_exec')) {
+            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+            if (!in_array('shell_exec', $disabled, true)) {
+                $output = shell_exec('tasklist /FI "PID eq ' . $pid . '" /NH 2>NUL');
+                $pidAlive = is_string($output) && preg_match('/\b' . preg_quote((string) $pid, '/') . '\b/', $output) === 1;
+            }
+        }
     }
-    $stale = orange_backup_lock_meta_is_reclaimable($metaForReclaim, $mtime);
-    $liveness = $pid > 0 ? orange_backup_process_liveness($pid) : 'dead';
-    $pidAlive = $liveness === 'alive' ? true : ($liveness === 'dead' ? false : null);
+
+    // Conservative: only stale when age exceeded AND process is proven dead (or pid unknown).
+    $stale = $age > ORANGE_RESTORE_PRE_BACKUP_LOCK_STALE_SECONDS && $pidAlive !== true;
 
     return ['held' => true, 'payload' => $payload, 'stale' => $stale, 'pid_alive' => $pidAlive];
 }
@@ -571,49 +583,17 @@ function orange_restore_pre_backup_request(
  */
 function orange_restore_pre_backup_invoke_engine(string $projectRoot, ?string $backupRootOverride): array
 {
-    if (isset($GLOBALS['orange_pre_restore_backup_engine_override'])
-        && is_callable($GLOBALS['orange_pre_restore_backup_engine_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_pre_restore_backup_engine_override'];
-        $result = $fn($projectRoot, $backupRootOverride);
-        if (!is_array($result)) {
-            return ['ok' => false, 'snapshot' => null, 'backend' => null, 'message' => 'engine_override_invalid', 'exit_code' => 1];
-        }
-
-        return [
-            'ok' => (bool) ($result['ok'] ?? false),
-            'snapshot' => isset($result['snapshot']) ? (string) $result['snapshot'] : null,
-            'backend' => isset($result['backend']) ? (string) $result['backend'] : null,
-            'message' => (string) ($result['message'] ?? ''),
-            'exit_code' => (int) ($result['exit_code'] ?? (($result['ok'] ?? false) ? 0 : 1)),
-        ];
-    }
-
-    // Disposable/self-test harness may inject Backup Center options through the shared service.
-    $options = [
-        // Exact package binding: never invent identity by scanning newest snapshot dir.
-        'forbid_latest_snapshot_refresh' => true,
-    ];
-    if (isset($GLOBALS['orange_backup_execute_full_authoritative_options'])
-        && is_array($GLOBALS['orange_backup_execute_full_authoritative_options'])) {
-        $options = array_merge($options, $GLOBALS['orange_backup_execute_full_authoritative_options']);
-        $options['forbid_latest_snapshot_refresh'] = true;
-    }
-
-    // $backupRootOverride is intentionally unused here: the shared CLI path uses BackupRoot from env
-    // (same as Backup Center). Fixtures must use engine override, not a second dump path.
-    if ($backupRootOverride !== null && $backupRootOverride !== '') {
-        // no-op: keep signature for callers/tests; never open a parallel engine.
-    }
-
-    $raw = orange_backup_execute_full_authoritative($projectRoot, $options);
+    // PHASE 1 FREEZE — REMOVE IN PHASE 2. No Backup engine / CLI / override path.
+    unset($projectRoot, $backupRootOverride);
 
     return [
-        'ok' => (bool) ($raw['ok'] ?? false),
-        'snapshot' => isset($raw['snapshot']) && is_string($raw['snapshot']) ? $raw['snapshot'] : null,
-        'backend' => isset($raw['backend']) ? (is_string($raw['backend']) ? $raw['backend'] : null) : null,
-        'message' => (string) ($raw['message'] ?? ''),
-        'exit_code' => (int) ($raw['exit_code'] ?? 1),
+        'ok' => false,
+        'snapshot' => null,
+        'backend' => null,
+        'message' => ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE,
+        'exit_code' => 1,
+        'phase1_freeze' => true,
+        'code' => 'step6_temporarily_frozen',
     ];
 }
 
@@ -664,6 +644,27 @@ function orange_restore_pre_backup_execute(
     string $jobId,
     string $owner = 'admin'
 ): array {
+    // PHASE 1 FREEZE — REMOVE IN PHASE 2.
+    // Fail-closed before any Backup invoke, worker schedule, package bind, or status advance.
+    unset($projectRoot, $owner);
+    if (ORANGE_RESTORE_STEP6_PHASE1_FROZEN) {
+        return [
+            'ok' => false,
+            'success' => false,
+            'idempotent' => false,
+            'execution_started' => false,
+            'scheduled' => false,
+            'detached' => false,
+            'phase1_freeze' => true,
+            'code' => 'step6_temporarily_frozen',
+            'job_id' => $jobId,
+            'message' => ORANGE_RESTORE_STEP6_PHASE1_FREEZE_MESSAGE,
+            'record' => orange_restore_pre_backup_public_record(
+                orange_restore_pre_backup_load_record($workRoot, $jobId) ?? []
+            ),
+        ];
+    }
+
     $check = orange_restore_pre_backup_revalidate($workRoot, $jobId, $backupRoot);
     if (!$check['ok']) {
         throw new RuntimeException((string) $check['code']);

@@ -5,9 +5,8 @@ declare(strict_types=1);
 /**
  * Restore Center Step 6 — mandatory pre-restore Full Backup.
  *
- * Authorized caller of the shared Full Backup service
- * (orange_backup_execute_full_authoritative), same engine path as Backup Center.
- * Does not schedule a Step-6 orchestrator worker / launch.cmd.
+ * PHASE 1 FREEZE (Owner 2026-08-11) — REMOVE IN PHASE 2:
+ * Fail-closed: do not invoke any Backup engine / worker / CLI / package bind / state advance.
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
@@ -28,20 +27,11 @@ try {
         json_response(['success' => false, 'code' => 'invalid_job_id', 'message' => 'Invalid restore job id.'], 422);
     }
 
-    $projectRoot = restore_admin_api_project_root();
-    $ctx = orange_restore_admin_context($projectRoot);
-    $result = orange_restore_admin_fw_execute_pre_restore_backup(
-        $projectRoot,
-        (string) $ctx['backup_root'],
-        (string) $ctx['work_root'],
-        $admin,
-        $pdo,
-        $jobId
-    );
-
-    $ok = !empty($result['ok']) || !empty($result['success']);
+    // PHASE 1 FREEZE — REMOVE IN PHASE 2 (after live Backup Center validation + Step 6 adapter rebuild).
+    // No Full Backup invoke, no worker schedule, no detached path, no package bind, no Restore state advance.
     json_response([
-        'success' => $ok,
+        'success' => false,
+        'code' => 'step6_temporarily_frozen',
         'read_only_execution' => false,
         'execution_started' => false,
         'scheduled' => false,
@@ -49,18 +39,15 @@ try {
         'cli_needed' => false,
         'cli_command' => '',
         'operator_action_required' => false,
-        'shared_full_backup_service' => 'orange_backup_execute_full_authoritative',
-        'idempotent' => (bool) ($result['idempotent'] ?? false),
-        'rollback_package_id' => (string) ($result['rollback_package_id'] ?? ''),
-        'job' => $result['job'] ?? null,
-        'record' => $result['record'] ?? null,
+        'idempotent' => false,
+        'rollback_package_id' => '',
+        'job' => null,
+        'record' => null,
         'csrf_token' => orange_backup_admin_csrf_token(),
-        'message' => (string) ($result['message'] ?? ($ok
-            ? 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد.'
-            : 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد.')),
-        'warning' => 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.',
-        'code' => (string) ($result['code'] ?? ($ok ? 'pre_restore_backup_ready' : 'pre_restore_backup_failed')),
-    ], $ok ? 200 : 409);
+        'message' => 'تم إيقاف تنفيذ الخطوة 6 مؤقتًا حتى اكتمال التحقق الحي من استقرار مركز النسخ الاحتياطي. لم يبدأ أي استرداد.',
+        'warning' => 'تم إيقاف تنفيذ الخطوة 6 مؤقتًا حتى اكتمال التحقق الحي من استقرار مركز النسخ الاحتياطي. لم يبدأ أي استرداد.',
+        'phase1_freeze' => true,
+    ], 409);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
     $status = 422;

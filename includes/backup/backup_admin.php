@@ -1709,19 +1709,12 @@ function orange_backup_admin_discard_captured_stdout(string $captured): void
 }
 
 /**
- * Authoritative Full Backup execution service (single engine path).
- *
- * Used by:
- * - Backup Center (`admin/api/backup/run-full.php` via orange_backup_admin_run_full_for_api)
- * - Restore Center Step 6 adapter (pre-restore mandatory Full backup)
- *
- * Production contract: CLI capture of scripts/backup/run_full_backup.php → orange_backup_run_full().
- * Never invoke via internal HTTP. Never invent a second dump/package engine.
+ * Admin API boundary for manual Full Backup — run via CLI capture; preserve engine logs on disk.
  *
  * @param array<string, mixed> $options
  * @return array<string, mixed>
  */
-function orange_backup_execute_full_authoritative(string $projectRoot, array $options = []): array
+function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
 {
     $startedAt = gmdate('c');
 
@@ -1743,10 +1736,7 @@ function orange_backup_execute_full_authoritative(string $projectRoot, array $op
             orange_backup_admin_discard_captured_stdout($captured);
         }
 
-        // Same option contract as the CLI path (Restore-only forbid must not become a default).
-        return array_merge($result, [
-            'latest_snapshot_refresh_applied' => empty($options['forbid_latest_snapshot_refresh']),
-        ]);
+        return $result;
     }
 
     [$phpBinary, $script] = orange_backup_admin_run_full_cli_command($projectRoot);
@@ -1759,47 +1749,13 @@ function orange_backup_execute_full_authoritative(string $projectRoot, array $op
         (int) ($capture['exit_code'] ?? 1),
         (string) ($capture['stderr'] ?? '')
     );
-    // Backup Center may refresh an omitted snapshot name; Restore Step 6 must bind only
-    // the authoritative CLI identity (never "latest directory" guess).
-    // Restore-only options must never become Backup Center defaults.
-    if (empty($options['forbid_latest_snapshot_refresh'])) {
-        $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
-    }
-
-    // After timeout/failure, attempt ownership-aware orphan Full-lock reclaim (no process kill).
-    $timedOut = !empty($capture['timed_out'])
-        || str_contains((string) ($capture['stderr'] ?? ''), 'Command timed out.');
-    $lockBusy = str_contains(strtolower((string) ($parsed['message'] ?? '')), 'already running')
-        || str_contains(strtolower((string) ($parsed['message'] ?? '')), 'holds the lock');
-    if (($timedOut || (empty($parsed['ok']) && !$lockBusy)) && function_exists('orange_backup_reclaim_full_lock_if_unowned')) {
-        try {
-            $env = orange_backup_load_env_array($projectRoot);
-            if (orange_backup_root_configured($env)) {
-                $backupRoot = orange_backup_resolve_root($env, null);
-                orange_backup_reclaim_full_lock_if_unowned($backupRoot);
-            }
-        } catch (Throwable) {
-            // never mask the primary Backup result
-        }
-    }
+    $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
 
     return array_merge($parsed, [
         'started_at' => $startedAt,
         'finished_at' => gmdate('c'),
         'action' => 'run_full_backup',
-        'latest_snapshot_refresh_applied' => empty($options['forbid_latest_snapshot_refresh']),
     ]);
-}
-
-/**
- * Admin API boundary for manual Full Backup — thin authorized caller of the shared service.
- *
- * @param array<string, mixed> $options
- * @return array<string, mixed>
- */
-function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
-{
-    return orange_backup_execute_full_authoritative($projectRoot, $options);
 }
 
 /**
@@ -1864,24 +1820,6 @@ function orange_backup_admin_run_country_batch(string $projectRoot, array $optio
                 ? 'Country batch export completed.'
                 : 'Country batch export failed.',
         ];
-        $timedOut = !empty($capture['timed_out'])
-            || str_contains((string) ($capture['stderr'] ?? ''), 'Command timed out.');
-        if (($timedOut || empty($cliResult['ok'])) && function_exists('orange_crp_batch_reclaim_lock_if_unowned')) {
-            try {
-                require_once __DIR__ . '/country_batch_export.php';
-                $env = orange_backup_load_env_array($projectRoot);
-                if (orange_backup_root_configured($env)) {
-                    $backupRoot = orange_backup_resolve_root($env, null);
-                    orange_crp_batch_reclaim_lock_if_unowned($backupRoot);
-                    // Country failure must not leave an orphan Full lock either.
-                    if (function_exists('orange_backup_reclaim_full_lock_if_unowned')) {
-                        orange_backup_reclaim_full_lock_if_unowned($backupRoot);
-                    }
-                }
-            } catch (Throwable) {
-                // never mask the primary Country result
-            }
-        }
     }
 
     return array_merge($cliResult, [
