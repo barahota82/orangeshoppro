@@ -26,10 +26,28 @@ require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v5-internal-atomic';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v6-stage-diag';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
 const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
+
+/** Owner-safe Step-7 start failure codes (no paths/secrets). */
+const ORANGE_RESTORE_STEP7_WRONG_STATE = 'STEP7_WRONG_STATE';
+const ORANGE_RESTORE_STEP7_REQUEST_TRANSITION_FAILED = 'STEP7_REQUEST_TRANSITION_FAILED';
+const ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT_EXISTS = 'STEP7_ACTIVE_ATTEMPT_EXISTS';
+const ORANGE_RESTORE_STEP7_CLAIM_CONFLICT = 'STEP7_CLAIM_CONFLICT';
+const ORANGE_RESTORE_STEP7_MUTEX_CONFLICT = 'STEP7_MUTEX_CONFLICT';
+const ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_READY = 'STEP7_WORK_ROOT_NOT_READY';
+const ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_WRITABLE = 'STEP7_WORK_ROOT_NOT_WRITABLE';
+const ORANGE_RESTORE_STEP7_WORKER_KEY_UNAVAILABLE = 'STEP7_WORKER_KEY_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_UNAVAILABLE = 'STEP7_WORKER_ENTRYPOINT_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_NOT_ALLOWED = 'STEP7_WORKER_ENTRYPOINT_NOT_ALLOWED';
+const ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE = 'STEP7_PHP_CLI_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PROCESS_EXECUTION_UNAVAILABLE = 'STEP7_PROCESS_EXECUTION_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_LAUNCH_ARTIFACT_FAILED = 'STEP7_LAUNCH_ARTIFACT_FAILED';
+const ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED = 'STEP7_PROCESS_SPAWN_FAILED';
+const ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED = 'STEP7_WORKER_BOOTSTRAP_FAILED';
+const ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE = 'STEP7_UNKNOWN_START_FAILURE';
 
 /**
  * Pending statuses that must never remain without a verified worker consumer.
@@ -118,7 +136,7 @@ function orange_restore_center_compensate_unconsumed_pending(
         'Worker dispatch failed — retry from Restore Center',
         'restore_center_dispatch_compensated'
     );
-    orange_restore_fw_audit_append($workRoot, $jobId, [
+    $compensateAudit = [
         'event' => 'restore_center_pending_without_worker_compensated',
         'result' => 'fail',
         'worker' => $workerKey,
@@ -126,7 +144,14 @@ function orange_restore_center_compensate_unconsumed_pending(
         'to_status' => $failed,
         'reason' => $reason,
         'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
-    ]);
+        'execution_started' => false,
+        'spawn_succeeded' => false,
+    ];
+    if ($workerKey === 'shadow_db') {
+        $compensateAudit['safe_failure_code'] = orange_restore_center_step7_classify_start_failure($reason);
+        $compensateAudit['stage'] = 'shadow_restore';
+    }
+    orange_restore_fw_audit_append($workRoot, $jobId, $compensateAudit);
 
     return $updated;
 }
@@ -863,10 +888,181 @@ function orange_restore_center_spawn_detached(
 }
 
 /**
+ * Guided Restore Center worker key from authoritative job status.
+ * Used by current-stage diagnostic authority (never invent a richer older stage).
+ */
+function orange_restore_center_guided_worker_key_from_status(string $status): string
+{
+    $status = trim($status);
+    if ($status === '') {
+        return '';
+    }
+    if (str_starts_with($status, 'pre_restore_backup_')) {
+        return 'pre_backup';
+    }
+    if (str_starts_with($status, 'shadow_restore_')) {
+        return 'shadow_db';
+    }
+    if ($status === ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY
+        || $status === ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED
+        || str_starts_with($status, 'shadow_verify')) {
+        return 'shadow_verify';
+    }
+    if (str_starts_with($status, 'shadow_files_')) {
+        return 'shadow_files';
+    }
+    if (str_starts_with($status, 'shadow_smoke_')
+        || str_starts_with($status, 'cutover_readiness_')) {
+        return 'shadow_smoke';
+    }
+    if (str_starts_with($status, 'production_import_')
+        || $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE) {
+        return 'production_import';
+    }
+    if (str_starts_with($status, 'uploads_cutover_')) {
+        return 'uploads_cutover';
+    }
+    if (str_starts_with($status, 'rollback_')) {
+        return 'rollback';
+    }
+    if (str_starts_with($status, 'restore_final')
+        || $status === ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING) {
+        return 'finalize';
+    }
+
+    return '';
+}
+
+/**
+ * Approved Audit event names per guided worker (canonical names only).
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_center_stage_audit_event_family_map(): array
+{
+    return [
+        'pre_backup' => [
+            'pre_restore_backup_requested',
+            'pre_restore_backup_running',
+            'pre_restore_backup_started',
+            'pre_restore_backup_completed',
+            'pre_restore_backup_failed',
+            'pre_restore_backup_ready',
+        ],
+        'shadow_db' => [
+            'shadow_restore_requested',
+            'shadow_restore_started',
+            'shadow_restore_failed',
+            'shadow_restore_ready',
+            'shadow_restore_verification_started',
+            'shadow_restore_verification_failed',
+            'shadow_restore_verification_passed',
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+            'restore_center_pending_without_worker_compensated',
+            'restore_center_dispatch_compensated',
+        ],
+        'shadow_verify' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'shadow_files' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'shadow_smoke' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'production_import' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'uploads_cutover' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'rollback' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+        'finalize' => [
+            'restore_center_worker_schedule_failed',
+            'restore_center_worker_scheduled',
+        ],
+    ];
+}
+
+/**
+ * Map orchestration / request failures to Step-7 owner-safe codes.
+ */
+function orange_restore_center_step7_classify_start_failure(string $code): string
+{
+    $code = trim($code);
+    return match (true) {
+        $code === 'invalid_status'
+            || $code === 'restore_center_invalid_stage'
+            || str_starts_with($code, 'illegal_framework_status_transition') => ORANGE_RESTORE_STEP7_WRONG_STATE,
+        $code === 'restore_center_worker_already_running' => ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT_EXISTS,
+        $code === 'restore_center_mutex_open_failed' => ORANGE_RESTORE_STEP7_MUTEX_CONFLICT,
+        $code === 'Restore work root unavailable.'
+            || $code === 'restore_work_root_unavailable' => ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_READY,
+        $code === 'restore_center_spawn_log_dir_failed' => ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_WRITABLE,
+        $code === 'restore_center_unknown_worker' => ORANGE_RESTORE_STEP7_WORKER_KEY_UNAVAILABLE,
+        $code === 'restore_center_worker_script_missing'
+            || $code === 'restore_center_worker_script_path_rejected' => ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_UNAVAILABLE,
+        $code === 'restore_center_worker_not_allowlisted' => ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_NOT_ALLOWED,
+        $code === 'php_cli_binary_unavailable'
+            || $code === ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE => ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE,
+        $code === 'restore_center_worker_executable_unavailable' => ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE,
+        $code === 'restore_center_spawn_launch_cmd_failed' => ORANGE_RESTORE_STEP7_LAUNCH_ARTIFACT_FAILED,
+        $code === 'restore_center_spawn_failed'
+            || $code === 'restore_center_spawn_invalid_command'
+            || $code === 'restore_center_spawn_job_arg_rejected' => ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED,
+        $code === 'restore_center_worker_bootstrap_failed' => ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED,
+        $code === 'shadow_restore_lock_active' => ORANGE_RESTORE_STEP7_CLAIM_CONFLICT,
+        str_starts_with($code, 'STEP7_') => $code,
+        default => ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE,
+    };
+}
+
+/**
+ * Step-7 owner Arabic for safe failure codes (no paths/commands/raw tokens).
+ */
+function orange_restore_center_step7_operator_reason_ar(string $safeCode): string
+{
+    $messages = [
+        ORANGE_RESTORE_STEP7_WRONG_STATE => 'لا يمكن بدء استعادة قاعدة الظل من الحالة الحالية. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.',
+        ORANGE_RESTORE_STEP7_REQUEST_TRANSITION_FAILED => 'تعذر قبول طلب استعادة قاعدة الظل. أعد المحاولة من شاشة الاسترداد.',
+        ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT_EXISTS => 'توجد محاولة أخرى نشطة لاستعادة قاعدة الظل لهذه المهمة. لن يُبدأ تنفيذ مكرر.',
+        ORANGE_RESTORE_STEP7_CLAIM_CONFLICT => 'تعذر بدء استعادة قاعدة الظل بسبب تعارض قفل التنفيذ. انتظر ثم أعد المحاولة.',
+        ORANGE_RESTORE_STEP7_MUTEX_CONFLICT => 'تعذر قفل بدء استعادة قاعدة الظل على الخادم. أعد المحاولة من مركز الاسترداد.',
+        ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_READY => 'تعذر تجهيز مجلد عمل المرحلة على الخادم.',
+        ORANGE_RESTORE_STEP7_WORK_ROOT_NOT_WRITABLE => 'مجلد عمل المرحلة غير قابل للكتابة على الخادم.',
+        ORANGE_RESTORE_STEP7_WORKER_KEY_UNAVAILABLE => 'مفتاح تشغيل مرحلة استعادة قاعدة الظل غير متاح.',
+        ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_UNAVAILABLE => 'تعذر العثور على ملف تشغيل المرحلة الداخلي.',
+        ORANGE_RESTORE_STEP7_WORKER_ENTRYPOINT_NOT_ALLOWED => 'ملف تشغيل المرحلة الداخلي غير مسموح به في سياسة التشغيل.',
+        ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE => 'منفذ PHP المطلوب لتشغيل المرحلة غير متاح. لم يبدأ أي تنفيذ، ويمكن إعادة المحاولة بعد إصلاح بيئة التشغيل.',
+        ORANGE_RESTORE_STEP7_PROCESS_EXECUTION_UNAVAILABLE => 'تعذر إنشاء عملية العامل الداخلي على الخادم.',
+        ORANGE_RESTORE_STEP7_LAUNCH_ARTIFACT_FAILED => 'تعذر تجهيز تشغيل المرحلة الداخلي على الخادم.',
+        ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED => 'تعذر إنشاء عملية العامل الداخلي. لم يبدأ أي تنفيذ.',
+        ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED => 'تعذر إقلاع عامل استعادة قاعدة الظل بعد الجدولة. لم يُعتمد التنفيذ.',
+        ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE => 'تعذر بدء استعادة قاعدة الظل. أعد المحاولة من شاشة الاسترداد.',
+    ];
+
+    return $messages[$safeCode] ?? $messages[ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE];
+}
+
+/**
  * Operator-safe Arabic reason for orchestration codes (no paths/secrets).
  */
 function orange_restore_center_operator_reason_ar(string $code, string $jobStatus = '', string $worker = ''): string
 {
+    if ($worker === 'shadow_db' || str_starts_with(trim($code), 'STEP7_')) {
+        $safe = orange_restore_center_step7_classify_start_failure($code);
+
+        return orange_restore_center_step7_operator_reason_ar($safe);
+    }
     $messages = [
         'restore_center_invalid_stage' => 'لا يمكن بدء هذه المرحلة الآن من مركز الاسترداد. أكمل المتطلبات السابقة أو حدّث الحالة.',
         'restore_center_worker_already_running' => 'تنفيذ هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.',
@@ -953,6 +1149,7 @@ function orange_restore_center_attach_verified_schedule(
 
 /**
  * Safe diagnostics for Restore Center (no absolute paths, no secrets).
+ * Current-stage authority: latest attempt of the guided stage only.
  *
  * @return array<string, mixed>
  */
@@ -960,6 +1157,12 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
 {
     $job = orange_restore_fw_read($workRoot, $jobId);
     $status = (string) ($job['status'] ?? '');
+    $guidedWorker = orange_restore_center_guided_worker_key_from_status($status);
+    $familyMap = orange_restore_center_stage_audit_event_family_map();
+    $guidedFamily = $guidedWorker !== '' && isset($familyMap[$guidedWorker])
+        ? $familyMap[$guidedWorker]
+        : [];
+
     $workers = [];
     foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
         $claim = orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, $job);
@@ -981,31 +1184,33 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         ];
     }
 
-    $failures = [];
-    $step6Events = [];
-    $latestStep6 = null;
-    $step6EventNames = [
-        'pre_restore_backup_requested',
-        'pre_restore_backup_running',
-        'pre_restore_backup_started',
-        'pre_restore_backup_completed',
-        'pre_restore_backup_failed',
-        'pre_restore_backup_ready',
-    ];
+    $currentStageEvents = [];
+    $historicalEvents = [];
+    $latestCurrent = null;
     $auditPath = orange_restore_fw_audit_file_path($workRoot, $jobId);
     if (is_file($auditPath)) {
         $lines = @file($auditPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (is_array($lines)) {
-            $slice = array_slice($lines, -120);
+            $slice = array_slice($lines, -160);
             foreach (array_reverse($slice) as $line) {
                 $row = json_decode((string) $line, true);
                 if (!is_array($row)) {
                     continue;
                 }
                 $event = (string) ($row['event'] ?? '');
+                if ($event === '') {
+                    continue;
+                }
                 $at = (string) ($row['recorded_at'] ?? $row['at'] ?? $row['timestamp'] ?? '');
+                $rowWorker = trim((string) ($row['worker'] ?? ''));
 
-                if (in_array($event, $step6EventNames, true)) {
+                $itemWorker = '';
+                $isCurrentFamily = false;
+                $reasonAr = '';
+                $code = '';
+
+                if (in_array($event, $familyMap['pre_backup'] ?? [], true)) {
+                    $itemWorker = 'pre_backup';
                     $rawCode = (string) ($row['code'] ?? '');
                     $category = (string) ($row['failure_category'] ?? '');
                     if ($category === '' && str_starts_with($rawCode, 'illegal_framework_status_transition:')) {
@@ -1016,6 +1221,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                             ? orange_restore_pre_backup_public_failure_code($rawCode)
                             : $rawCode;
                     }
+                    $code = $category !== '' ? $category : $event;
                     $reasonAr = match ($event) {
                         'pre_restore_backup_requested' => 'تم قبول طلب النسخة الاحتياطية الإلزامية ودخلت حالة الانتظار.',
                         'pre_restore_backup_running' => 'تم اعتماد انتقال التنفيذ إلى حالة التشغيل.',
@@ -1027,52 +1233,111 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                             : 'فشلت محاولة النسخة الاحتياطية الإلزامية. يمكن إعادة المحاولة من مركز الاسترداد.'),
                         default => 'تحديث مرحلة النسخة الاحتياطية الإلزامية.',
                     };
-                    $item = [
-                        'event' => $event,
-                        'result' => (string) ($row['result'] ?? ''),
-                        'worker' => 'pre_backup',
-                        'code' => $category !== '' ? $category : $event,
-                        'reason_ar' => $reasonAr,
-                        'at' => $at,
-                        'is_step6_attempt' => true,
-                    ];
-                    if ($latestStep6 === null) {
-                        $latestStep6 = $item;
+                    $isCurrentFamily = ($guidedWorker === 'pre_backup');
+                } elseif (str_starts_with($event, 'shadow_restore_')
+                    || (
+                        ($event === 'restore_center_worker_schedule_failed'
+                            || $event === 'restore_center_worker_scheduled'
+                            || $event === 'restore_center_pending_without_worker_compensated'
+                            || $event === 'restore_center_dispatch_compensated')
+                        && $rowWorker === 'shadow_db'
+                    )
+                ) {
+                    $itemWorker = 'shadow_db';
+                    $rawCode = (string) ($row['safe_failure_code'] ?? $row['code'] ?? $row['reason'] ?? '');
+                    if ($event === 'restore_center_worker_scheduled') {
+                        $code = 'ok';
+                        $reasonAr = 'تم جدولة استعادة قاعدة الظل بنجاح.';
+                    } elseif ($event === 'shadow_restore_requested') {
+                        $code = 'shadow_restore_requested';
+                        $reasonAr = 'تم قبول طلب استعادة قاعدة الظل ودخلت حالة الانتظار.';
+                    } elseif ($event === 'shadow_restore_started') {
+                        $code = 'shadow_restore_started';
+                        $reasonAr = 'بدأ تنفيذ استعادة قاعدة الظل بعد تأكيد الإقلاع.';
+                    } elseif ($event === 'shadow_restore_ready') {
+                        $code = 'shadow_restore_ready';
+                        $reasonAr = 'اكتملت استعادة قاعدة الظل وأصبحت جاهزة للتحقق.';
+                    } elseif ($event === 'shadow_restore_failed'
+                        || $event === 'restore_center_worker_schedule_failed'
+                        || $event === 'restore_center_pending_without_worker_compensated'
+                        || $event === 'restore_center_dispatch_compensated') {
+                        $internal = $rawCode !== '' ? $rawCode : 'restore_center_spawn_failed';
+                        $safe = orange_restore_center_step7_classify_start_failure($internal);
+                        $code = $safe;
+                        $reasonAr = orange_restore_center_step7_operator_reason_ar($safe);
+                    } else {
+                        $code = $rawCode !== '' ? $rawCode : $event;
+                        $reasonAr = 'تحديث مرحلة استعادة قاعدة الظل.';
                     }
-                    if (count($step6Events) < 12) {
-                        $step6Events[] = $item;
-                    }
+                    $isCurrentFamily = ($guidedWorker === 'shadow_db');
+                } elseif ($event === 'restore_center_worker_schedule_failed'
+                    || $event === 'restore_center_worker_scheduled'
+                    || $event === 'restore_center_pending_without_worker_compensated'
+                    || $event === 'restore_center_dispatch_compensated') {
+                    $itemWorker = $rowWorker !== '' ? $rowWorker : 'unknown';
+                    $code = (string) ($row['safe_failure_code'] ?? $row['code']
+                        ?? ($event === 'restore_center_worker_scheduled' ? 'ok' : 'restore_center_spawn_failed'));
+                    $reasonAr = $code === 'ok'
+                        ? 'تم جدولة المرحلة بنجاح.'
+                        : orange_restore_center_operator_reason_ar($code, $status, $itemWorker);
+                    $isCurrentFamily = ($guidedWorker !== '' && $itemWorker === $guidedWorker
+                        && in_array($event, $guidedFamily, true));
+                }
+
+                if ($itemWorker === '') {
                     continue;
                 }
 
-                if ($event !== 'restore_center_worker_schedule_failed' && $event !== 'restore_center_worker_scheduled') {
-                    continue;
-                }
-                $code = (string) ($row['code'] ?? ($event === 'restore_center_worker_scheduled' ? 'ok' : 'restore_center_spawn_failed'));
-                $failures[] = [
+                $item = [
                     'event' => $event,
                     'result' => (string) ($row['result'] ?? ''),
-                    'worker' => (string) ($row['worker'] ?? ''),
+                    'worker' => $itemWorker,
                     'code' => $code,
-                    'reason_ar' => $code === 'ok'
-                        ? 'تم جدولة العامل بنجاح.'
-                        : orange_restore_center_operator_reason_ar($code, $status, (string) ($row['worker'] ?? '')),
+                    'reason_ar' => $reasonAr,
                     'at' => $at,
-                    'is_step6_attempt' => false,
-                    'historical_only' => true,
+                    'is_step6_attempt' => $itemWorker === 'pre_backup',
+                    'is_step7_attempt' => $itemWorker === 'shadow_db',
+                    'historical_only' => !$isCurrentFamily,
                 ];
-                if (count($failures) >= 12) {
-                    break;
+                if (!empty($row['safe_failure_code'])) {
+                    $item['safe_failure_code'] = (string) $row['safe_failure_code'];
+                } elseif ($itemWorker === 'shadow_db' && str_starts_with((string) $code, 'STEP7_')) {
+                    $item['safe_failure_code'] = (string) $code;
+                }
+
+                if ($isCurrentFamily) {
+                    if ($latestCurrent === null) {
+                        $latestCurrent = $item;
+                    }
+                    if (count($currentStageEvents) < 12) {
+                        $currentStageEvents[] = $item;
+                    }
+                } else {
+                    if (count($historicalEvents) < 12) {
+                        $historicalEvents[] = $item;
+                    }
                 }
             }
         }
     }
 
-    // Latest Step-6 attempt authority: never prefer stale worker-schedule failures when newer Step-6 events exist.
-    $isStep6Status = str_starts_with($status, 'pre_restore_backup_');
-    $recent = $isStep6Status || $latestStep6 !== null
-        ? array_slice(array_merge($step6Events, $failures), 0, 12)
-        : array_slice(array_merge($failures, $step6Events), 0, 12);
+    // Current stage first; prior stages remain labeled historical. Never delete history.
+    $recent = array_slice(array_merge($currentStageEvents, $historicalEvents), 0, 16);
+
+    if ($latestCurrent === null && $guidedWorker !== '') {
+        $latestCurrent = [
+            'event' => '',
+            'result' => '',
+            'worker' => $guidedWorker,
+            'code' => 'missing_current_attempt',
+            'reason_ar' => 'تعذر العثور على تفاصيل المحاولة الحالية في سجل التشغيل.',
+            'at' => '',
+            'missing_current_attempt' => true,
+            'is_step6_attempt' => $guidedWorker === 'pre_backup',
+            'is_step7_attempt' => $guidedWorker === 'shadow_db',
+            'historical_only' => false,
+        ];
+    }
 
     $logSnippets = [];
     foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
@@ -1109,16 +1374,17 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
     return [
         'job_id' => $jobId,
         'job_status' => $status,
+        'guided_stage_worker' => $guidedWorker,
         'package_type' => (string) ($job['package_type'] ?? ''),
         'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
         'workers' => $workers,
         'recent_orchestration_events' => $recent,
-        'latest_attempt_diagnostic' => $latestStep6,
+        'latest_attempt_diagnostic' => $latestCurrent,
         'log_tails' => $logSnippets,
         'notes_ar' => [
             'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
             'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا رموز الانتقال الداخلية.',
-            'عند وجود محاولات حديثة للخطوة 6 تُعرض أحدث محاولة حالية؛ أحداث الجدولة القديمة تبقى تاريخية.',
+            'أحدث محاولة تخص المرحلة الحالية حسب حالة المهمة؛ أحداث المراحل السابقة تُعرض كتاريخية فقط.',
             'يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.',
         ],
     ];
@@ -1275,7 +1541,17 @@ function orange_restore_center_run_worker(
                 'operator_username' => $operatorUsername,
                 'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             ];
-            if ($code === 'restore_center_worker_executable_unavailable'
+            if ($workerKey === 'shadow_db') {
+                $safeStep7 = orange_restore_center_step7_classify_start_failure($code);
+                $failAudit['safe_failure_code'] = $safeStep7;
+                $failAudit['stage'] = 'shadow_restore';
+                $failAudit['scheduling_attempted'] = true;
+                $failAudit['spawn_succeeded'] = false;
+                $failAudit['execution_started'] = false;
+            }
+            if (($code === 'restore_center_worker_executable_unavailable'
+                    || $code === 'php_cli_binary_unavailable'
+                    || ($failAudit['safe_failure_code'] ?? '') === ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE)
                 && function_exists('orange_backup_admin_cli_php_safe_resolve_diag')) {
                 // Categories only — no raw paths (Owner UI must stay path-free).
                 $failAudit['resolve_diag'] = orange_backup_admin_cli_php_safe_resolve_diag($projectRoot);

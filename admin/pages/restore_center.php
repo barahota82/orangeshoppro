@@ -1306,11 +1306,20 @@ body.rc-modal-open{overflow:hidden!important}
         const latest = diag.latest_attempt_diagnostic && typeof diag.latest_attempt_diagnostic === 'object'
             ? diag.latest_attempt_diagnostic
             : null;
-        if (latest) {
-            html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">أحدث محاولة للمرحلة الحالية</h4>';
+        html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">أحدث محاولة للمرحلة الحالية</h4>';
+        if (!latest || latest.missing_current_attempt) {
+            html += '<p style="margin:0 0 8px;line-height:1.55;">'
+                + esc((latest && latest.reason_ar)
+                    ? String(latest.reason_ar)
+                    : 'تعذر العثور على تفاصيل المحاولة الحالية في سجل التشغيل.')
+                + '</p>';
+        } else {
+            const safeCode = String(latest.safe_failure_code || latest.code || '').trim();
+            const showCode = safeCode && /^(STEP7_|retry_state_conflict|shadow_restore_|pre_restore_backup_|ok)/.test(safeCode);
             html += '<p style="margin:0 0 8px;line-height:1.55;"><strong>'
-                + esc(stageNameAr(latest.worker || 'pre_backup')) + '</strong> — '
+                + esc(stageNameAr(latest.worker || diag.guided_stage_worker || '')) + '</strong> — '
                 + esc(String(latest.reason_ar || 'تحديث المرحلة').replace(/illegal_framework_status_transition[^\\s]*/gi, 'تعارض حالة'))
+                + (showCode ? ' <span class="muted">[' + esc(safeCode) + ']</span>' : '')
                 + (latest.at ? ' <span class="muted">(' + esc(latest.at) + ')</span>' : '')
                 + '</p>';
         }

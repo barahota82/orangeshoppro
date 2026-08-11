@@ -77,11 +77,31 @@ try {
     if ($code === 'country_production_restore_not_enabled') {
         $status = 403;
     }
-    $safe = $code !== '' && str_starts_with($code, 'restore_center_')
-        ? orange_restore_center_operator_reason_ar($code)
-        : (function_exists('orange_restore_shadow_operator_message_ar')
-            ? orange_restore_shadow_operator_message_ar($code)
-            : orange_restore_admin_safe_message($e));
+    $isOrchestration = $code !== '' && (
+        str_starts_with($code, 'restore_center_')
+        || str_starts_with($code, 'STEP7_')
+        || $code === 'php_cli_binary_unavailable'
+        || $code === 'Restore work root unavailable.'
+    );
+    if ($isOrchestration) {
+        $safeCode = orange_restore_center_step7_classify_start_failure($code);
+        $safe = orange_restore_center_step7_operator_reason_ar($safeCode);
+        json_response([
+            'success' => false,
+            'code' => $safeCode,
+            'internal_code' => str_starts_with($code, 'STEP7_') ? $safeCode : $code,
+            'message' => $safe,
+            'execution_started' => false,
+            'production_touched' => false,
+            'scheduled' => false,
+            'cli_needed' => false,
+            'cli_command' => '',
+            'csrf_token' => orange_backup_admin_csrf_token(),
+        ], $status);
+    }
+    $safe = function_exists('orange_restore_shadow_operator_message_ar')
+        ? orange_restore_shadow_operator_message_ar($code)
+        : orange_restore_admin_safe_message($e);
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'shadow_restore_request_failed',
