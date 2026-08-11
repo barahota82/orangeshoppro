@@ -1528,7 +1528,9 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
         (int) ($capture['exit_code'] ?? 1),
         (string) ($capture['stderr'] ?? '')
     );
-    $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
+    if (($options['refresh_snapshot_after_cli'] ?? true) !== false) {
+        $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
+    }
 
     return array_merge($parsed, [
         'started_at' => $startedAt,
