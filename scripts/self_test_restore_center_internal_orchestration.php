@@ -107,6 +107,26 @@ orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_OK_MSG'), 'CORE Step6 success Arab
 orch_ok(str_contains($pageSrc, 'RC_PRE_BACKUP_FAIL_MSG'), 'CORE Step6 failure Arabic constant');
 orch_ok(str_contains($pageSrc, 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد'), 'CORE Step6 success Arabic text');
 orch_ok(str_contains($pageSrc, 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد'), 'CORE Step6 failure Arabic text');
+/* Step 7 — one browser POST to authoritative request-shadow-restore (atomic schedule). */
+orch_ok(str_contains($pageSrc, 'RESTORE_CENTER_STEP7_ONE_BROWSER_REQUEST_01'), 'STEP7 one-browser register');
+orch_ok(str_contains($pageSrc, 'RC_SHADOW_SCHEDULED_MSG'), 'STEP7 scheduled Arabic constant');
+orch_ok(str_contains($pageSrc, 'RC_SHADOW_FAIL_MSG'), 'STEP7 failure Arabic constant');
+orch_ok(
+    preg_match(
+        "/classList\\.contains\\('rc-shadow-req'\\)[\\s\\S]*?apiPost\\('job\\/request-shadow-restore\\.php'/",
+        $pageSrc
+    ) === 1,
+    'STEP7 rc-shadow-req posts request-shadow-restore only'
+);
+orch_ok(
+    preg_match(
+        "/classList\\.contains\\('rc-shadow-req'\\)[\\s\\S]*?apiPost\\('job\\/run-worker\\.php'/",
+        $pageSrc
+    ) !== 1,
+    'STEP7 rc-shadow-req does not chain run-worker'
+);
+orch_ok(!str_contains($pageSrc, "data-worker': 'shadow_db'"), 'STEP7 guided UI no direct shadow_db run-worker');
+orch_ok(!str_contains($pageSrc, 'data-worker="shadow_db"'), 'STEP7 legacy UI no direct shadow_db run-worker');
 orch_ok(str_contains($pageSrc, 'APPROVED_CREATE_BUTTON_POSITION_CHANGED=0'), 'FREEZE create position');
 orch_ok(str_contains($pageSrc, 'APPROVED_STEP1_BEHAVIOR_CHANGED=0'), 'FREEZE step1');
 orch_ok(str_contains($pageSrc, 'APPROVED_MOBILE_ORDER_CHANGED=0'), 'FREEZE mobile order');

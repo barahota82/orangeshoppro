@@ -40,23 +40,36 @@ try {
         $result
     );
 
+    $scheduled = !empty($result['scheduled']);
+    $idempotent = (bool) ($result['idempotent'] ?? false);
+    $message = (string) ($result['message'] ?? '');
+    if ($scheduled) {
+        $message = 'تم بدء استعادة قاعدة الظل على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
+    } elseif ($idempotent && $message === '') {
+        $message = 'استعادة قاعدة الظل قيد التنفيذ أو مكتملة مسبقاً.';
+    } elseif ($message === '' || str_contains($message, 'CLI') || str_contains($message, 'php scripts')) {
+        $message = $scheduled
+            ? 'تم بدء استعادة قاعدة الظل على الخادم.'
+            : 'تعذر بدء استعادة قاعدة الظل.';
+    }
+
     json_response([
         'success' => true,
         'read_only_execution' => true,
         'execution_started' => false,
         'production_touched' => false,
-        'scheduled' => !empty($result['scheduled']),
+        'scheduled' => $scheduled,
         'detached' => !empty($result['detached']),
         'cli_needed' => false,
         'cli_command' => '',
         'operator_action_required' => false,
-        'idempotent' => (bool) ($result['idempotent'] ?? false),
+        'idempotent' => $idempotent,
         'job' => $result['job'] ?? null,
         'meta' => $result['meta'] ?? null,
         'pid' => (int) ($result['pid'] ?? 0),
         'csrf_token' => orange_backup_admin_csrf_token(),
-        'message' => (string) ($result['message'] ?? 'تم بدء استعادة قاعدة الظل على الخادم.'),
-        'warning' => 'Shadow restore only — production database will not be modified.',
+        'message' => $message,
+        'warning' => 'استعادة قاعدة الظل فقط — قاعدة الإنتاج لن تُعدَّل.',
     ]);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
@@ -64,14 +77,18 @@ try {
     if ($code === 'country_production_restore_not_enabled') {
         $status = 403;
     }
+    $safe = $code !== '' && str_starts_with($code, 'restore_center_')
+        ? orange_restore_center_operator_reason_ar($code)
+        : (function_exists('orange_restore_shadow_operator_message_ar')
+            ? orange_restore_shadow_operator_message_ar($code)
+            : orange_restore_admin_safe_message($e));
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'shadow_restore_request_failed',
-        'message' => $code !== '' && str_starts_with($code, 'restore_center_')
-            ? orange_restore_center_operator_reason_ar($code)
-            : orange_restore_admin_safe_message($e),
+        'message' => $safe !== '' ? $safe : 'تعذر بدء استعادة قاعدة الظل.',
         'execution_started' => false,
         'production_touched' => false,
+        'scheduled' => false,
         'cli_needed' => false,
         'cli_command' => '',
         'csrf_token' => orange_backup_admin_csrf_token(),

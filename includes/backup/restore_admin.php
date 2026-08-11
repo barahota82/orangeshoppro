@@ -2051,6 +2051,21 @@ function orange_restore_admin_safe_message(Throwable $e): string
     if ($msg === '') {
         return 'تعذر تنفيذ العملية.';
     }
+    if (function_exists('orange_restore_shadow_operator_message_ar')) {
+        $shadowAr = orange_restore_shadow_operator_message_ar($msg);
+        $shadowCodes = [
+            'shadow_restore_lock_active', 'pre_restore_backup_not_ready', 'source_package_missing',
+            'source_package_unreadable', 'source_rollback_package_swap', 'source_package_schema_mismatch',
+            'source_package_health_failed', 'source_package_checksum_failed', 'source_package_verify_failed',
+            'source_package_drv_failed', 'source_package_fingerprint_mismatch', 'dump_file_missing',
+            'shadow_db_create_failed', 'sql_import_failed', 'shadow_verify_failed',
+            'shadow_db_equals_production', 'shadow_db_rejected_as_production', 'shadow_db_name_invalid',
+            'shadow_db_ownership_mismatch',
+        ];
+        if (in_array($msg, $shadowCodes, true)) {
+            return $shadowAr;
+        }
+    }
     $passthrough = [
         'restore_job_already_active',
         'execution_orchestration_already_active',

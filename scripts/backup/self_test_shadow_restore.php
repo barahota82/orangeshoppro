@@ -197,6 +197,7 @@ function shadow_test_make_approved_job(string $workRoot, string $backupRoot, str
 
 function shadow_test_mark_pre_backup_ready(string $workRoot, string $jobId, string $sourceId): void
 {
+    $jobNow = orange_restore_fw_read($workRoot, $jobId);
     orange_restore_pre_backup_write_record($workRoot, $jobId, [
         'record_version' => ORANGE_RESTORE_PRE_BACKUP_RECORD_VERSION,
         'framework_job_id' => $jobId,
@@ -208,21 +209,38 @@ function shadow_test_mark_pre_backup_ready(string $workRoot, string $jobId, stri
         'ready_for_rollback' => true,
         'retention_pinned' => true,
         'retention_pin_id' => 'pin_test',
+        'package_fingerprint' => (string) ($jobNow['package_fingerprint'] ?? ''),
         'execution_started' => false,
         'status' => ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
         'verify_result' => 'PASS',
         'drv_result' => 'pass',
         'purpose' => ORANGE_RESTORE_PRE_BACKUP_PURPOSE,
     ]);
-    orange_restore_fw_transition(
-        $workRoot,
-        $jobId,
-        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
-        ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_READY,
-        100,
-        'test pre-restore backup ready',
-        'pre_restore_backup_ready'
-    );
+    // Test fixture only: walk legal adjacent edges (no illegal approved→ready jump).
+    $status = (string) ($jobNow['status'] ?? '');
+    if ($status === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION) {
+        foreach ([
+            [ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING, ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_PENDING],
+            [ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING, ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_RUNNING],
+            [ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING, ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_VERIFYING],
+            [ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY, ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_READY],
+        ] as $step) {
+            orange_restore_fw_transition(
+                $workRoot,
+                $jobId,
+                $step[0],
+                $step[1],
+                100,
+                'test pre-restore backup fixture',
+                'pre_restore_backup_ready'
+            );
+        }
+    } elseif ($status !== ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY) {
+        $jForce = orange_restore_fw_read($workRoot, $jobId);
+        $jForce['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY;
+        $jForce['phase'] = ORANGE_RESTORE_FW_PHASE_PRE_RESTORE_BACKUP_READY;
+        orange_restore_fw_write($workRoot, $jForce);
+    }
     $j = orange_restore_fw_read($workRoot, $jobId);
     $j['pre_restore_backup_file'] = ORANGE_RESTORE_PRE_BACKUP_FILE;
     $j['pre_restore_backup_status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY;

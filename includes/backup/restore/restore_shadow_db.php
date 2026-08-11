@@ -24,6 +24,7 @@ require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../backup_manifest.php';
 require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/../backup_full.php';
+require_once __DIR__ . '/../backup_validate.php';
 
 const ORANGE_RESTORE_SHADOW_RECORD_VERSION = '3B.3B4-v1';
 const ORANGE_RESTORE_SHADOW_REPORT_FILE = 'shadow_restore_report.json';
@@ -33,6 +34,50 @@ const ORANGE_RESTORE_SHADOW_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_ENV_SHADOW_DB = 'ORANGE_RESTORE_SHADOW_DB';
 const ORANGE_RESTORE_SHADOW_CHARSET = 'utf8mb4';
 const ORANGE_RESTORE_SHADOW_COLLATION = 'utf8mb4_unicode_ci';
+/** Expected Schema for Step-7 source import (Owner 2026-08-11). */
+const ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION = 124;
+
+/**
+ * Safe Owner Arabic messages for Step-7 shadow restore (no paths/SQL/DB names).
+ */
+function orange_restore_shadow_operator_message_ar(string $code): string
+{
+    $code = trim($code);
+    $map = [
+        'shadow_restore_lock_active' => 'استعادة قاعدة الظل تعمل بالفعل. انتظر ثم حدّث الحالة.',
+        'pre_restore_backup_not_ready' => 'تعذر بدء استعادة قاعدة الظل. أكمل النسخة الاحتياطية الإلزامية أولاً.',
+        'invalid_status' => 'تعذر بدء استعادة قاعدة الظل في الحالة الحالية للمهمة.',
+        'package_type_mismatch' => 'تعذر بدء استعادة قاعدة الظل. نوع الحزمة غير صالح.',
+        'country_production_restore_not_enabled' => 'استعادة حزمة الدولة غير مفعّلة لهذا المسار.',
+        'contract_missing' => 'تعذر بدء استعادة قاعدة الظل. عقد التنفيذ غير متاح.',
+        'version_mismatch' => 'تعذر بدء استعادة قاعدة الظل. بصمة الحزمة لا تطابق الخطة المعتمدة.',
+        'package_changed' => 'تعذر بدء استعادة قاعدة الظل. تغيّرت الحزمة بعد الاعتماد.',
+        'schema_mismatch' => 'تعذر بدء استعادة قاعدة الظل. إصدار المخطط غير متوافق.',
+        'source_package_missing' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. الحزمة المصدر غير موجودة.',
+        'source_package_unreadable' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. الحزمة غير قابلة للقراءة.',
+        'source_rollback_package_swap' => 'تعذر بدء استعادة قاعدة الظل. حزمة الرجوع ليست مصدر الاستيراد.',
+        'source_package_schema_mismatch' => 'تعذر التحقق من قاعدة الظل بعد الاستيراد. إصدار المخطط غير متوافق.',
+        'source_package_health_failed' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. صحة الحزمة غير مقبولة.',
+        'source_package_checksum_failed' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. فشل التحقق من المجاميع.',
+        'source_package_verify_failed' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. فشل التحقق الكامل.',
+        'source_package_drv_failed' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. فشل تقرير قابلية الاسترداد.',
+        'source_package_fingerprint_mismatch' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. بصمة الحزمة لا تطابق الاعتماد.',
+        'dump_file_missing' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. ملف قاعدة البيانات مفقود.',
+        'shadow_db_create_failed' => 'تعذر إنشاء بيئة قاعدة الظل.',
+        'sql_import_failed' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل.',
+        'shadow_verify_failed' => 'تعذر التحقق من قاعدة الظل بعد الاستيراد.',
+        'shadow_db_equals_production' => 'تعذر إنشاء بيئة قاعدة الظل. الهدف غير مسموح.',
+        'shadow_db_rejected_as_production' => 'تعذر إنشاء بيئة قاعدة الظل. الهدف غير مسموح.',
+        'shadow_db_name_invalid' => 'تعذر إنشاء بيئة قاعدة الظل.',
+        'shadow_db_ownership_mismatch' => 'تعذر إنشاء بيئة قاعدة الظل. الهدف لا يخص هذه المهمة.',
+        'cli_only' => 'تعذر تنفيذ العملية.',
+        'package_incompatible' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. الحزمة غير متوافقة.',
+    ];
+
+    return $map[$code] ?? ($code !== '' && !str_contains($code, '/') && !str_contains($code, '\\') && strlen($code) < 80
+        ? 'تعذر بدء استعادة قاعدة الظل.'
+        : 'تعذر بدء استعادة قاعدة الظل.');
+}
 
 function orange_restore_shadow_report_path(string $workRoot, string $jobId): string
 {
@@ -214,13 +259,22 @@ function orange_restore_shadow_load_report(string $workRoot, string $jobId): ?ar
 function orange_restore_shadow_public_meta(array $meta): array
 {
     unset($meta['absolute_paths'], $meta['package_path'], $meta['dump_path'], $meta['password'], $meta['secrets']);
+    $shadowRaw = (string) ($meta['shadow_db'] ?? '');
+    $jobId = (string) ($meta['framework_job_id'] ?? '');
+    $identity = $shadowRaw !== ''
+        ? hash('sha256', strtolower($shadowRaw) . '|' . $jobId . '|' . ORANGE_RESTORE_SHADOW_RECORD_VERSION)
+        : '';
 
     return [
         'record_version' => (string) ($meta['record_version'] ?? ''),
-        'framework_job_id' => (string) ($meta['framework_job_id'] ?? ''),
+        'framework_job_id' => $jobId,
         'source_package_id' => (string) ($meta['source_package_id'] ?? ''),
-        'shadow_db' => (string) ($meta['shadow_db'] ?? ''),
-        'production_db' => (string) ($meta['production_db'] ?? ''),
+        'rollback_package_id' => (string) ($meta['rollback_package_id'] ?? ''),
+        // Owner UI: never expose raw DB names (RESTORE_CENTER_STEP7_SHADOW_DB_ISOLATION_01).
+        'shadow_db' => '',
+        'production_db' => '',
+        'shadow_db_identity_hash' => $identity,
+        'shadow_db_owned_by_job' => $jobId !== '' && (string) ($meta['owner_job_id'] ?? $jobId) === $jobId,
         'status' => (string) ($meta['status'] ?? ''),
         'created_at' => (string) ($meta['created_at'] ?? ''),
         'created_by' => (string) ($meta['created_by'] ?? ''),
@@ -234,9 +288,9 @@ function orange_restore_shadow_public_meta(array $meta): array
         'files_restored' => false,
         'maintenance_enabled' => false,
         'execution_started' => false,
-        'cli_needed' => (bool) ($meta['cli_needed'] ?? false),
+        'cli_needed' => false,
         'failure_code' => (string) ($meta['failure_code'] ?? ''),
-        'warning' => (string) ($meta['warning'] ?? 'Shadow restore only — production database was not modified.'),
+        'warning' => 'استعادة قاعدة الظل فقط — قاعدة الإنتاج لم تُعدَّل.',
     ];
 }
 
@@ -246,12 +300,244 @@ function orange_restore_shadow_public_meta(array $meta): array
  */
 function orange_restore_shadow_public_report(array $report): array
 {
-    unset($report['absolute_paths'], $report['package_path'], $report['dump_path'], $report['password']);
+    unset(
+        $report['absolute_paths'],
+        $report['package_path'],
+        $report['dump_path'],
+        $report['password'],
+        $report['shadow_db'],
+        $report['production_db']
+    );
+    if (isset($report['production_compare']) && is_array($report['production_compare'])) {
+        unset($report['production_compare']['production_database']);
+    }
 
     return $report + [
         'production_touched' => false,
         'cutover_performed' => false,
         'execution_started' => false,
+    ];
+}
+
+/**
+ * Resolve and fence the Step-7 import source package (never the Step-6 rollback anchor).
+ * RESTORE_CENTER_STEP7_SOURCE_VS_ROLLBACK_PACKAGE_FENCE_01
+ *
+ * @return array{
+ *   ok:bool,
+ *   code:string,
+ *   source_package_id:string,
+ *   rollback_package_id:string,
+ *   package_path:string,
+ *   manifest:array<string,mixed>,
+ *   fingerprint:string
+ * }
+ */
+function orange_restore_shadow_resolve_source_package(
+    string $workRoot,
+    string $jobId,
+    string $backupRoot,
+    array $job
+): array {
+    $sourceId = trim((string) ($job['package_id'] ?? ''));
+    $anchor = orange_restore_pre_backup_load_record($workRoot, $jobId);
+    $rollbackId = is_array($anchor) ? trim((string) ($anchor['rollback_package_id'] ?? '')) : '';
+
+    if ($sourceId === '' || !preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $sourceId)) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_missing',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => '',
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+    if ($rollbackId !== '' && hash_equals($sourceId, $rollbackId)) {
+        return [
+            'ok' => false,
+            'code' => 'source_rollback_package_swap',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => '',
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+    if ((string) ($job['package_type'] ?? '') !== 'full_disaster') {
+        return [
+            'ok' => false,
+            'code' => 'package_type_mismatch',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => '',
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+
+    try {
+        $packagePath = orange_backup_admin_resolve_full_package_path($backupRoot, $sourceId);
+    } catch (Throwable) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_missing',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => '',
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+    if ($packagePath === '' || !is_dir($packagePath)) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_missing',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => '',
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+
+    $manifestPath = $packagePath . DIRECTORY_SEPARATOR . 'manifest.json';
+    $manifestRaw = is_file($manifestPath) ? file_get_contents($manifestPath) : false;
+    $manifest = is_string($manifestRaw) ? json_decode($manifestRaw, true) : null;
+    if (!is_array($manifest) || ($manifest['package_type'] ?? '') !== 'full_disaster') {
+        return [
+            'ok' => false,
+            'code' => 'package_type_mismatch',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => [],
+            'fingerprint' => '',
+        ];
+    }
+    $schema = (int) ($manifest['schema_revision'] ?? 0);
+    if ($schema !== ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_schema_mismatch',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => '',
+        ];
+    }
+    $dumpFile = (string) ($manifest['dump_file'] ?? '');
+    if ($dumpFile === '' || !is_file($packagePath . DIRECTORY_SEPARATOR . $dumpFile)) {
+        return [
+            'ok' => false,
+            'code' => 'dump_file_missing',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => '',
+        ];
+    }
+
+    $healthPath = $packagePath . DIRECTORY_SEPARATOR . 'health.json';
+    $health = is_file($healthPath) ? json_decode((string) file_get_contents($healthPath), true) : null;
+    $healthStatus = is_array($health) ? strtolower((string) ($health['package_status'] ?? $health['status'] ?? '')) : '';
+    if ($healthStatus !== '' && !in_array($healthStatus, ['healthy', 'success', 'pass', 'ok'], true)) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_health_failed',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => '',
+        ];
+    }
+
+    if (function_exists('orange_backup_verify_checksums')) {
+        $checksums = orange_backup_verify_checksums($packagePath);
+        if (is_array($checksums) && isset($checksums['ok']) && !$checksums['ok']) {
+            return [
+                'ok' => false,
+                'code' => 'source_package_checksum_failed',
+                'source_package_id' => $sourceId,
+                'rollback_package_id' => $rollbackId,
+                'package_path' => $packagePath,
+                'manifest' => $manifest,
+                'fingerprint' => '',
+            ];
+        }
+    }
+
+    $verify = orange_backup_verify_full_package($packagePath);
+    if (!($verify['ok'] ?? false)) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_verify_failed',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => '',
+        ];
+    }
+
+    $drvPath = orange_backup_admin_recovery_report_sibling_path($packagePath, $sourceId);
+    $drv = is_file($drvPath) ? json_decode((string) file_get_contents($drvPath), true) : null;
+    $drvResult = is_array($drv) ? strtolower((string) ($drv['overall_result'] ?? '')) : '';
+    $drvScore = is_array($drv) ? (int) ($drv['recovery_score'] ?? 0) : 0;
+    if ($drvResult !== 'pass' && $drvScore < 70) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_drv_failed',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => '',
+        ];
+    }
+
+    $fingerprint = '';
+    try {
+        if (!function_exists('orange_restore_exec_build_package_fingerprint')) {
+            require_once __DIR__ . '/restore_execution_orchestrator.php';
+        }
+        $fpRow = orange_restore_exec_build_package_fingerprint(
+            $backupRoot,
+            'full_disaster',
+            $sourceId,
+            null
+        );
+        $fingerprint = trim((string) ($fpRow['fingerprint'] ?? ''));
+    } catch (Throwable) {
+        $fingerprint = '';
+    }
+    $jobFp = trim((string) ($job['package_fingerprint'] ?? ''));
+    $anchorFp = is_array($anchor) ? trim((string) ($anchor['package_fingerprint'] ?? '')) : '';
+    $expectedFp = $jobFp !== '' ? $jobFp : $anchorFp;
+    if ($expectedFp !== '' && $fingerprint !== '' && !hash_equals($expectedFp, $fingerprint)) {
+        return [
+            'ok' => false,
+            'code' => 'source_package_fingerprint_mismatch',
+            'source_package_id' => $sourceId,
+            'rollback_package_id' => $rollbackId,
+            'package_path' => $packagePath,
+            'manifest' => $manifest,
+            'fingerprint' => $fingerprint,
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'code' => 'ok',
+        'source_package_id' => $sourceId,
+        'rollback_package_id' => $rollbackId,
+        'package_path' => $packagePath,
+        'manifest' => $manifest,
+        'fingerprint' => $fingerprint,
     ];
 }
 
@@ -294,6 +580,12 @@ function orange_restore_shadow_revalidate(string $workRoot, string $jobId, strin
         }
     } catch (Throwable) {
         return ['ok' => false, 'code' => 'contract_missing', 'job' => $job];
+    }
+
+    // Source package fence (never rollback anchor) — RESTORE_CENTER_STEP7_SOURCE_VS_ROLLBACK_PACKAGE_FENCE_01
+    $source = orange_restore_shadow_resolve_source_package($workRoot, $jobId, $backupRoot, $job);
+    if (!($source['ok'] ?? false)) {
+        return ['ok' => false, 'code' => (string) ($source['code'] ?? 'source_package_missing'), 'job' => $job];
     }
 
     return ['ok' => true, 'code' => 'ok', 'job' => $job];
@@ -342,13 +634,14 @@ function orange_restore_shadow_request(
             'meta' => orange_restore_shadow_public_meta($meta ?? [
                 'framework_job_id' => $jobId,
                 'status' => $status,
-                'cli_needed' => true,
+                'cli_needed' => false,
                 'execution_started' => false,
             ]),
+            // Keep true so attach_verified_schedule can ensure a worker consumer exists.
             'cli_needed' => true,
             'idempotent' => true,
             'execution_started' => false,
-            'message' => 'Shadow restore already requested. Run CLI worker.',
+            'message' => 'استعادة قاعدة الظل قيد التنفيذ.',
         ];
     }
 
@@ -361,10 +654,18 @@ function orange_restore_shadow_request(
         throw new RuntimeException('invalid_status');
     }
 
+    $source = orange_restore_shadow_resolve_source_package($workRoot, $jobId, $backupRoot, $job);
+    if (!($source['ok'] ?? false)) {
+        throw new RuntimeException((string) ($source['code'] ?? 'source_package_missing'));
+    }
+
     $meta = [
         'record_version' => ORANGE_RESTORE_SHADOW_RECORD_VERSION,
         'framework_job_id' => $jobId,
-        'source_package_id' => (string) ($job['package_id'] ?? ''),
+        'owner_job_id' => $jobId,
+        'source_package_id' => (string) ($source['source_package_id'] ?? ''),
+        'rollback_package_id' => (string) ($source['rollback_package_id'] ?? ''),
+        'source_package_fingerprint' => (string) ($source['fingerprint'] ?? ''),
         'shadow_db' => '',
         'production_db' => '',
         'status' => ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
@@ -380,9 +681,9 @@ function orange_restore_shadow_request(
         'files_restored' => false,
         'maintenance_enabled' => false,
         'execution_started' => false,
-        'cli_needed' => true,
-        'cli_command' => 'php scripts/backup/restore_shadow_db.php --job=' . $jobId,
-        'warning' => 'Shadow restore only — production database will not be modified.',
+        'cli_needed' => false,
+        'cli_command' => '',
+        'warning' => 'استعادة قاعدة الظل فقط — قاعدة الإنتاج لن تُعدَّل.',
     ];
     orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
 
@@ -392,7 +693,7 @@ function orange_restore_shadow_request(
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
         ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_PENDING,
         10,
-        'Shadow DB restore pending — CLI worker required',
+        'Shadow DB restore pending — internal worker required',
         'shadow_restore_requested'
     );
     $job['shadow_restore_file'] = ORANGE_RESTORE_SHADOW_META_FILE;
@@ -403,10 +704,10 @@ function orange_restore_shadow_request(
     return [
         'job' => orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId)),
         'meta' => orange_restore_shadow_public_meta($meta),
-        'cli_needed' => true,
+        'cli_needed' => true, // signals attach_verified_schedule to spawn internal worker
         'idempotent' => false,
         'execution_started' => false,
-        'message' => 'Shadow restore requested. Run CLI: php scripts/backup/restore_shadow_db.php --job=' . $jobId,
+        'message' => 'تم قبول طلب استعادة قاعدة الظل.',
     ];
 }
 
@@ -810,8 +1111,17 @@ function orange_restore_shadow_verify(
     }
     $expRev = (int) ($manifest['schema_revision'] ?? 0);
     $actRev = (int) ($shadowInv['schema_revision'] ?? 0);
-    if ($expRev > 0 && $actRev > 0 && $expRev !== $actRev) {
-        $warnings[] = 'Shadow schema_revision differs from package.';
+    if ($expRev !== ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION) {
+        $errors[] = 'Package schema_revision must be '
+            . ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION
+            . ' (got ' . $expRev . ').';
+    }
+    if ($actRev > 0 && $actRev !== ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION) {
+        $errors[] = 'Shadow schema_revision must be '
+            . ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION
+            . ' (got ' . $actRev . ').';
+    } elseif ($expRev > 0 && $actRev > 0 && $expRev !== $actRev) {
+        $errors[] = 'Shadow schema_revision differs from package.';
     }
 
     $shadowTables = array_values(array_map('strval', $shadowInv['tables'] ?? []));
@@ -933,19 +1243,33 @@ function orange_restore_shadow_run_cli(
 
         $productionDb = orange_restore_shadow_production_db_name($projectRoot);
         $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+        if ($shadowDb === '' || strcasecmp($shadowDb, $productionDb) === 0) {
+            throw new RuntimeException('shadow_db_equals_production');
+        }
         $meta['shadow_db'] = $shadowDb;
         $meta['production_db'] = $productionDb;
+        $meta['owner_job_id'] = $jobId;
         $meta['status'] = ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING;
         $meta['cli_needed'] = false;
         orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
 
-        $packageId = (string) ($job['package_id'] ?? '');
-        $packagePath = orange_backup_admin_resolve_full_package_path($backupRoot, $packageId);
-        $manifestPath = $packagePath . DIRECTORY_SEPARATOR . 'manifest.json';
-        $manifestRaw = file_get_contents($manifestPath);
-        $manifest = is_string($manifestRaw) ? json_decode($manifestRaw, true) : null;
-        if (!is_array($manifest) || ($manifest['package_type'] ?? '') !== 'full_disaster') {
-            throw new RuntimeException('package_type_mismatch');
+        // Source package only — never Step-6 rollback anchor.
+        $source = orange_restore_shadow_resolve_source_package($workRoot, $jobId, $backupRoot, $job);
+        if (!($source['ok'] ?? false)) {
+            throw new RuntimeException((string) ($source['code'] ?? 'source_package_missing'));
+        }
+        $packageId = (string) ($source['source_package_id'] ?? '');
+        $rollbackId = (string) ($source['rollback_package_id'] ?? '');
+        if ($rollbackId !== '' && hash_equals($packageId, $rollbackId)) {
+            throw new RuntimeException('source_rollback_package_swap');
+        }
+        $meta['source_package_id'] = $packageId;
+        $meta['rollback_package_id'] = $rollbackId;
+        $meta['source_package_fingerprint'] = (string) ($source['fingerprint'] ?? '');
+        $packagePath = (string) ($source['package_path'] ?? '');
+        $manifest = is_array($source['manifest'] ?? null) ? $source['manifest'] : [];
+        if ($packagePath === '' || $manifest === []) {
+            throw new RuntimeException('source_package_unreadable');
         }
         $dumpFile = (string) ($manifest['dump_file'] ?? '');
         if ($dumpFile === '') {
@@ -1017,6 +1341,7 @@ function orange_restore_shadow_run_cli(
             'generated_at' => gmdate('c'),
             'framework_job_id' => $jobId,
             'source_package_id' => $packageId,
+            'rollback_package_id' => $rollbackId,
             'shadow_db' => $shadowDb,
             'production_db' => $productionDb,
             'overall_result' => 'PASS',

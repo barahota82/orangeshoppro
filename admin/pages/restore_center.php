@@ -1506,6 +1506,8 @@ body.rc-modal-open{overflow:hidden!important}
     const RC_SCHEDULED_MSG = 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
     const RC_PRE_BACKUP_OK_MSG = 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.';
     const RC_PRE_BACKUP_FAIL_MSG = 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد.\nلم تُربط أي حزمة، ويمكن إعادة المحاولة من شاشة الاسترداد.';
+    const RC_SHADOW_SCHEDULED_MSG = 'تم بدء استعادة قاعدة الظل على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
+    const RC_SHADOW_FAIL_MSG = 'تعذر بدء استعادة قاعدة الظل.';
 
     function deriveReadiness(ov, maint) {
         const counts = (ov && ov.job_counts) || {};
@@ -2208,17 +2210,20 @@ body.rc-modal-open{overflow:hidden!important}
         states[5] = 'done';
 
         if (!shadowDbDone) {
+            // Step 7 — one authoritative control → request-shadow-restore.php (atomic schedule).
+            // RESTORE_CENTER_STEP7_ONE_BROWSER_REQUEST_01
+            // RESTORE_CENTER_STEP7_INTERNAL_WORKER_REQUIRED_01
             if (job.shadow_restore_requestable) {
                 setCurrent(6, 'نفّذ استعادة قاعدة الظل.');
                 primaryHtml = guidedBtn('rc-shadow-req', { 'data-id': id }, 'تنفيذ استعادة قاعدة الظل', true);
             } else if (job.is_shadow_restore_failed) {
                 setCurrent(6, 'تابع استعادة قاعدة الظل.');
-                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_db' }, 'متابعة استعادة الظل', true);
+                primaryHtml = guidedBtn('rc-shadow-req', { 'data-id': id }, 'إعادة محاولة استعادة قاعدة الظل', true);
             } else if (job.status === 'shadow_restore_pending'
                 || stIncludes(job, 'shadow_restore_running')
                 || stIncludes(job, 'shadow_restore_verifying')) {
                 setCurrent(6, 'استعادة الظل جارية. انتظر ثم حدّث.');
-                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_db' }, 'متابعة استعادة الظل', true, { disabled: true });
+                primaryHtml = guidedBtn('rc-shadow-req', { 'data-id': id }, 'استعادة قاعدة الظل قيد التنفيذ', true, { disabled: true });
             } else {
                 setCurrent(6, 'بانتظار استعادة قاعدة الظل.');
                 blockReason = 'استعادة الظل غير متاحة بعد. أكمل النسخة الاحتياطية أولاً.';
@@ -2825,8 +2830,13 @@ body.rc-modal-open{overflow:hidden!important}
         if (job.shadow_restore_requestable) {
             html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">تنفيذ استعادة قاعدة الظل</button> ';
         }
-        if (job.status === 'shadow_restore_pending') {
-            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="shadow_db">متابعة استعادة الظل</button> ';
+        if (job.is_shadow_restore_failed) {
+            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">إعادة محاولة استعادة قاعدة الظل</button> ';
+        }
+        if (job.status === 'shadow_restore_pending'
+            || job.status === 'shadow_restore_running'
+            || job.status === 'shadow_restore_verifying') {
+            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '" disabled aria-disabled="true">استعادة قاعدة الظل قيد التنفيذ</button> ';
         }
         if (job.has_shadow_restore) {
             html += '<button type="button" class="btn-link rc-shadow-view" data-id="' + id + '">عرض تقرير قاعدة الظل</button> ';
@@ -3351,27 +3361,63 @@ body.rc-modal-open{overflow:hidden!important}
         }
 
         if (t.classList.contains('rc-shadow-req')) {
+            // One browser POST → authoritative Step-7 endpoint (server atomic request+schedule).
+            // Forbidden: request-shadow-restore.php then run-worker.php chain.
+            // RESTORE_CENTER_STEP7_ONE_BROWSER_REQUEST_01
+            // RESTORE_CENTER_STEP7_SHADOW_DB_ISOLATION_01
+            const jobId = t.dataset.id || '';
+            const lockKey = t.getAttribute('data-rc-lock-key') || '';
+            const inflightKey = String(jobId) + '::shadow_db';
+            if (rcScheduleInFlight.has(inflightKey)) {
+                showRcTerminalMessage('استعادة قاعدة الظل تعمل بالفعل لهذه المهمة. لن يُبدأ تنفيذ مكرر.', false);
+                endStageActionLock(lockKey);
+                return;
+            }
+            rcScheduleInFlight.add(inflightKey);
+            lockStageActionControl(t);
+            let ambiguous = false;
             try {
-                await requestThenRunWorker(
-                    'job/request-shadow-restore.php',
-                    'shadow_db',
-                    t.dataset.id || '',
-                    'جاري طلب استعادة قاعدة الظل…',
-                    'جاري تنفيذ استعادة قاعدة الظل من مركز الاسترداد…'
-                );
-                showRcTerminalMessage(RC_SCHEDULED_MSG, true);
+                setBusy(true, 'جاري بدء استعادة قاعدة الظل على الخادم…');
+                const j = await apiPost('job/request-shadow-restore.php', {
+                    csrf_token: state.csrf,
+                    job_id: jobId
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                if (!j.success) {
+                    throw new Error(j.message || RC_SHADOW_FAIL_MSG);
+                }
+                if (!j.scheduled && !j.idempotent) {
+                    const fail = new Error(
+                        (j.diagnostics && j.diagnostics.reason_ar) || j.message || RC_SHADOW_FAIL_MSG
+                    );
+                    fail.code = j.code || '';
+                    throw fail;
+                }
+                showRcTerminalMessage(j.message || RC_SHADOW_SCHEDULED_MSG, true);
+                endStageActionLock(lockKey);
                 await loadAll();
             } catch (e) {
                 const reason = (e && e.message) ? String(e.message) : '';
-                if (e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(reason))) {
-                    await reconcileAfterStageAmbiguity(t, t.getAttribute('data-rc-lock-key') || '');
+                const isNetwork = !!(e && (e.name === 'TypeError' || /failed to fetch|network|timeout/i.test(reason)));
+                if (isNetwork) {
+                    ambiguous = true;
+                    await reconcileAfterStageAmbiguity(t, lockKey);
                 } else {
-                    showRcTerminalMessage(reason || 'تعذر تنفيذ استعادة الظل', false);
-                    endStageActionLock(t.getAttribute('data-rc-lock-key') || '');
+                    showRcTerminalMessage(
+                        reason && reason.indexOf('تعمل بالفعل') !== -1
+                            ? reason
+                            : operatorJobMessage(reason || RC_SHADOW_FAIL_MSG),
+                        false
+                    );
+                    endStageActionLock(lockKey);
                     await loadAll();
                 }
             } finally {
+                rcScheduleInFlight.delete(inflightKey);
                 setBusy(false);
+                if (!ambiguous) {
+                    // Authority after loadAll.
+                }
             }
             return;
         }
