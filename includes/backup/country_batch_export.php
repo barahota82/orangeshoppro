@@ -215,24 +215,10 @@ function orange_crp_batch_acquire_lock(string $backupRoot): array
     if (is_file($path)) {
         $raw = file_get_contents($path);
         $meta = is_string($raw) ? json_decode($raw, true) : null;
-        $pid = is_array($meta) ? (int) ($meta['pid'] ?? 0) : 0;
-        $startedAt = is_array($meta) ? (string) ($meta['started_at'] ?? '') : '';
-        $ageSeconds = 0;
-        if ($startedAt !== '') {
-            $startedTs = strtotime($startedAt);
-            if ($startedTs !== false) {
-                $ageSeconds = time() - $startedTs;
-            }
-        } elseif (is_file($path)) {
-            $mtime = filemtime($path);
-            if ($mtime !== false) {
-                $ageSeconds = time() - $mtime;
-            }
-        }
-
-        $stale = $ageSeconds >= ORANGE_BACKUP_LOCK_STALE_SECONDS;
-        $pidAlive = $pid > 0 && orange_backup_process_alive($pid);
-        if (!$pidAlive || $stale) {
+        $metaArr = is_array($meta) ? $meta : null;
+        $pid = is_array($metaArr) ? (int) ($metaArr['pid'] ?? 0) : 0;
+        $mtime = (int) (@filemtime($path) ?: 0);
+        if (orange_backup_lock_meta_is_reclaimable($metaArr, $mtime)) {
             @unlink($path);
         } else {
             return [
@@ -282,18 +268,43 @@ function orange_crp_batch_release_lock(): void
 {
     global $orangeCrpBatchLockHandle;
 
-    if (!is_resource($orangeCrpBatchLockHandle)) {
+    $handle = $orangeCrpBatchLockHandle;
+    if (!is_resource($handle)) {
+        $orangeCrpBatchLockHandle = null;
+
         return;
     }
 
-    $meta = stream_get_meta_data($orangeCrpBatchLockHandle);
+    $meta = stream_get_meta_data($handle);
     $path = (string) ($meta['uri'] ?? '');
-    flock($orangeCrpBatchLockHandle, LOCK_UN);
-    fclose($orangeCrpBatchLockHandle);
+    @flock($handle, LOCK_UN);
+    @fclose($handle);
     $orangeCrpBatchLockHandle = null;
     if ($path !== '' && is_file($path)) {
         @unlink($path);
     }
+}
+
+/**
+ * Ownership-aware reclaim of an orphan Country-batch lock file (never kills processes).
+ *
+ * @return array{reclaimed:bool,reason:string}
+ */
+function orange_crp_batch_reclaim_lock_if_unowned(string $backupRoot): array
+{
+    $path = orange_crp_batch_lock_path($backupRoot);
+    if (!is_file($path)) {
+        return ['reclaimed' => false, 'reason' => 'absent'];
+    }
+    $raw = file_get_contents($path);
+    $meta = is_string($raw) ? json_decode($raw, true) : null;
+    $mtime = (int) (@filemtime($path) ?: 0);
+    if (!orange_backup_lock_meta_is_reclaimable(is_array($meta) ? $meta : null, $mtime)) {
+        return ['reclaimed' => false, 'reason' => 'owner_active_or_unverified_young'];
+    }
+    @unlink($path);
+
+    return ['reclaimed' => is_file($path) ? false : true, 'reason' => 'reclaimed'];
 }
 
 /**
@@ -507,6 +518,11 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
             'retention' => [],
         ];
     }
+
+    // Best-effort release if the process is terminated without an orderly finally path.
+    register_shutdown_function(static function (): void {
+        orange_crp_batch_release_lock();
+    });
 
     $succeeded = [];
     $failed = [];

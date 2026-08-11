@@ -63,24 +63,16 @@ function orange_restore_pre_backup_lock_status(string $workRoot): array
         return ['held' => true, 'payload' => null, 'stale' => true, 'pid_alive' => null];
     }
 
-    $acquiredAt = strtotime((string) ($payload['acquired_at'] ?? $payload['heartbeat_at'] ?? ''));
-    $age = $acquiredAt !== false ? (time() - $acquiredAt) : PHP_INT_MAX;
     $pid = (int) ($payload['pid'] ?? 0);
-    $pidAlive = null;
-    if ($pid > 0) {
-        if (function_exists('posix_kill')) {
-            $pidAlive = @posix_kill($pid, 0);
-        } elseif (PHP_OS_FAMILY === 'Windows' && function_exists('shell_exec')) {
-            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-            if (!in_array('shell_exec', $disabled, true)) {
-                $output = shell_exec('tasklist /FI "PID eq ' . $pid . '" /NH 2>NUL');
-                $pidAlive = is_string($output) && preg_match('/\b' . preg_quote((string) $pid, '/') . '\b/', $output) === 1;
-            }
-        }
+    $mtime = (int) (@filemtime($path) ?: 0);
+    // Align with Full/Country lock reclaim policy (started_at ← acquired_at).
+    $metaForReclaim = $payload;
+    if (!isset($metaForReclaim['started_at']) || (string) $metaForReclaim['started_at'] === '') {
+        $metaForReclaim['started_at'] = (string) ($payload['acquired_at'] ?? $payload['heartbeat_at'] ?? '');
     }
-
-    // Conservative: only stale when age exceeded AND process is proven dead (or pid unknown).
-    $stale = $age > ORANGE_RESTORE_PRE_BACKUP_LOCK_STALE_SECONDS && $pidAlive !== true;
+    $stale = orange_backup_lock_meta_is_reclaimable($metaForReclaim, $mtime);
+    $liveness = $pid > 0 ? orange_backup_process_liveness($pid) : 'dead';
+    $pidAlive = $liveness === 'alive' ? true : ($liveness === 'dead' ? false : null);
 
     return ['held' => true, 'payload' => $payload, 'stale' => $stale, 'pid_alive' => $pidAlive];
 }
@@ -998,8 +990,6 @@ function orange_restore_pre_backup_execute(
         $job['execution_started'] = false;
         orange_restore_fw_write($workRoot, $job);
 
-        orange_restore_pre_backup_release_lock($workRoot, $jobId);
-
         return [
             'ok' => true,
             'idempotent' => false,
@@ -1070,7 +1060,6 @@ function orange_restore_pre_backup_execute(
         } catch (Throwable) {
             // ignore secondary failures
         }
-        orange_restore_pre_backup_release_lock($workRoot, $jobId);
 
         return [
             'ok' => false,
@@ -1085,5 +1074,8 @@ function orange_restore_pre_backup_execute(
             'execution_started' => false,
             'record' => orange_restore_pre_backup_public_record($partial),
         ];
+    } finally {
+        // Always release Step-6 lock — including abrupt failures after acquire.
+        orange_restore_pre_backup_release_lock($workRoot, $jobId);
     }
 }

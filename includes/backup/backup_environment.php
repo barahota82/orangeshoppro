@@ -6,6 +6,8 @@ require_once __DIR__ . '/backup_paths.php';
 
 const ORANGE_BACKUP_LOCK_RELATIVE = 'locks/orange_full_backup.lock';
 const ORANGE_BACKUP_LOCK_STALE_SECONDS = 21600;
+/** When PID liveness cannot be probed, allow ownership-aware reclaim after this age (not unconditional delete). */
+const ORANGE_BACKUP_LOCK_UNVERIFIED_STALE_SECONDS = 900;
 const ORANGE_BACKUP_TEMP_STALE_SECONDS = 86400;
 
 const ORANGE_BACKUP_ENV_ROOT = 'ORANGE_BACKUP_ROOT';
@@ -685,14 +687,19 @@ function orange_backup_load_db_settings(string $projectRoot): array
 
 /**
  * @param list<string> $command
- * @return array{exit_code:int,stdout:string,stderr:string}
+ * @return array{exit_code:int,stdout:string,stderr:string,timed_out?:bool}
  */
 function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds = null): array
 {
     try {
         if (!orange_backup_can_proc_open()) {
             if (!orange_backup_can_shell_exec()) {
-                return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'No command execution functions available.'];
+                return [
+                    'exit_code' => 127,
+                    'stdout' => '',
+                    'stderr' => 'No command execution functions available.',
+                    'timed_out' => false,
+                ];
             }
             $escaped = array_map(static fn (string $part): string => escapeshellarg($part), $command);
             $output = shell_exec(implode(' ', $escaped) . ' 2>&1');
@@ -701,6 +708,7 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
                 'exit_code' => 0,
                 'stdout' => is_string($output) ? $output : '',
                 'stderr' => '',
+                'timed_out' => false,
             ];
         }
 
@@ -711,7 +719,12 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
         ];
         $process = proc_open($command, $descriptors, $pipes);
         if (!is_resource($process)) {
-            return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'proc_open failed.'];
+            return [
+                'exit_code' => 127,
+                'stdout' => '',
+                'stderr' => 'proc_open failed.',
+                'timed_out' => false,
+            ];
         }
         fclose($pipes[0]);
         stream_set_blocking($pipes[1], false);
@@ -727,7 +740,20 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
                 break;
             }
             if ($timeoutSeconds !== null && (time() - $started) > $timeoutSeconds) {
-                proc_terminate($process);
+                // Soft-stop then hard-stop so CLI finally/shutdown can release flock locks.
+                @proc_terminate($process);
+                usleep(500000);
+                $statusAfter = proc_get_status($process);
+                if (!empty($statusAfter['running'])) {
+                    if (DIRECTORY_SEPARATOR === '\\') {
+                        $pid = (int) ($statusAfter['pid'] ?? 0);
+                        if ($pid > 0 && orange_backup_can_execute_commands()) {
+                            orange_backup_run_command_capture(['taskkill', '/PID', (string) $pid, '/T', '/F'], 15);
+                        }
+                    } else {
+                        @proc_terminate($process, 9);
+                    }
+                }
                 $stderr .= 'Command timed out.';
                 break;
             }
@@ -741,36 +767,96 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
             'exit_code' => $exitCode,
             'stdout' => $stdout,
             'stderr' => $stderr,
+            'timed_out' => str_contains($stderr, 'Command timed out.'),
         ];
     } catch (Throwable $e) {
         return [
             'exit_code' => 127,
             'stdout' => '',
             'stderr' => $e->getMessage(),
+            'timed_out' => false,
         ];
     }
 }
 
-function orange_backup_process_alive(int $pid): bool
+/**
+ * PID liveness probe for Backup locks.
+ *
+ * @return 'alive'|'dead'|'unknown'
+ */
+function orange_backup_process_liveness(int $pid): string
 {
     if ($pid <= 0) {
-        return false;
+        return 'dead';
     }
     if (DIRECTORY_SEPARATOR === '\\') {
         if (!orange_backup_can_execute_commands()) {
-            return true;
+            // Never claim alive when we cannot probe — that left orphan Full/Country locks for hours.
+            return 'unknown';
         }
         $result = orange_backup_run_command_capture(['tasklist', '/FI', 'PID eq ' . $pid, '/NH'], 15);
         $combined = strtolower($result['stdout'] . $result['stderr']);
+        if (str_contains($combined, 'no tasks') || trim($combined) === '') {
+            return 'dead';
+        }
+        if (str_contains($combined, (string) $pid)) {
+            return 'alive';
+        }
 
-        return str_contains($combined, (string) $pid) && !str_contains($combined, 'no tasks');
+        return 'unknown';
     }
 
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0);
+        return @posix_kill($pid, 0) ? 'alive' : 'dead';
     }
 
-    return true;
+    return 'unknown';
+}
+
+/**
+ * Backward-compatible boolean probe: true only when process is proven alive.
+ */
+function orange_backup_process_alive(int $pid): bool
+{
+    return orange_backup_process_liveness($pid) === 'alive';
+}
+
+/**
+ * Whether an existing lock metadata row may be reclaimed without killing processes.
+ *
+ * @param array<string, mixed>|null $meta
+ */
+function orange_backup_lock_meta_is_reclaimable(?array $meta, int $fileMtime = 0): bool
+{
+    if (!is_array($meta)) {
+        return true;
+    }
+    $pid = (int) ($meta['pid'] ?? 0);
+    $startedAt = (string) ($meta['started_at'] ?? '');
+    $ageSeconds = 0;
+    if ($startedAt !== '') {
+        $startedTs = strtotime($startedAt);
+        if ($startedTs !== false) {
+            $ageSeconds = max(0, time() - $startedTs);
+        }
+    } elseif ($fileMtime > 0) {
+        $ageSeconds = max(0, time() - $fileMtime);
+    }
+
+    if ($ageSeconds >= ORANGE_BACKUP_LOCK_STALE_SECONDS) {
+        return true;
+    }
+
+    $liveness = $pid > 0 ? orange_backup_process_liveness($pid) : 'dead';
+    if ($liveness === 'dead') {
+        return true;
+    }
+    if ($liveness === 'alive') {
+        return false;
+    }
+
+    // Unknown liveness: reclaim only after the shorter unverified threshold.
+    return $ageSeconds >= ORANGE_BACKUP_LOCK_UNVERIFIED_STALE_SECONDS;
 }
 
 /**
