@@ -807,7 +807,18 @@ function orange_backup_process_liveness(int $pid): string
     }
 
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0) ? 'alive' : 'dead';
+        if (@posix_kill($pid, 0)) {
+            return 'alive';
+        }
+        if (function_exists('posix_get_last_error')) {
+            $error = posix_get_last_error();
+            if (defined('POSIX_EPERM') && $error === POSIX_EPERM) {
+                // The process exists but this PHP user cannot signal it.
+                return 'alive';
+            }
+        }
+
+        return 'dead';
     }
 
     return 'unknown';
