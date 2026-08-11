@@ -24,7 +24,7 @@ $pass = 0;
 $fail = 0;
 $skip = 0;
 $coreSkip = 0;
-$evidenceDir = 'D:\\orange_restore_failed_retry_and_action_lock_evidence';
+$evidenceDir = getenv('ORANGE_TEST_EVIDENCE_DIR') ?: (sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_failed_retry_and_action_lock_evidence');
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
@@ -46,9 +46,11 @@ ag_ok(str_contains((string) file_get_contents($indexPath), 'restore_center'), 'r
 
 /* Shared lock helper contracts on genuine page */
 ag_ok(str_contains($page, 'function beginStageActionLock'), 'GENUINE_ACTION_LOCK_BEFORE_REQUEST_PASS helper');
+ag_ok(str_contains($page, 'function releaseStageActionControl'), 'GENUINE_ACTION_UNLOCK_AFTER_FAILURE_PASS helper');
 ag_ok(str_contains($page, 'lockStageActionControl(t)') || str_contains($page, 'beginStageActionLock(t)'), 'lock applied on click path');
 ag_ok(str_contains($page, 'reconcileAfterStageAmbiguity'), 'network ambiguity path on genuine page');
 ag_ok(str_contains($page, "job.is_pre_restore_backup_failed"), 'GENUINE_ACTION_UNLOCK_AFTER_FAILURE_PASS branch');
+ag_ok(str_contains($page, "'rc-fw-cancel'"), 'GENUINE_CANCEL_ACTION_LOCKED_PASS');
 ag_ok(str_contains($page, 'GUIDED_DONE_RANK') && str_contains($page, 'backup: 60'), 'GENUINE_NEXT_STAGE_ENABLE_AFTER_SUCCESS_PASS rank gate');
 ag_ok(!str_contains($page, 'restore_prepare_backup.php'), 'STEP6_LEGACY_PATH_RUNTIME_CALL_COUNT=0');
 ag_ok(!preg_match('/illegal_framework_status_transition:[^\s\'"]+/', $page), 'VISIBLE_RAW_INTERNAL_MESSAGE_COUNT=0 in page source');

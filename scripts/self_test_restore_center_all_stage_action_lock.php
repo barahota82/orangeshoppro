@@ -34,7 +34,7 @@ function al_ok(bool $cond, string $label): void
     }
 }
 
-$evidenceDir = 'D:/orange_restore_failed_retry_and_action_lock_evidence';
+$evidenceDir = getenv('ORANGE_TEST_EVIDENCE_DIR') ?: (sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_failed_retry_and_action_lock_evidence');
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
@@ -101,6 +101,8 @@ al_ok(str_contains($page, 'RESTORE_CENTER_ALL_STAGE_ACTION_EXECUTION_LOCK_01')
     || str_contains($page, 'rc-stage-action-busy'), 'lock contract marker/class');
 al_ok(str_contains($page, 'function beginStageActionLock'), 'beginStageActionLock present');
 al_ok(str_contains($page, 'function lockStageActionControl'), 'lockStageActionControl present');
+al_ok(str_contains($page, 'function releaseStageActionControl'), 'releaseStageActionControl present');
+al_ok(str_contains($page, "'rc-fw-cancel'"), 'real cancel button class is lock-protected');
 al_ok(str_contains($page, 'aria-busy'), 'aria-busy used');
 al_ok(str_contains($page, 'reconcileAfterStageAmbiguity'), 'network reconciliation helper');
 al_ok(str_contains($page, 'rcStageActionLocks.clear()'), 'server reconciliation clears client locks');
