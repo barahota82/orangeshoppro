@@ -68,6 +68,7 @@ $workRoot = $tmp . DIRECTORY_SEPARATOR . 'work';
 $jobId = '2026-08-13_s7a_' . bin2hex(random_bytes(2));
 $jobDir = $workRoot . DIRECTORY_SEPARATOR . 'jobs' . DIRECTORY_SEPARATOR . $jobId;
 mkdir($jobDir, 0777, true);
+$GLOBALS['orange_shadow_production_db_override'] = 'orange_prod_mock_s7a';
 
 $job = [
     'job_id' => $jobId,
@@ -219,6 +220,7 @@ function s7a_rrmdir(string $dir): void
     @rmdir($dir);
 }
 s7a_rrmdir($tmp);
+unset($GLOBALS['orange_shadow_production_db_override']);
 s7a_ok(!is_dir($tmp), 'disposable fixture cleaned');
 
 $summary = [
