@@ -715,6 +715,57 @@ function orange_restore_private_engine_spawn_daemon(string $mysqld, array $args,
     return $pid > 0 ? $pid : 0;
 }
 
+function orange_restore_private_engine_process_alive(int $pid): bool
+{
+    if ($pid <= 1) {
+        return false;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        $out = [];
+        $code = 1;
+        @exec('tasklist /FI ' . escapeshellarg('PID eq ' . (string) $pid) . ' 2>nul', $out, $code);
+        $blob = implode("\n", $out);
+
+        return $code === 0 && str_contains($blob, (string) $pid);
+    }
+    if (function_exists('posix_kill')) {
+        return @posix_kill($pid, 0);
+    }
+    $out = [];
+    $code = 1;
+    @exec('kill -0 ' . (string) $pid . ' 2>/dev/null', $out, $code);
+
+    return $code === 0;
+}
+
+function orange_restore_private_engine_stop_daemon(int $pid, string $pidFile = ''): void
+{
+    $pidFromFile = $pidFile !== '' ? orange_restore_private_engine_read_pid_file($pidFile) : 0;
+    $pids = array_values(array_unique(array_filter([$pidFromFile, $pid], static fn (int $p): bool => $p > 1)));
+    foreach ($pids as $p) {
+        if (PHP_OS_FAMILY === 'Windows') {
+            @exec('taskkill /PID ' . (string) $p . ' /F /T 2>nul');
+            continue;
+        }
+        if (function_exists('posix_kill')) {
+            @posix_kill($p, 15);
+            $deadline = microtime(true) + 3.0;
+            while (microtime(true) < $deadline && orange_restore_private_engine_process_alive($p)) {
+                usleep(200000);
+            }
+            if (orange_restore_private_engine_process_alive($p)) {
+                @posix_kill($p, 9);
+            }
+            continue;
+        }
+        @exec('kill ' . (string) $p . ' 2>/dev/null');
+        usleep(300000);
+        if (orange_restore_private_engine_process_alive($p)) {
+            @exec('kill -9 ' . (string) $p . ' 2>/dev/null');
+        }
+    }
+}
+
 function orange_restore_private_engine_read_pid_file(string $pidFile): int
 {
     if (!is_file($pidFile)) {
@@ -1093,6 +1144,8 @@ function orange_restore_private_engine_provision(
         usleep(300000);
     }
     if (!$up) {
+        orange_restore_private_engine_stop_daemon($enginePid, $pidFile);
+
         return [
             'ok' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
@@ -1189,6 +1242,7 @@ function orange_restore_private_engine_provision(
         ];
     } catch (Throwable $e) {
         @unlink($bootOpt);
+        orange_restore_private_engine_stop_daemon($enginePid, $pidFile);
         $code = trim($e->getMessage());
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
@@ -1220,6 +1274,19 @@ function orange_restore_private_engine_bootstrap_users_pdo(
         . ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
     $hosts = ['127.0.0.1', 'localhost'];
+    $lockedRoot = 0;
+    foreach ($hosts as $host) {
+        $rootSpec = $pdo->quote('root') . '@' . $pdo->quote($host);
+        try {
+            $pdo->exec('ALTER USER ' . $rootSpec . ' IDENTIFIED BY ' . $pdo->quote($adminPass));
+            $lockedRoot++;
+        } catch (Throwable) {
+            // Some runtimes create only root@localhost; requiring at least one lock keeps fail-closed.
+        }
+    }
+    if ($lockedRoot <= 0) {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED);
+    }
     foreach ($hosts as $host) {
         foreach (
             [
@@ -1227,23 +1294,26 @@ function orange_restore_private_engine_bootstrap_users_pdo(
                 [$runtimeUser, $runtimePass],
             ] as [$u, $p]
         ) {
+            $account = $pdo->quote($u) . '@' . $pdo->quote($host);
             try {
-                $pdo->exec("CREATE USER '{$u}'@'{$host}' IDENTIFIED BY '{$p}'");
+                $pdo->exec('CREATE USER ' . $account . ' IDENTIFIED BY ' . $pdo->quote($p));
             } catch (Throwable) {
                 try {
-                    $pdo->exec("ALTER USER '{$u}'@'{$host}' IDENTIFIED BY '{$p}'");
+                    $pdo->exec('ALTER USER ' . $account . ' IDENTIFIED BY ' . $pdo->quote($p));
                 } catch (Throwable) {
                     // continue — other host may still succeed
                 }
             }
         }
+        $adminAccount = $pdo->quote($adminUser) . '@' . $pdo->quote($host);
+        $runtimeAccount = $pdo->quote($runtimeUser) . '@' . $pdo->quote($host);
         try {
-            $pdo->exec("GRANT ALL PRIVILEGES ON *.* TO '{$adminUser}'@'{$host}' WITH GRANT OPTION");
+            $pdo->exec('GRANT ALL PRIVILEGES ON *.* TO ' . $adminAccount . ' WITH GRANT OPTION');
         } catch (Throwable) {
             // ignore host-specific grant miss
         }
         try {
-            $pdo->exec("GRANT ALL PRIVILEGES ON {$quotedShadow}.* TO '{$runtimeUser}'@'{$host}'");
+            $pdo->exec('GRANT ALL PRIVILEGES ON ' . $quotedShadow . '.* TO ' . $runtimeAccount);
         } catch (Throwable) {
             // ignore host-specific grant miss
         }
