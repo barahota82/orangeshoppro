@@ -17,9 +17,21 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_engine_supply_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_engine_supply_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_engine_supply_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
+}
+
+if (PHP_OS_FAMILY !== 'Windows') {
+    file_put_contents($ev . DIRECTORY_SEPARATOR . 'environment_skip.json', json_encode([
+        'result' => 'SKIP',
+        'reason' => 'Restore Step 7 engine supply self-test requires Windows/Laragon local MySQL runtime.',
+        'generated_at' => gmdate('c'),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n");
+    echo "SKIP: Restore Step 7 engine supply self-test requires Windows/Laragon local MySQL runtime.\n";
+    exit(0);
 }
 
 $phpBin = 'C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe';
