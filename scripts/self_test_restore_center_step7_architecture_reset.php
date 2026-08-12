@@ -13,7 +13,19 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$evDir = 'D:\\orange_restore_step7_architecture_reset_evidence';
+
+function s7a_evidence_dir(): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:\\orange_restore_step7_architecture_reset_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'orange_restore_step7_architecture_reset_evidence';
+}
+
+$evDir = s7a_evidence_dir();
 if (!is_dir($evDir)) {
     mkdir($evDir, 0777, true);
 }
@@ -56,6 +68,7 @@ $workRoot = $tmp . DIRECTORY_SEPARATOR . 'work';
 $jobId = '2026-08-13_s7a_' . bin2hex(random_bytes(2));
 $jobDir = $workRoot . DIRECTORY_SEPARATOR . 'jobs' . DIRECTORY_SEPARATOR . $jobId;
 mkdir($jobDir, 0777, true);
+$GLOBALS['orange_shadow_production_db_override'] = 'orange_prod_mock_s7a';
 
 $job = [
     'job_id' => $jobId,
@@ -207,6 +220,7 @@ function s7a_rrmdir(string $dir): void
     @rmdir($dir);
 }
 s7a_rrmdir($tmp);
+unset($GLOBALS['orange_shadow_production_db_override']);
 s7a_ok(!is_dir($tmp), 'disposable fixture cleaned');
 
 $summary = [
@@ -218,6 +232,7 @@ $summary = [
     'ARCHITECTURE_REJECTED' => ['A_COUNTRY_CRP_SHADOW', 'B_DEDICATED_STAGING_CHANNEL'],
     'stage_matrix' => $stageMatrix,
     'UNKNOWN_SHARED_DEP_COUNT' => $unknown,
+    'evidence_dir' => $evDir,
     'lines' => $lines,
     'at' => gmdate('c'),
 ];

@@ -667,4 +667,5 @@ mutex is a separate channel. Duplicate click returns the same `attempt_id` (idem
 - `admin/api/restore/list.php` + Restore Center Refresh UI — read-only reconcile;
   categorized refresh errors; never generic «حدث خطأ غير متوقع» as sole Refresh outcome.
 - Self-test: `scripts/self_test_restore_center_step7_architecture_reset.php`
-  → evidence `D:\orange_restore_step7_architecture_reset_evidence\`.
+  → evidence `D:\orange_restore_step7_architecture_reset_evidence\` on Windows,
+  and `sys_get_temp_dir()/orange_restore_step7_architecture_reset_evidence/` on Linux/macOS.

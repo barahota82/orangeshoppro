@@ -725,6 +725,28 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
     return ctype_digit($raw) ? (int) $raw : 0;
 }
 
+function orange_restore_private_engine_stop_process(int $pid): void
+{
+    if ($pid <= 0) {
+        return;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        @exec('taskkill /PID ' . (string) $pid . ' /T /F >NUL 2>NUL');
+
+        return;
+    }
+    if (function_exists('posix_kill')) {
+        @posix_kill($pid, 15);
+        usleep(300000);
+        if (@posix_kill($pid, 0)) {
+            @posix_kill($pid, 9);
+        }
+
+        return;
+    }
+    @exec('kill -TERM ' . (string) $pid . ' >/dev/null 2>&1');
+}
+
 /**
  * Whether this PHP SAPI can spawn a private engine child process (zero-mutation check).
  */
@@ -1093,6 +1115,8 @@ function orange_restore_private_engine_provision(
         usleep(300000);
     }
     if (!$up) {
+        orange_restore_private_engine_stop_process($enginePid);
+
         return [
             'ok' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
@@ -1102,6 +1126,8 @@ function orange_restore_private_engine_provision(
     }
 
     $bootOpt = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_BOOTSTRAP_OPT;
+    $secretPath = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_SECRET_FILE;
+    $portFile = $root . DIRECTORY_SEPARATOR . '.engine_port';
     try {
         // Bootstrap as insecure root via localhost/127.0.0.1 (initialize-insecure).
         $pdoBoot = null;
@@ -1142,7 +1168,6 @@ function orange_restore_private_engine_provision(
         ]);
         @unlink($bootOpt);
 
-        $secretPath = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_SECRET_FILE;
         orange_restore_private_engine_write_option_file($secretPath, [
             'user' => $runtimeUser,
             'password' => $runtimePass,
@@ -1177,7 +1202,6 @@ function orange_restore_private_engine_provision(
             // Internal-only port retained in side channel file, not state JSON for browser.
         ]);
         // Persist port for worker reconnect without exposing via public state.
-        $portFile = $root . DIRECTORY_SEPARATOR . '.engine_port';
         file_put_contents($portFile, (string) $port . "\n", LOCK_EX);
         orange_restore_private_engine_harden_secret_file($portFile);
 
@@ -1189,6 +1213,10 @@ function orange_restore_private_engine_provision(
         ];
     } catch (Throwable $e) {
         @unlink($bootOpt);
+        @unlink($secretPath);
+        @unlink($portFile);
+        $pidFromFile = orange_restore_private_engine_read_pid_file($pidFile);
+        orange_restore_private_engine_stop_process($pidFromFile > 0 ? $pidFromFile : $enginePid);
         $code = trim($e->getMessage());
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
