@@ -456,10 +456,15 @@ function orange_restore_private_engine_extract_and_verify(
                 throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
             }
             $prefixes = $manifest['file_allowlist_prefixes'] ?? [];
+            $allowedEntries = [];
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $stat = $zip->statIndex($i);
                 $name = str_replace('\\', '/', (string) ($stat['name'] ?? ''));
-                if ($name === '' || str_contains($name, '..')) {
+                if ($name === ''
+                    || str_contains($name, "\0")
+                    || str_contains($name, '..')
+                    || str_starts_with($name, '/')
+                    || preg_match('/^[A-Za-z]:/', $name) === 1) {
                     $zip->close();
                     throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED);
                 }
@@ -482,8 +487,15 @@ function orange_restore_private_engine_extract_and_verify(
                     // Soft: skip unexpected files rather than execute them; still extract known prefixes only.
                     continue;
                 }
+                if (!str_ends_with($name, '/')) {
+                    $allowedEntries[] = (string) ($stat['name'] ?? '');
+                }
             }
-            if (!$zip->extractTo($staging)) {
+            if ($allowedEntries === []) {
+                $zip->close();
+                throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
+            }
+            if (!$zip->extractTo($staging, $allowedEntries)) {
                 $zip->close();
                 throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
             }

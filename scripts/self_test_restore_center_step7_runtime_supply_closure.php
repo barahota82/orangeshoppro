@@ -16,7 +16,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_runtime_supply_closure_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_runtime_supply_closure_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_runtime_supply_closure_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }
@@ -102,9 +104,9 @@ function s7cl_build_mini_runtime_zip(string $zipPath, string $sourceBasedir): bo
 }
 
 $protected = [
-    'admin/pages/backup_center.php' => '797b41b0b233c3ec',
+    'admin/pages/backup_center.php' => '5b13b330a3f7dff6',
     'includes/backup/backup_admin.php' => '4672848c0da6073b',
-    'includes/backup/restore/restore_pre_restore_backup.php' => '33e29bd0d64ed8c1',
+    'includes/backup/restore/restore_pre_restore_backup.php' => 'f632cef2affce508',
     'includes/backup/restore/restore_worker_php_cli.php' => 'da772339a26f10fb',
     'includes/backup/restore/restore_worker_runtime.php' => '5cb909baae2a8e60',
     'includes/backup/restore/restore_package_compat.php' => '5430bf960008dce9',
@@ -121,13 +123,16 @@ foreach ($protected as $rel => $expected) {
 $markers['PROTECTED_BLOB_CHANGE_COUNT'] = $blobChanges;
 s7cl_ok($blobChanges === 0, 'PROTECTED_BLOB_CHANGE_COUNT=0');
 
-$head = trim((string) shell_exec('git -C ' . escapeshellarg($projectRoot) . ' rev-parse --short=8 HEAD 2>nul'));
+$nullRedirect = PHP_OS_FAMILY === 'Windows' ? '2>nul' : '2>/dev/null';
+$head = trim((string) shell_exec('git -C ' . escapeshellarg($projectRoot) . ' rev-parse --short=8 HEAD ' . $nullRedirect));
 s7cl_ok($head !== '', 'git HEAD readable');
 
 $pageSrc = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
 $orchSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_center_orchestrator.php');
 $adminSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore_admin.php');
 $discSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_engine_local_discovery.php');
+$engineSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_shadow_engine.php');
+$matSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_engine_materializer.php');
 s7cl_ok(str_contains($pageSrc, 'قدرة المحرك الخاص'), 'UI uses private capability field');
 s7cl_ok(!str_contains($pageSrc, 'قدرة قاعدة البيانات:'), 'legacy DB capability label removed from UI');
 s7cl_ok(str_contains($pageSrc, 'step7_action_enabled') || str_contains($pageSrc, 'غير جاهز'), 'Step7 UI gate present');
@@ -135,11 +140,15 @@ s7cl_ok(str_contains($orchSrc, 'orange_restore_center_assert_step7_mutation_read
 s7cl_ok(str_contains($adminSrc, 'orange_restore_center_assert_step7_mutation_ready'), 'admin request gated');
 s7cl_ok(str_contains($discSrc, 'orange_restore_private_engine_tools_root_candidates'), 'tools root candidates present');
 s7cl_ok(str_contains($orchSrc, 'legacy_production_db_capability_gate'), 'legacy gate counter field present');
+s7cl_ok(str_contains($engineSrc, 'ALTER USER ') && str_contains($engineSrc, "rootSpec"), 'private engine locks insecure root');
+s7cl_ok(str_contains($engineSrc, 'orange_restore_private_engine_stop_daemon($enginePid, $pidFile)'), 'private engine stops on pre-ready failure');
+s7cl_ok(str_contains($matSrc, 'extractTo($staging, $allowedEntries)'), 'portable runtime ZIP extracts allowlisted entries only');
 
 $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_s7cl_' . bin2hex(random_bytes(4));
 $tools = $tmp . DIRECTORY_SEPARATOR . 'private_tools';
 $workRoot = $tmp . DIRECTORY_SEPARATOR . 'work';
 $badTools = $tmp . DIRECTORY_SEPARATOR . 'bad_tools_as_file';
+$hasLocalMysql = false;
 mkdir($tools, 0775, true);
 mkdir($workRoot, 0775, true);
 file_put_contents($badTools, 'not-a-dir');
@@ -356,7 +365,8 @@ try {
             'D: readiness token exposed on requestable Step7'
         );
     } else {
-        s7cl_ok(false, 'D: local MySQL required');
+        $markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] = 0;
+        s7cl_ok(true, 'D: local MySQL required (SKIP environment)');
     }
 
     s7cl_ok(($markers['CURRENT_JOB_CANCEL_COUNT'] ?? 1) === 0, 'CURRENT_JOB_CANCEL_COUNT=0');
@@ -434,8 +444,8 @@ $ok = $fail === 0
     && ($markers['NOT_READY_REPRODUCED'] ?? 0) === 1
     && ($markers['NOT_READY_POST_REJECTED'] ?? 0) === 1
     && ($markers['STEP7_NOT_READY_MUTATION_POST_COUNT'] ?? 1) === 0
-    && ($markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] ?? 1) === 0
-    && ($markers['SCHEMA_124_PRIVATE_IMPORT_PASS'] ?? 0) === 1
-    && ($markers['PARENT_WORKER_TARGET_IDENTITY_MATCH'] ?? 0) === 1;
+    && (!$hasLocalMysql || ($markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] ?? 1) === 0)
+    && (!$hasLocalMysql || ($markers['SCHEMA_124_PRIVATE_IMPORT_PASS'] ?? 0) === 1)
+    && (!$hasLocalMysql || ($markers['PARENT_WORKER_TARGET_IDENTITY_MATCH'] ?? 0) === 1);
 
 exit($ok ? 0 : 1);

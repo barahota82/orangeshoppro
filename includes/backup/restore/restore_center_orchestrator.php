@@ -1268,10 +1268,20 @@ function orange_restore_center_step7_mutation_readiness(
             'engine' => [],
         ];
     }
-    $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
-    $env = orange_backup_load_env_array($projectRoot);
-    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
-    $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
+    $engine = [];
+    try {
+        $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
+        $env = orange_backup_load_env_array($projectRoot);
+        $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+        $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
+    } catch (Throwable) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+            'ready_token' => '',
+            'engine' => [],
+        ];
+    }
     $identity = (string) ($resolved['identity_hash'] ?? '');
     $boundHash = trim((string) ($meta['shadow_db_identity_hash'] ?? ''));
     $match = $identity !== '' && $boundHash !== '' && hash_equals($identity, $boundHash);
