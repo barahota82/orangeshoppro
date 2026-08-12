@@ -886,8 +886,17 @@ function orange_restore_shadow_verify_run_cli(
             $env = array_merge($env, $GLOBALS['orange_shadow_env_override']);
         }
 
+        if (!function_exists('orange_restore_shadow_environment_ensure')) {
+            require_once __DIR__ . '/restore_shadow_environment.php';
+        }
+        $ensured = orange_restore_shadow_environment_ensure($projectRoot, $workRoot, $jobId, true);
+        if (empty($ensured['ok'])) {
+            throw new RuntimeException(
+                (string) ($ensured['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY)
+            );
+        }
         $productionDb = orange_restore_shadow_production_db_name($projectRoot);
-        $shadowDb = (string) ($shadowMeta['shadow_db'] ?? '');
+        $shadowDb = (string) ($ensured['shadow_db'] ?? ($shadowMeta['shadow_db'] ?? ''));
         if ($shadowDb === '') {
             $shadowDb = orange_restore_shadow_db_name(
                 $env,
@@ -919,7 +928,7 @@ function orange_restore_shadow_verify_run_cli(
                 throw new RuntimeException('shadow_verify_connect_override_invalid');
             }
         } else {
-            $pdo = orange_restore_shadow_connect_pdo($projectRoot, $env, $shadowDb);
+            $pdo = orange_restore_shadow_environment_connect_pdo($projectRoot, $workRoot, $jobId, true);
         }
 
         $shadowDeep = orange_restore_shadow_deep_inventory($pdo, $shadowDb);

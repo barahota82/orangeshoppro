@@ -28,9 +28,13 @@ require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 require_once __DIR__ . '/restore_private_shadow_engine.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v9-private-shadow-engine';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v10-attempt-contract';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
+/** Active-attempt class F: own pending after request must never look like a foreign ACTIVE. */
+const ORANGE_RESTORE_STEP7_ACTIVE_CLASS_OWN_PENDING_FALSE_POSITIVE = 'F';
+/** Active-attempt class A: blocking claim with live/grace semantics. */
+const ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS = 'A';
 const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
 const ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_WAIT_MS = 5000;
 const ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_POLL_MS = 100;
@@ -1238,9 +1242,46 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
 }
 
 /**
+ * Genuine Step-7 active attempt (claim/mutex contract) — never status-only.
+ *
+ * Class A: blocking run-claim (live PID or grace).
+ * Class F (rejected): treating own PENDING after request as ACTIVE — must not happen.
+ * Install/materialize mutex is a separate channel and must not surface as ACTIVE.
+ *
+ * @param array<string, mixed> $job
+ * @return array{active:bool,class:string,attempt_id:string,claim:array<string,mixed>|null}
+ */
+function orange_restore_center_step7_genuine_active_attempt(
+    string $workRoot,
+    string $jobId,
+    array $job
+): array {
+    $claim = orange_restore_center_reconcile_run_claim($workRoot, $jobId, 'shadow_db', $job);
+    if ($claim === null || !orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')) {
+        return [
+            'active' => false,
+            'class' => '',
+            'attempt_id' => '',
+            'claim' => null,
+        ];
+    }
+
+    return [
+        'active' => true,
+        'class' => ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS,
+        'attempt_id' => trim((string) ($claim['attempt_id'] ?? '')),
+        'claim' => $claim,
+    ];
+}
+
+/**
  * Fail closed before pending/attempt/worker when Step7 readiness is not green.
  *
- * @return array{ok:bool,code:string,ready_token:string,engine:array<string,mixed>}
+ * ACTIVE is claim-based only. Pending/running status alone is never ACTIVE
+ * (OWN_PENDING_POST_REQUEST_FALSE_POSITIVE / class F). Duplicate clicks while
+ * genuinely active are handled as idempotent same-attempt by shadow_request + schedule.
+ *
+ * @return array{ok:bool,code:string,ready_token:string,engine:array<string,mixed>,active_attempt?:array<string,mixed>}
  */
 function orange_restore_center_step7_mutation_readiness(
     string $projectRoot,
@@ -1254,20 +1295,9 @@ function orange_restore_center_step7_mutation_readiness(
         require_once __DIR__ . '/restore_shadow_db.php';
     }
     $job = orange_restore_fw_read($workRoot, $jobId);
-    $status = (string) ($job['status'] ?? '');
-    $running = in_array($status, [
-        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
-        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
-        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
-    ], true);
-    if ($running) {
-        return [
-            'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT_EXISTS,
-            'ready_token' => '',
-            'engine' => [],
-        ];
-    }
+    $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
+    // Do not reject on ACTIVE here — caller uses idempotent same-attempt path.
+    // Surface diagnostic only so UI/tests can classify claim-based active vs class F.
     $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
     $env = orange_backup_load_env_array($projectRoot);
     $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
@@ -1290,6 +1320,7 @@ function orange_restore_center_step7_mutation_readiness(
             'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
             'ready_token' => '',
             'engine' => $engine,
+            'active_attempt' => $active,
         ];
     }
     if (!$match && $boundHash !== '') {
@@ -1298,12 +1329,21 @@ function orange_restore_center_step7_mutation_readiness(
             'code' => ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH,
             'ready_token' => '',
             'engine' => $engine,
+            'active_attempt' => $active,
         ];
     }
     $token = (string) ($engine['ready_token'] ?? '');
+    $status = (string) ($job['status'] ?? '');
+    $inflight = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
+    ], true);
+    // Inflight without blocking claim (orphan pending) may proceed to idempotent attach.
+    // Green token required only when starting a new request from entry/failed statuses.
     $green = $token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
         || $token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
-    if (!$green) {
+    if (!$green && !$inflight && empty($active['active'])) {
         $code = (string) ($engine['code'] ?? ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED);
         if ($code === '' || $code === 'ok') {
             $code = ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED;
@@ -1314,6 +1354,29 @@ function orange_restore_center_step7_mutation_readiness(
             'code' => $code,
             'ready_token' => '',
             'engine' => $engine,
+            'active_attempt' => $active,
+        ];
+    }
+    if (!$green && $inflight && empty($active['active'])) {
+        // Orphan pending/running: allow schedule attach without re-advertising READY tokens.
+        return [
+            'ok' => true,
+            'code' => 'ok',
+            'ready_token' => $token,
+            'engine' => $engine,
+            'active_attempt' => $active,
+            'orphan_inflight_attach' => true,
+        ];
+    }
+    if (!$green && !empty($active['active'])) {
+        // Genuinely active — HTTP will return idempotent same attempt (not a new start).
+        return [
+            'ok' => true,
+            'code' => 'ok',
+            'ready_token' => $token,
+            'engine' => $engine,
+            'active_attempt' => $active,
+            'idempotent_active' => true,
         ];
     }
 
@@ -1322,6 +1385,7 @@ function orange_restore_center_step7_mutation_readiness(
         'code' => 'ok',
         'ready_token' => $token,
         'engine' => $engine,
+        'active_attempt' => $active,
     ];
 }
 
@@ -1660,7 +1724,8 @@ function orange_restore_center_attach_verified_schedule(
         );
     } catch (Throwable $e) {
         $code = trim($e->getMessage());
-        if ($code === 'restore_center_worker_already_running') {
+        if ($code === 'restore_center_worker_already_running'
+            || $code === ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT_EXISTS) {
             $liveJob = orange_restore_fw_read($workRoot, $jobId);
             $liveStatus = (string) ($liveJob['status'] ?? '');
             $failedMap = orange_restore_center_worker_dispatch_failure_status_map();
@@ -1669,13 +1734,33 @@ function orange_restore_center_attach_verified_schedule(
                 && isset($failedMap[$workerKey])
                 && $liveStatus === $failedMap[$workerKey]
             ) {
+                // Stale claim on failed status — reconcile and surface retryable failure, not ACTIVE.
+                orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, $liveJob);
                 throw new RuntimeException(ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE, 0, $e);
             }
-            $requestResult['scheduled'] = true;
+            $activeInfo = $workerKey === 'shadow_db'
+                ? orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $liveJob)
+                : ['active' => true, 'attempt_id' => '', 'class' => ''];
+            // Duplicate click / same attempt: return identical attempt — never a new spawn.
+            $requestResult['scheduled'] = !empty($activeInfo['active']);
             $requestResult['detached'] = true;
-            $requestResult['bootstrap_acked'] = true;
+            $requestResult['bootstrap_acked'] = !empty($activeInfo['active']);
+            $requestResult['idempotent'] = true;
+            $requestResult['attempt_id'] = (string) ($activeInfo['attempt_id']
+                ?? ($requestResult['attempt_id'] ?? ''));
+            if ($requestResult['attempt_id'] === '' && is_array($activeInfo['claim'] ?? null)) {
+                $requestResult['attempt_id'] = trim((string) (($activeInfo['claim']['attempt_id'] ?? '')));
+            }
+            $metaLive = function_exists('orange_restore_shadow_load_meta')
+                ? (orange_restore_shadow_load_meta($workRoot, $jobId) ?? [])
+                : [];
+            if ($requestResult['attempt_id'] === '') {
+                $requestResult['attempt_id'] = trim((string) ($metaLive['attempt_id'] ?? ''));
+            }
             $requestResult['job'] = orange_restore_fw_public_row($liveJob);
-            $requestResult['message'] = 'التنفيذ يعمل بالفعل على الخادم.';
+            $requestResult['message'] = 'استعادة قاعدة الظل قيد التنفيذ أو مكتملة مسبقاً.';
+            $requestResult['active_attempt_class'] = (string) ($activeInfo['class']
+                ?? ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS);
 
             return $requestResult;
         }
@@ -2349,8 +2434,9 @@ function orange_restore_center_run_worker(
         $attemptId = '';
         $privateEnginePid = 0;
         if ($workerKey === 'shadow_db') {
-            // Fail closed BEFORE pending consumption / spawn when readiness not green.
-            orange_restore_center_assert_step7_mutation_ready($projectRoot, $workRoot, $jobId);
+            // Do NOT re-call assert_step7_mutation_ready here: HTTP already gated readiness,
+            // and shadow_request may have moved status to PENDING. Status-only ACTIVE was
+            // class F false-positive (OWN_PENDING_POST_REQUEST). Claim/mutex above is authority.
             // Fail closed BEFORE spawn: private-engine provision + readiness proven.
             $pre = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jobId);
             $attemptId = (string) ($pre['attempt_id'] ?? '');

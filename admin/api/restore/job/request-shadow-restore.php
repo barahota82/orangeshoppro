@@ -45,10 +45,12 @@ try {
     $idempotent = (bool) ($result['idempotent'] ?? false);
     $message = (string) ($result['message'] ?? '');
     // Owner F: "started" only after bootstrap/readiness ack — never on bare spawn.
-    if ($scheduled && $bootstrapAcked) {
+    if ($idempotent) {
+        $message = $message !== ''
+            ? $message
+            : 'استعادة قاعدة الظل قيد التنفيذ أو مكتملة مسبقاً.';
+    } elseif ($scheduled && $bootstrapAcked) {
         $message = 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
-    } elseif ($idempotent && $message === '') {
-        $message = 'استعادة قاعدة الظل قيد التنفيذ أو مكتملة مسبقاً.';
     } elseif ($message === '' || str_contains($message, 'CLI') || str_contains($message, 'php scripts')) {
         $message = $scheduled
             ? 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع.'
@@ -68,6 +70,7 @@ try {
         'cli_command' => '',
         'operator_action_required' => false,
         'idempotent' => $idempotent,
+        'active_attempt_class' => (string) ($result['active_attempt_class'] ?? ''),
         'job' => $result['job'] ?? null,
         'meta' => $result['meta'] ?? null,
         'pid' => (int) ($result['pid'] ?? 0),
@@ -89,6 +92,9 @@ try {
     );
     if ($isOrchestration) {
         $safeCode = orange_restore_center_step7_classify_start_failure($code);
+        // ACTIVE after own request must not be returned as hard failure when same attempt exists —
+        // attach_verified_schedule already converts claim-active to idempotent success.
+        // Remaining ACTIVE here means a true control conflict before request acceptance.
         $safe = orange_restore_center_step7_operator_reason_ar($safeCode);
         json_response([
             'success' => false,

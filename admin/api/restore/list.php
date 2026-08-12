@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once dirname(__DIR__, 3) . '/includes/backup/restore/restore_center_orchestrator.php';
 
 restore_admin_api_require_get();
 
@@ -24,6 +25,21 @@ try {
     // eligibility/context filtering (not a global limit before filter).
     $countryContextCode = orange_admin_context_country_code($pdo);
 
+    // Refresh-only reconcile (no new Step7 attempt / no cancel / no live mutate beyond nested status).
+    try {
+        $resumable = orange_restore_fw_find_resumable_job($workRoot);
+        if (is_array($resumable)) {
+            $rjid = trim((string) ($resumable['job_id'] ?? ''));
+            if ($rjid !== '') {
+                orange_restore_center_reconcile_stale_shadow_restore_public_state($workRoot, $rjid);
+                $rj = orange_restore_fw_read($workRoot, $rjid);
+                orange_restore_center_reconcile_run_claim($workRoot, $rjid, 'shadow_db', $rj);
+            }
+        }
+    } catch (Throwable) {
+        // Refresh must still return a usable list payload.
+    }
+
     $fullPackages = [];
     if ($mayFull) {
         foreach (orange_backup_admin_list_full_snapshots($backupRoot, 100) as $pkg) {
@@ -38,10 +54,52 @@ try {
         }
     }
 
+    $overview = [];
+    try {
+        $overview = orange_restore_admin_collect_overview($workRoot);
+    } catch (Throwable) {
+        $overview = ['error' => 'overview_unavailable'];
+    }
+
+    $fwJobs = [];
+    try {
+        $fwJobs = orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry);
+    } catch (Throwable) {
+        $fwJobs = [];
+    }
+
+    $currentJourney = null;
+    try {
+        $job = orange_restore_fw_find_resumable_job($workRoot);
+        if ($job !== null) {
+            $type = (string) ($job['package_type'] ?? '');
+            if (!(($type === 'full_disaster' && !$mayFull) || ($type === 'country_recovery' && !$mayCountry))) {
+                $currentJourney = orange_restore_fw_public_row($job);
+            }
+        }
+    } catch (Throwable) {
+        $currentJourney = null;
+    }
+
+    $legacyJobs = [];
+    try {
+        $legacyJobs = orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry);
+    } catch (Throwable) {
+        $legacyJobs = [];
+    }
+
+    $maintenance = [];
+    try {
+        $maintenance = orange_restore_admin_fw_maintenance_status($workRoot);
+    } catch (Throwable) {
+        $maintenance = ['available' => false];
+    }
+
     json_response([
         'success' => true,
         'read_only' => true,
         'read_only_execution' => true,
+        'refresh_safe' => true,
         'csrf_token' => orange_backup_admin_csrf_token(),
         'permissions' => [
             'can_view_full' => $mayFull,
@@ -51,30 +109,43 @@ try {
             'can_cancel_job' => $mayFull || $mayCountry,
         ],
         'country_context_code' => orange_countries_display_code($countryContextCode),
-        'overview' => orange_restore_admin_collect_overview($workRoot),
+        'overview' => $overview,
         'full_packages' => $fullPackages,
         'country_packages' => $countryPackages,
-        'framework_jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
-        'jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
+        'framework_jobs' => $fwJobs,
+        'jobs' => $fwJobs,
         // Wizard journey job only — terminal/history jobs never selected here (Owner 2026-07-24).
-        'current_journey_job' => (static function () use ($workRoot, $mayFull, $mayCountry): ?array {
-            $job = orange_restore_fw_find_resumable_job($workRoot);
-            if ($job === null) {
-                return null;
-            }
-            $type = (string) ($job['package_type'] ?? '');
-            if ($type === 'full_disaster' && !$mayFull) {
-                return null;
-            }
-            if ($type === 'country_recovery' && !$mayCountry) {
-                return null;
-            }
-
-            return $job;
-        })(),
-        'legacy_engine_jobs' => orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry),
-        'maintenance' => orange_restore_admin_fw_maintenance_status($workRoot),
+        'current_journey_job' => $currentJourney,
+        'legacy_engine_jobs' => $legacyJobs,
+        'maintenance' => $maintenance,
     ]);
 } catch (Throwable $e) {
-    orange_admin_api_catch($e, orange_restore_admin_safe_message($e));
+    // Refresh must never surface generic unexpected / raw English codes.
+    $code = trim($e->getMessage());
+    $category = 'refresh_unexpected';
+    if (str_contains($code, 'permission') || str_contains($code, 'CSRF') || str_contains($code, 'session')) {
+        $category = 'refresh_auth';
+    } elseif (str_contains($code, 'work root') || str_contains($code, 'work_root')) {
+        $category = 'refresh_work_root';
+    } elseif (str_starts_with($code, 'STEP7_') || str_contains($code, 'shadow')) {
+        $category = 'refresh_step7_state';
+    }
+    $safe = orange_restore_admin_safe_message($e);
+    if ($safe === '' || $safe === 'حدث خطأ غير متوقع' || $safe === $code) {
+        $safe = match ($category) {
+            'refresh_auth' => 'تعذر تحديث الحالة بسبب جلسة أو صلاحية. أعد تسجيل الدخول ثم حدّث.',
+            'refresh_work_root' => 'تعذر تحديث الحالة لأن مجلد عمل الاسترداد غير متاح.',
+            'refresh_step7_state' => 'تعذر مزامنة حالة خطوة استعادة قاعدة الظل. حدّث مرة أخرى دون إلغاء المهمة.',
+            default => 'تعذر تحديث حالة مركز الاسترداد. أعد المحاولة دون إلغاء المهمة.',
+        };
+    }
+    json_response([
+        'success' => false,
+        'code' => 'restore_center_refresh_failed',
+        'refresh_error_category' => $category,
+        'message' => $safe,
+        'read_only' => true,
+        'execution_started' => false,
+        'csrf_token' => orange_backup_admin_csrf_token(),
+    ], 422);
 }

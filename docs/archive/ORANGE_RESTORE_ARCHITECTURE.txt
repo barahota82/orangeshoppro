@@ -636,3 +636,35 @@ No Production MySQL CREATE DATABASE / privilege provisioning required.
   is NOT_READY (`STEP7_NOT_READY_MUTATION_REJECTED`) even if state-requestable;
   exact non-green codes include `STEP7_PRIVATE_TOOLS_ROOT_NOT_READY` and
   `STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE`.
+
+================================================================================
+P0 architecture reset — attempt contract + one shadow environment (Owner 2026-08-13)
+================================================================================
+
+**Registers:** ACTIVE_ATTEMPT_MESSAGE_01, REFRESH_UNEXPECTED_ERROR_01,
+CURRENT_LIVE_ATTEMPT_STATE_UNKNOWN_01, NO_MORE_SPECULATIVE_PATCHES_01,
+COMPLETE_ARCHITECTURE_REVIEW_REQUIRED_01, REMAINING_JOURNEY_SHARED_PREREQUISITE_REVIEW_01,
+CURRENT_JOB_PRESERVE_01.
+
+**Control-plane root cause (class F):** After Step7 HTTP request transitioned the job to
+`shadow_restore_pending`, `run_worker` re-called `assert_step7_mutation_ready`, which
+treated own PENDING as `STEP7_ACTIVE_ATTEMPT_EXISTS` («توجد محاولة أخرى نشطة…») — false
+ACTIVE. Genuine ACTIVE is claim/mutex + PID/grace only (class A). Install/materialize
+mutex is a separate channel. Duplicate click returns the same `attempt_id` (idempotent).
+
+**Architecture selection (inventory → one):**
+- A country CRP C6/C7 — rejected for Full Step7 (country packages only).
+- B dedicated `ORANGE_RESTORE_STAGING_DB*` — rejected (Owner manual GRANT/env).
+- **C private MySQL instance (selected)** — application-owned private shadow engine;
+  no Production CREATE DATABASE; no Owner manual.
+
+**تنفيذ:**
+- `includes/backup/restore/restore_center_orchestrator.php` — claim-based ACTIVE;
+  no post-request mutation_ready re-assert; idempotent same-attempt on duplicate.
+- `includes/backup/restore/restore_shadow_environment.php` — shared Steps 7–10
+  ensure/reconnect service (`C_PRIVATE_MYSQL_INSTANCE`).
+- `restore_shadow_verify.php` / `restore_shadow_smoke.php` — reconnect via shared service.
+- `admin/api/restore/list.php` + Restore Center Refresh UI — read-only reconcile;
+  categorized refresh errors; never generic «حدث خطأ غير متوقع» as sole Refresh outcome.
+- Self-test: `scripts/self_test_restore_center_step7_architecture_reset.php`
+  → evidence `D:\orange_restore_step7_architecture_reset_evidence\`.

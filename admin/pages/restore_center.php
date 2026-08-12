@@ -1273,7 +1273,12 @@ body.rc-modal-open{overflow:hidden!important}
     async function apiGet(path) {
         const r = await fetch(API_BASE + '/' + path, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
         const j = await parseApiJsonResponse(r);
-        if (!j.success && r.status >= 400) throw new Error(operatorMessage(j.message || 'فشل الطلب'));
+        if (!j.success && r.status >= 400) {
+            const err = new Error(operatorMessage(j.message || 'فشل الطلب'));
+            err.code = j.code || '';
+            err.refresh_error_category = j.refresh_error_category || '';
+            throw err;
+        }
         return j;
     }
 
@@ -3140,6 +3145,24 @@ body.rc-modal-open{overflow:hidden!important}
         }
     }
 
+    function refreshErrorMessage(err) {
+        const raw = String((err && err.message) || '').trim();
+        const cat = String((err && err.refresh_error_category) || '').trim();
+        if (cat === 'refresh_auth') {
+            return 'تعذر تحديث الحالة بسبب جلسة أو صلاحية. أعد تسجيل الدخول ثم حدّث.';
+        }
+        if (cat === 'refresh_work_root') {
+            return 'تعذر تحديث الحالة لأن مجلد عمل الاسترداد غير متاح.';
+        }
+        if (cat === 'refresh_step7_state') {
+            return 'تعذر مزامنة حالة خطوة استعادة قاعدة الظل. حدّث مرة أخرى دون إلغاء المهمة.';
+        }
+        if (!raw || raw === 'حدث خطأ غير متوقع' || raw === 'تعذر تنفيذ العملية.') {
+            return 'تعذر تحديث حالة مركز الاسترداد. أعد المحاولة دون إلغاء المهمة.';
+        }
+        return raw;
+    }
+
     async function loadAll() {
         setBusy(true, 'جاري تحميل البيانات…');
         try {
@@ -3159,7 +3182,7 @@ body.rc-modal-open{overflow:hidden!important}
                 renderCertification({ available: false, message: (certErr && certErr.message) ? certErr.message : 'تعذر تحميل الشهادة' });
             }
         } catch (e) {
-            showRcTerminalMessage(e.message || 'تعذر التحميل', false);
+            showRcTerminalMessage(refreshErrorMessage(e), false, null, 'refresh:' + String((e && e.refresh_error_category) || 'refresh_unexpected'));
         } finally {
             setBusy(false);
         }

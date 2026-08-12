@@ -1539,10 +1539,19 @@ function orange_restore_shadow_smoke_execute_pipeline(
 ): array {
     unset($backupRoot);
     $env = orange_backup_load_env_array($projectRoot);
+    if (!function_exists('orange_restore_shadow_environment_ensure')) {
+        require_once __DIR__ . '/restore_shadow_environment.php';
+    }
+    $ensured = orange_restore_shadow_environment_ensure($projectRoot, $workRoot, $jobId, true);
+    if (empty($ensured['ok'])) {
+        throw new RuntimeException(
+            (string) ($ensured['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY)
+        );
+    }
     $shadowMeta = function_exists('orange_restore_shadow_load_meta')
         ? orange_restore_shadow_load_meta($workRoot, $jobId)
         : null;
-    $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+    $shadowDb = trim((string) ($ensured['shadow_db'] ?? (($shadowMeta['shadow_db'] ?? '') ?: '')));
     if ($shadowDb === '') {
         $shadowDb = orange_restore_shadow_db_name($env, $projectRoot, $jobId, is_array($shadowMeta) ? $shadowMeta : null);
     }
@@ -1563,7 +1572,7 @@ function orange_restore_shadow_smoke_execute_pipeline(
 
     orange_restore_shadow_context_begin($jobId, $shadowDb, $workspace, $productionDb);
 
-    $pdoRaw = orange_restore_shadow_connect_pdo($projectRoot, $env, $shadowDb);
+    $pdoRaw = orange_restore_shadow_environment_connect_pdo($projectRoot, $workRoot, $jobId, true);
     $guard = new OrangeRestoreShadowPdoGuard($pdoRaw);
     $pdo = $guard; // use guard methods
 
