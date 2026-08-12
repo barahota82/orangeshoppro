@@ -80,47 +80,157 @@ function orange_restore_private_engine_classify_db_host(string $projectRoot): ar
 }
 
 /**
+ * Probe-create a candidate tools root (outside webroot, writable). Null on failure.
+ */
+function orange_restore_private_engine_try_prepare_tools_root(string $root): ?string
+{
+    $root = orange_backup_normalize_directory_path(trim($root));
+    if ($root === '') {
+        return null;
+    }
+    try {
+        orange_backup_assert_outside_web_root($root);
+    } catch (Throwable) {
+        return null;
+    }
+    if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
+        return null;
+    }
+    if (!is_writable($root)) {
+        return null;
+    }
+    $probe = $root . DIRECTORY_SEPARATOR . '.orange_runtime_write_probe';
+    if (@file_put_contents($probe, 'ok', LOCK_EX) === false) {
+        return null;
+    }
+    @unlink($probe);
+
+    return realpath($root) ?: $root;
+}
+
+/**
+ * Ordered tools-root candidates (env → backup-root sibling → work-root sibling → drive/project parent).
+ *
+ * @return list<string>
+ */
+function orange_restore_private_engine_tools_root_candidates(string $projectRoot, ?array $env = null): array
+{
+    $env = $env ?? orange_backup_load_env_array($projectRoot);
+    $out = [];
+    $configured = trim((string) ($env['ORANGE_RESTORE_PRIVATE_TOOLS_DIR'] ?? ''));
+    if ($configured !== '') {
+        $out[] = orange_backup_normalize_directory_path($configured);
+    }
+    try {
+        $backupRoot = orange_backup_resolve_root($env);
+        $out[] = dirname($backupRoot) . DIRECTORY_SEPARATOR . 'orange_restore_private_tools';
+    } catch (Throwable) {
+        // continue
+    }
+    try {
+        if (!function_exists('orange_restore_resolve_work_root')) {
+            require_once __DIR__ . '/restore_paths.php';
+        }
+        $workRoot = orange_restore_resolve_work_root($env);
+        $out[] = dirname($workRoot) . DIRECTORY_SEPARATOR . 'orange_restore_private_tools';
+    } catch (Throwable) {
+        // continue
+    }
+    $projectReal = realpath($projectRoot) ?: $projectRoot;
+    $drive = preg_match('/^([A-Za-z]:)/', $projectReal, $m) ? $m[1] : '';
+    if ($drive !== '') {
+        $out[] = $drive . DIRECTORY_SEPARATOR . 'orange_restore_private_tools';
+    }
+    $out[] = dirname($projectReal) . DIRECTORY_SEPARATOR . 'orange_restore_private_tools';
+
+    $unique = [];
+    foreach ($out as $cand) {
+        $norm = strtolower(str_replace('\\', '/', orange_backup_normalize_directory_path($cand)));
+        if ($norm === '' || isset($unique[$norm])) {
+            continue;
+        }
+        $unique[$norm] = orange_backup_normalize_directory_path($cand);
+    }
+
+    return array_values($unique);
+}
+
+/**
+ * Zero-mutation tools-root readiness (no download). Does not throw.
+ *
+ * @return array{ok:bool,code:string,writable:bool}
+ */
+function orange_restore_private_engine_tools_root_probe(string $projectRoot, ?array $env = null): array
+{
+    if (isset($GLOBALS['orange_restore_private_engine_tools_root_override'])
+        && is_string($GLOBALS['orange_restore_private_engine_tools_root_override'])
+        && trim($GLOBALS['orange_restore_private_engine_tools_root_override']) !== '') {
+        $got = orange_restore_private_engine_try_prepare_tools_root(
+            trim($GLOBALS['orange_restore_private_engine_tools_root_override'])
+        );
+        if ($got !== null) {
+            return ['ok' => true, 'code' => 'ok', 'writable' => true];
+        }
+
+        return [
+            'ok' => false,
+            'code' => defined('ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY')
+                ? ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+                : 'STEP7_PRIVATE_TOOLS_ROOT_NOT_READY',
+            'writable' => false,
+        ];
+    }
+
+    foreach (orange_restore_private_engine_tools_root_candidates($projectRoot, $env) as $cand) {
+        if (orange_restore_private_engine_try_prepare_tools_root($cand) !== null) {
+            return ['ok' => true, 'code' => 'ok', 'writable' => true];
+        }
+    }
+
+    return [
+        'ok' => false,
+        'code' => defined('ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY')
+            ? ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+            : 'STEP7_PRIVATE_TOOLS_ROOT_NOT_READY',
+        'writable' => false,
+    ];
+}
+
+/**
  * Resolve shared private tools root (outside webroot / backups snapshots).
+ * Prefers a writable sibling of BackupRoot/restore_work (Plesk-safe) over bare drive root.
  */
 function orange_restore_private_engine_tools_root(string $projectRoot, ?array $env = null): string
 {
     if (isset($GLOBALS['orange_restore_private_engine_tools_root_override'])
         && is_string($GLOBALS['orange_restore_private_engine_tools_root_override'])
         && trim($GLOBALS['orange_restore_private_engine_tools_root_override']) !== '') {
-        $root = orange_backup_normalize_directory_path(
+        $got = orange_restore_private_engine_try_prepare_tools_root(
             trim($GLOBALS['orange_restore_private_engine_tools_root_override'])
         );
-        orange_backup_assert_outside_web_root($root);
-        if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
-            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+        if ($got === null) {
+            throw new RuntimeException(
+                defined('ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY')
+                    ? ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+                    : ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED
+            );
         }
 
-        return realpath($root) ?: $root;
+        return $got;
     }
 
-    $env = $env ?? orange_backup_load_env_array($projectRoot);
-    $configured = trim((string) ($env['ORANGE_RESTORE_PRIVATE_TOOLS_DIR'] ?? ''));
-    if ($configured !== '') {
-        $root = orange_backup_normalize_directory_path($configured);
-        orange_backup_assert_outside_web_root($root);
-        if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
-            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+    foreach (orange_restore_private_engine_tools_root_candidates($projectRoot, $env) as $cand) {
+        $got = orange_restore_private_engine_try_prepare_tools_root($cand);
+        if ($got !== null) {
+            return $got;
         }
-
-        return realpath($root) ?: $root;
     }
 
-    $projectReal = realpath($projectRoot) ?: $projectRoot;
-    $drive = preg_match('/^([A-Za-z]:)/', $projectReal, $m) ? $m[1] : '';
-    $root = $drive !== ''
-        ? ($drive . DIRECTORY_SEPARATOR . 'orange_restore_private_tools')
-        : (dirname($projectReal) . DIRECTORY_SEPARATOR . 'orange_restore_private_tools');
-    orange_backup_assert_outside_web_root($root);
-    if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
-        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
-    }
-
-    return realpath($root) ?: $root;
+    throw new RuntimeException(
+        defined('ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY')
+            ? ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+            : ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED
+    );
 }
 
 /**

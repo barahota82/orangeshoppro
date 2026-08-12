@@ -1393,8 +1393,13 @@ body.rc-modal-open{overflow:hidden!important}
             const tokenLabel = readyControlled
                 ? 'READY_FOR_CONTROLLED_STEP7_ATTEMPT'
                 : (readyProvision ? 'READY_FOR_PRIVATE_SHADOW_PROVISIONING' : (token || 'NOT_READY'));
-            const cap = readiness ? String(readiness.database_capability || 'unavailable') : 'unavailable';
+            const privateCap = readiness
+                ? String(readiness.private_capability
+                    || (readiness.private_engine && readiness.private_engine.private_capability)
+                    || 'unavailable')
+                : 'unavailable';
             const match = readiness ? !!readiness.parent_worker_target_identity_match : false;
+            const runtimeMatch = readiness ? !!readiness.parent_worker_runtime_identity_match : match;
             const runtimeSource = readiness
                 ? String(readiness.runtime_source || (readiness.private_engine && readiness.private_engine.runtime_source) || 'unavailable')
                 : 'unavailable';
@@ -1402,17 +1407,24 @@ body.rc-modal-open{overflow:hidden!important}
                 || (readiness.private_engine && readiness.private_engine.runtime_verified)));
             const runtimeCompatible = !!(readiness && (readiness.runtime_compatible
                 || (readiness.private_engine && readiness.private_engine.runtime_compatible)));
+            const toolsReady = !!(readiness && (readiness.tools_root_ready
+                || (readiness.private_engine && readiness.private_engine.tools_root_ready)));
             const hostCat = readiness
                 ? String(readiness.db_host_category || (readiness.private_engine && readiness.private_engine.db_host_category) || 'UNKNOWN')
                 : 'UNKNOWN';
+            const actionEnabled = !!(readiness && readiness.step7_action_enabled)
+                || readyControlled || readyProvision;
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
                 + '<li><strong>' + esc(tokenLabel) + '</strong></li>'
-                + '<li>قدرة قاعدة البيانات: ' + esc(cap === 'available' ? 'available' : 'unavailable') + '</li>'
+                + '<li>قدرة المحرك الخاص: ' + esc(privateCap) + '</li>'
                 + '<li>تطابق هدف الأب/العامل: ' + (match ? 'نعم' : 'لا') + '</li>'
+                + '<li>تطابق محرك الأب/العامل: ' + (runtimeMatch ? 'نعم' : 'لا') + '</li>'
                 + '<li>المصدر: ' + esc((readiness && readiness.source) ? String(readiness.source) : '—') + '</li>'
                 + '<li>مصدر المحرك: ' + esc(runtimeSource) + '</li>'
                 + '<li>المحرك موثّق: ' + (runtimeVerified ? 'نعم' : 'لا') + '</li>'
                 + '<li>المحرك متوافق: ' + (runtimeCompatible ? 'نعم' : 'لا') + '</li>'
+                + '<li>جذر الأدوات جاهز: ' + (toolsReady ? 'نعم' : 'لا') + '</li>'
+                + '<li>زر الخطوة مفعّل: ' + (actionEnabled ? 'نعم' : 'لا') + '</li>'
                 + '<li>فئة مضيف قاعدة الإنتاج: ' + esc(hostCat) + '</li>'
                 + '</ul>';
         }
@@ -2898,10 +2910,30 @@ body.rc-modal-open{overflow:hidden!important}
             html += '<button type="button" class="btn-link rc-pre-backup-view" data-id="' + id + '">عرض حالة النسخة الاحتياطية</button> ';
         }
         if (job.shadow_restore_requestable) {
-            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">تنفيذ استعادة قاعدة الظل</button> ';
+            const step7Ready = !!(job.step7_action_enabled
+                || job.ready_for_private_shadow_provisioning
+                || job.ready_for_controlled_step7_attempt
+                || job.step7_ready_token === 'READY_FOR_PRIVATE_SHADOW_PROVISIONING'
+                || job.step7_ready_token === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT');
+            if (step7Ready) {
+                html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">تنفيذ استعادة قاعدة الظل</button> ';
+            } else {
+                html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id
+                    + '" disabled aria-disabled="true" title="الجاهزية NOT_READY — لا يُنشأ طلب جديد">تنفيذ استعادة قاعدة الظل (غير جاهز)</button> ';
+            }
         }
         if (job.is_shadow_restore_failed) {
-            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">إعادة محاولة استعادة قاعدة الظل</button> ';
+            const step7RetryReady = !!(job.step7_action_enabled
+                || job.ready_for_private_shadow_provisioning
+                || job.ready_for_controlled_step7_attempt
+                || job.step7_ready_token === 'READY_FOR_PRIVATE_SHADOW_PROVISIONING'
+                || job.step7_ready_token === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT');
+            if (step7RetryReady) {
+                html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">إعادة محاولة استعادة قاعدة الظل</button> ';
+            } else {
+                html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id
+                    + '" disabled aria-disabled="true" title="الجاهزية NOT_READY — لا يُنشأ طلب جديد">إعادة محاولة استعادة قاعدة الظل (غير جاهز)</button> ';
+            }
         }
         if (job.status === 'shadow_restore_pending'
             || job.status === 'shadow_restore_running'

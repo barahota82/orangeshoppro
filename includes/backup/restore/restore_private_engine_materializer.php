@@ -23,6 +23,8 @@ require_once __DIR__ . '/restore_private_engine_local_discovery.php';
  *   channel:string,
  *   materializable:bool,
  *   code:string,
+ *   tools_root_ready:bool,
+ *   https_pinned:bool,
  *   manifest_summary:array<string,mixed>
  * }
  */
@@ -30,49 +32,69 @@ function orange_restore_private_engine_runtime_channel_probe(string $projectRoot
 {
     $summary = orange_restore_private_engine_runtime_manifest_public_summary();
     $manifest = orange_restore_private_engine_runtime_manifest_for_platform();
+    $toolsProbe = orange_restore_private_engine_tools_root_probe($projectRoot);
+    $toolsReady = !empty($toolsProbe['ok']);
     if (!is_array($manifest) || empty($summary['sha256_pinned'])) {
         return [
             'ok' => false,
             'channel' => 'none',
             'materializable' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE,
+            'tools_root_ready' => $toolsReady,
+            'https_pinned' => false,
             'manifest_summary' => $summary,
         ];
     }
 
-    // A/B: local artifact already present under tools root (vendor-assets or release cache).
-    try {
-        $tools = orange_restore_private_engine_tools_root($projectRoot);
-    } catch (Throwable) {
-        return [
-            'ok' => false,
-            'channel' => 'none',
-            'materializable' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE,
-            'manifest_summary' => $summary,
-        ];
-    }
-    $artifact = orange_restore_private_engine_find_local_artifact($tools, $manifest);
-    if ($artifact !== null) {
-        return [
-            'ok' => true,
-            'channel' => (string) $artifact['channel'],
-            'materializable' => true,
-            'code' => 'ok',
-            'manifest_summary' => $summary,
-        ];
+    // A/B: local artifact already present under a writable tools root.
+    if ($toolsReady) {
+        try {
+            $tools = orange_restore_private_engine_tools_root($projectRoot);
+            $artifact = orange_restore_private_engine_find_local_artifact($tools, $manifest);
+            if ($artifact !== null) {
+                return [
+                    'ok' => true,
+                    'channel' => (string) $artifact['channel'],
+                    'materializable' => true,
+                    'code' => 'ok',
+                    'tools_root_ready' => true,
+                    'https_pinned' => true,
+                    'manifest_summary' => $summary,
+                ];
+            }
+        } catch (Throwable) {
+            $toolsReady = false;
+        }
     }
 
     $url = trim((string) ($manifest['official_https_url'] ?? ''));
     $parts = @parse_url($url);
     $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
     $scheme = is_array($parts) ? strtolower((string) ($parts['scheme'] ?? '')) : '';
-    if ($scheme !== 'https' || !orange_restore_private_engine_runtime_host_allowed($host)) {
+    $httpsPinned = $scheme === 'https' && orange_restore_private_engine_runtime_host_allowed($host);
+    if (!$httpsPinned) {
         return [
             'ok' => false,
             'channel' => 'none',
             'materializable' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE,
+            'tools_root_ready' => $toolsReady,
+            'https_pinned' => false,
+            'manifest_summary' => $summary,
+        ];
+    }
+
+    // HTTPS channel is pinned; materializable only when tools root can receive the artifact.
+    if (!$toolsReady) {
+        return [
+            'ok' => false,
+            'channel' => 'pinned_https_first_use',
+            'materializable' => false,
+            'code' => defined('ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY')
+                ? ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+                : ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE,
+            'tools_root_ready' => false,
+            'https_pinned' => true,
             'manifest_summary' => $summary,
         ];
     }
@@ -82,6 +104,8 @@ function orange_restore_private_engine_runtime_channel_probe(string $projectRoot
         'channel' => 'pinned_https_first_use',
         'materializable' => true,
         'code' => 'ok',
+        'tools_root_ready' => true,
+        'https_pinned' => true,
         'manifest_summary' => $summary,
     ];
 }

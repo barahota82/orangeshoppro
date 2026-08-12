@@ -627,5 +627,12 @@ No Production MySQL CREATE DATABASE / privilege provisioning required.
   current cause; distinct `STEP7_PRIVATE_ENGINE_*` codes; tracks PHP worker PID and
   private engine PID separately.
 - Self-tests: `scripts/self_test_restore_center_step7_private_shadow_engine.php`,
-  `scripts/self_test_restore_center_step7_engine_supply.php`.
+  `scripts/self_test_restore_center_step7_engine_supply.php`,
+  `scripts/self_test_restore_center_step7_runtime_supply_closure.php`.
 - License notice: `docs/backup/THIRD_PARTY_NOTICES_RESTORE_PRIVATE_ENGINE.txt`.
+- Readiness closure (Owner 2026-08-12): tools root prefers BackupRoot/work-root
+  siblings (writable outside webroot); private_capability replaces unexplained
+  Production `database_capability` gate; Step7 mutation rejected when readiness
+  is NOT_READY (`STEP7_NOT_READY_MUTATION_REJECTED`) even if state-requestable;
+  exact non-green codes include `STEP7_PRIVATE_TOOLS_ROOT_NOT_READY` and
+  `STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE`.

@@ -49,6 +49,16 @@ const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED = 'STEP7_PRIVATE_E
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED = 'STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED = 'STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE = 'STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE = 'STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_ARTIFACT_UNREACHABLE = 'STEP7_PRIVATE_RUNTIME_ARTIFACT_UNREACHABLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_CHECKSUM_FAILED = 'STEP7_PRIVATE_RUNTIME_CHECKSUM_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_INCOMPATIBLE = 'STEP7_PRIVATE_RUNTIME_INCOMPATIBLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY = 'STEP7_PRIVATE_TOOLS_ROOT_NOT_READY';
+const ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_EXECUTION_UNAVAILABLE = 'STEP7_PRIVATE_PROCESS_EXECUTION_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_OWNERSHIP_CONFLICT = 'STEP7_PRIVATE_OWNERSHIP_CONFLICT';
+const ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH = 'STEP7_PARENT_WORKER_IDENTITY_MISMATCH';
+const ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN = 'STEP7_PRIVATE_READINESS_UNKNOWN';
+const ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED = 'STEP7_NOT_READY_MUTATION_REJECTED';
 
 // Supply-chain helpers (after constants — avoid circular redefinition).
 require_once __DIR__ . '/restore_private_engine_runtime_manifest.php';
@@ -75,6 +85,16 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED => 'تعذر توريد محرك قاعدة الظل المحمول الموثوق. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED => 'فشل التحقق من سلامة حزمة محرك قاعدة الظل. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE => 'لا تتوفر قناة آمنة لتوريد محرك قاعدة الظل على هذا الخادم. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE => 'مصدر محرك قاعدة الظل الخاص غير متاح حالياً. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_ARTIFACT_UNREACHABLE => 'تعذر الوصول إلى حزمة محرك قاعدة الظل المحمولة الموثوقة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_CHECKSUM_FAILED => 'فشل التحقق من سلامة حزمة محرك قاعدة الظل. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_INCOMPATIBLE => 'حزمة محرك قاعدة الظل غير متوافقة مع هذا الخادم. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY => 'مجلد أدوات محرك الظل الخاص غير جاهز أو غير قابل للكتابة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_EXECUTION_UNAVAILABLE => 'تعذر تشغيل عملية محرك قاعدة الظل الخاص على الخادم. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_OWNERSHIP_CONFLICT => 'تعارض ملكية لمحرك قاعدة الظل الخاص. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH => 'عدم تطابق هوية الهدف/المحرك بين الأب والعامل. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN => 'جاهزية محرك قاعدة الظل الخاص غير مؤكدة. حدّث الحالة ثم أعد المحاولة.',
+        ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED => 'خطوة استعادة قاعدة الظل غير جاهزة للتنفيذ. حدّث الجاهزية ولا تُنشأ محاولة جديدة.',
         ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING => 'الجاهزية: يمكن تجهيز محرك قاعدة الظل الخاص عند الضغط على خطوة استعادة قاعدة الظل.',
     ];
 
@@ -376,15 +396,27 @@ function orange_restore_private_engine_resolve_runtime(
             'source' => 'materializable_portable',
             'family' => (string) (($probe['manifest_summary']['family'] ?? '') ?: ''),
             'version_prefix' => (string) (($probe['manifest_summary']['version'] ?? '') ?: ''),
+            'tools_root_ready' => !empty($probe['tools_root_ready']),
+            'https_pinned' => !empty($probe['https_pinned']),
         ]);
+    }
+
+    $failCode = (string) ($probe['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE);
+    if ($failCode === '' || $failCode === 'ok') {
+        $failCode = ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE;
+    }
+    if (!empty($probe['https_pinned']) && empty($probe['tools_root_ready'])) {
+        $failCode = ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY;
+    } elseif (empty($probe['https_pinned']) && empty($probe['ok'])) {
+        $failCode = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE;
     }
 
     return array_merge($base, [
         'materializable' => false,
         'channel' => (string) ($probe['channel'] ?? 'none'),
-        'code' => !empty($probe['ok'])
-            ? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE
-            : (string) ($probe['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE),
+        'code' => $failCode,
+        'tools_root_ready' => !empty($probe['tools_root_ready']),
+        'https_pinned' => !empty($probe['https_pinned']),
     ]);
 }
 
@@ -694,6 +726,24 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
 }
 
 /**
+ * Whether this PHP SAPI can spawn a private engine child process (zero-mutation check).
+ */
+function orange_restore_private_engine_process_execution_available(): bool
+{
+    if (isset($GLOBALS['orange_restore_private_engine_process_execution_override'])) {
+        return (bool) $GLOBALS['orange_restore_private_engine_process_execution_override'];
+    }
+    if (!function_exists('proc_open')) {
+        return false;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        return true;
+    }
+
+    return is_executable('/bin/sh') || is_executable('/usr/bin/env');
+}
+
+/**
  * Zero-mutation preflight: resolve runtime source (no download/datadir/credentials).
  *
  * @return array{
@@ -709,6 +759,9 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
  *   channel:string,
  *   db_host_category:string,
  *   runtime_compatible:bool,
+ *   tools_root_ready:bool,
+ *   process_execution_available:bool,
+ *   private_capability:string,
  *   manifest:array<string,mixed>
  * }
  */
@@ -722,6 +775,10 @@ function orange_restore_private_engine_preflight(
     $binaryOk = !empty($discovered['ok']);
     $sourceReady = $binaryOk || $materializable;
     $manifest = orange_restore_private_engine_runtime_manifest_public_summary();
+    $toolsProbe = orange_restore_private_engine_tools_root_probe($projectRoot);
+    $toolsReady = !empty($toolsProbe['ok']) || !empty($discovered['tools_root_ready']);
+    $procOk = orange_restore_private_engine_process_execution_available();
+    $runtimeCompatible = !empty($manifest['sha256_pinned']) || $binaryOk;
     $runtimeSource = 'unavailable';
     if ($binaryOk) {
         $src = (string) ($discovered['source'] ?? '');
@@ -738,22 +795,54 @@ function orange_restore_private_engine_preflight(
         $runtimeSource = 'materializable_portable';
     }
 
+    $baseFail = [
+        'ok' => false,
+        'ready_token' => '',
+        'binary_available' => false,
+        'engine_ready' => false,
+        'family' => (string) ($discovered['family'] ?? ($manifest['family'] ?? '')),
+        'shadow_db_identity_hash' => '',
+        'runtime_source' => 'unavailable',
+        'materializable' => false,
+        'channel' => (string) ($discovered['channel'] ?? 'none'),
+        'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+        'runtime_compatible' => $runtimeCompatible,
+        'tools_root_ready' => $toolsReady,
+        'process_execution_available' => $procOk,
+        'private_capability' => 'unavailable',
+        'manifest' => $manifest,
+    ];
+
+    if (!$runtimeCompatible) {
+        return array_merge($baseFail, [
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_INCOMPATIBLE,
+        ]);
+    }
+    if (!$procOk) {
+        return array_merge($baseFail, [
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_EXECUTION_UNAVAILABLE,
+            'runtime_source' => $runtimeSource !== 'unavailable' ? $runtimeSource : 'unavailable',
+        ]);
+    }
     if (!$sourceReady) {
-        return [
-            'ok' => false,
-            'code' => (string) ($discovered['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE),
-            'ready_token' => '',
-            'binary_available' => false,
-            'engine_ready' => false,
-            'family' => (string) ($discovered['family'] ?? ($manifest['family'] ?? '')),
-            'shadow_db_identity_hash' => '',
-            'runtime_source' => 'unavailable',
-            'materializable' => false,
+        $code = (string) ($discovered['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE);
+        if ($code === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE;
+        }
+
+        return array_merge($baseFail, [
+            'code' => $code,
             'channel' => (string) ($discovered['channel'] ?? 'none'),
-            'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
-            'runtime_compatible' => !empty($manifest['sha256_pinned']),
-            'manifest' => $manifest,
-        ];
+            'tools_root_ready' => $toolsReady,
+        ]);
+    }
+    if ($materializable && !$binaryOk && !$toolsReady) {
+        return array_merge($baseFail, [
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY,
+            'runtime_source' => 'materializable_portable',
+            'materializable' => false,
+            'channel' => (string) ($discovered['channel'] ?? 'pinned_https_first_use'),
+        ]);
     }
 
     $state = orange_restore_private_engine_load_state($workRoot, $jobId);
@@ -775,6 +864,9 @@ function orange_restore_private_engine_preflight(
             'channel' => (string) ($discovered['channel'] ?? ''),
             'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
             'runtime_compatible' => true,
+            'tools_root_ready' => $toolsReady,
+            'process_execution_available' => true,
+            'private_capability' => 'available',
             'manifest' => $manifest,
         ];
     }
@@ -793,7 +885,10 @@ function orange_restore_private_engine_preflight(
         'materializable' => $materializable,
         'channel' => (string) ($discovered['channel'] ?? ''),
         'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
-        'runtime_compatible' => !empty($manifest['sha256_pinned']) || $binaryOk,
+        'runtime_compatible' => true,
+        'tools_root_ready' => $toolsReady || $binaryOk,
+        'process_execution_available' => true,
+        'private_capability' => $materializable && !$binaryOk ? 'materializable' : 'runtime_present',
         'manifest' => $manifest,
     ];
 }
@@ -1249,6 +1344,13 @@ function orange_restore_private_engine_public_readiness(
     $pre = orange_restore_private_engine_preflight($projectRoot, $workRoot, $jobId);
     $manifest = is_array($pre['manifest'] ?? null) ? $pre['manifest'] : [];
 
+    $privateCap = (string) ($pre['private_capability'] ?? 'unavailable');
+    if ($privateCap === '' || ($privateCap === 'unavailable' && !empty($pre['ok']))) {
+        $privateCap = !empty($pre['engine_ready'])
+            ? 'available'
+            : (!empty($pre['materializable']) ? 'materializable' : (!empty($pre['binary_available']) ? 'runtime_present' : 'unavailable'));
+    }
+
     return [
         'binary_available' => !empty($pre['binary_available']),
         'engine_ready' => !empty($pre['engine_ready']),
@@ -1264,11 +1366,15 @@ function orange_restore_private_engine_public_readiness(
         'runtime_verified' => in_array((string) ($pre['runtime_source'] ?? ''), [
             'verified_portable_artifact',
             'verified_local_service_binary',
+            'materializable_portable',
         ], true) || !empty($pre['engine_ready']),
         'runtime_compatible' => !empty($pre['runtime_compatible']),
         'materializable' => !empty($pre['materializable']),
         'channel' => (string) ($pre['channel'] ?? 'none'),
         'db_host_category' => (string) ($pre['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+        'tools_root_ready' => !empty($pre['tools_root_ready']),
+        'process_execution_available' => !empty($pre['process_execution_available']),
+        'private_capability' => $privateCap,
         'runtime_vendor' => (string) ($manifest['vendor'] ?? ''),
         'runtime_version' => (string) ($manifest['version'] ?? ''),
         'sha256_pinned' => !empty($manifest['sha256_pinned']),

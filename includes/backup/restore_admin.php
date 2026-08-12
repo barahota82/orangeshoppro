@@ -786,6 +786,12 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
     if ($workRoot === '' || !is_dir($workRoot)) {
         return [];
     }
+    $projectRoot = function_exists('orange_backup_project_root')
+        ? orange_backup_project_root()
+        : dirname(__DIR__, 2);
+    if (!function_exists('orange_restore_private_engine_public_readiness')) {
+        require_once __DIR__ . '/restore/restore_private_shadow_engine.php';
+    }
     $rows = [];
     foreach (orange_restore_fw_list_jobs($workRoot) as $row) {
         $type = (string) ($row['package_type'] ?? '');
@@ -794,6 +800,30 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
         }
         if ($type === 'country_recovery' && !$mayCountry) {
             continue;
+        }
+        // Step7-only action gate: state-requestable ≠ runtime ready.
+        if (!empty($row['shadow_restore_requestable'])) {
+            $jobId = (string) ($row['job_id'] ?? '');
+            try {
+                $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
+                $token = (string) ($engine['ready_token'] ?? '');
+                $row['step7_ready_token'] = $token;
+                $row['ready_for_private_shadow_provisioning'] = $token
+                    === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
+                $row['ready_for_controlled_step7_attempt'] = $token
+                    === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT';
+                $row['step7_action_enabled'] = $row['ready_for_private_shadow_provisioning']
+                    || $row['ready_for_controlled_step7_attempt'];
+                $row['private_capability'] = (string) ($engine['private_capability'] ?? 'unavailable');
+                $row['step7_readiness_code'] = (string) ($engine['code'] ?? '');
+            } catch (Throwable) {
+                $row['step7_ready_token'] = '';
+                $row['ready_for_private_shadow_provisioning'] = false;
+                $row['ready_for_controlled_step7_attempt'] = false;
+                $row['step7_action_enabled'] = false;
+                $row['private_capability'] = 'unavailable';
+                $row['step7_readiness_code'] = 'STEP7_PRIVATE_READINESS_UNKNOWN';
+            }
         }
         $rows[] = $row;
     }
@@ -1295,6 +1325,15 @@ function orange_restore_admin_fw_request_shadow_restore(
     if (!orange_restore_admin_may_view_full($admin, $pdo)) {
         throw new RuntimeException('Operator lacks backup_restore_full permission.');
     }
+
+    // STEP7_NOT_READY_MUTATION_POST_COUNT=0 — reject before pending/attempt.
+    if (!function_exists('orange_restore_center_assert_step7_mutation_ready')) {
+        require_once __DIR__ . '/restore/restore_center_orchestrator.php';
+    }
+    $projectRoot = function_exists('orange_backup_project_root')
+        ? orange_backup_project_root()
+        : dirname(__DIR__, 2);
+    orange_restore_center_assert_step7_mutation_ready($projectRoot, $workRoot, $jobId);
 
     return orange_restore_shadow_request($workRoot, $jobId, $backupRoot, $admin);
 }
