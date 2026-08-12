@@ -20,6 +20,7 @@ require_once __DIR__ . '/restore_pre_restore_backup.php';
 require_once __DIR__ . '/restore_staging_target.php';
 require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_package_compat.php';
+require_once __DIR__ . '/restore_private_shadow_engine.php';
 require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../backup_manifest.php';
 require_once __DIR__ . '/../backup_environment.php';
@@ -88,6 +89,11 @@ function orange_restore_shadow_operator_message_ar(string $code): string
         'package_incompatible' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. الحزمة غير متوافقة.',
     ];
 
+    if (str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')
+        || $code === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING) {
+        return orange_restore_private_engine_operator_reason_ar($code);
+    }
+
     // Never echo raw env keys / paths / SQL fragments to Owner UI.
     if (str_contains($code, 'ORANGE_RESTORE_') || str_contains($code, '.env') || str_contains($code, 'DB_')) {
         return $map[ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE];
@@ -106,6 +112,9 @@ function orange_restore_shadow_normalize_failure_code(string $code): string
     $code = trim($code);
     if ($code === '') {
         return 'shadow_restore_failed';
+    }
+    if (str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
+        return $code;
     }
     if ($code === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
         || $code === 'shadow_db_capability_unavailable') {
@@ -323,44 +332,87 @@ function orange_restore_shadow_db_name(
 }
 
 /**
- * Connection credentials for shadow ensure/connect.
- * Prefer dedicated staging user when configured and ≠ production; else trusted app DB credentials
- * (sibling schema only — never session on production).
+ * Optional job context for private shadow engine (set by Step-7 parent/worker).
  *
- * @param array<string, mixed> $env
- * @return array{host:string,user:string,pass:string,mode:string}
+ * @return array{work_root:string,job_id:string}
  */
-function orange_restore_shadow_connection_credentials(array $env, string $projectRoot): array
+function orange_restore_shadow_private_engine_context(): array
 {
-    $settings = orange_backup_load_db_settings($projectRoot);
-    $host = (string) $settings['host'];
-    $prodUser = (string) $settings['user'];
-    $prodPass = (string) $settings['pass'];
-
-    $stagingUser = trim((string) ($env[ORANGE_RESTORE_ENV_STAGING_DB_USER] ?? ''));
-    $stagingPass = (string) ($env[ORANGE_RESTORE_ENV_STAGING_DB_PASS] ?? '');
-    if ($stagingUser !== ''
-        && preg_match('/^[A-Za-z0-9_]+$/', $stagingUser) === 1
-        && strcasecmp($stagingUser, $prodUser) !== 0
-    ) {
-        return [
-            'host' => $host,
-            'user' => $stagingUser,
-            'pass' => $stagingPass,
-            'mode' => 'staging_optional',
-        ];
-    }
-
-    if ($prodUser === '') {
-        throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
+    $ctx = $GLOBALS['orange_restore_private_engine_context'] ?? null;
+    if (!is_array($ctx)) {
+        return ['work_root' => '', 'job_id' => ''];
     }
 
     return [
-        'host' => $host,
-        'user' => $prodUser,
-        'pass' => $prodPass,
-        'mode' => 'trusted_app',
+        'work_root' => trim((string) ($ctx['work_root'] ?? '')),
+        'job_id' => trim((string) ($ctx['job_id'] ?? '')),
     ];
+}
+
+/**
+ * Connection credentials for shadow ensure/connect.
+ * Authoritative path: application-owned private shadow engine (NO Production CREATE DATABASE).
+ * Legacy staging/trusted_app retained only for disposable self-test overrides.
+ *
+ * @param array<string, mixed> $env
+ * @return array{host:string,user:string,pass:string,mode:string,port?:int}
+ */
+function orange_restore_shadow_connection_credentials(array $env, string $projectRoot): array
+{
+    $ctx = orange_restore_shadow_private_engine_context();
+    if ($ctx['work_root'] !== '' && $ctx['job_id'] !== '') {
+        $priv = orange_restore_private_engine_connection_credentials($ctx['work_root'], $ctx['job_id']);
+        if (!empty($priv['ok'])) {
+            return [
+                'host' => (string) $priv['host'],
+                'user' => (string) $priv['user'],
+                'pass' => (string) $priv['pass'],
+                'mode' => 'private_shadow_engine',
+                'port' => (int) $priv['port'],
+            ];
+        }
+        // Private-engine architecture is mandatory for live Step-7 — do not fall back to Production.
+        if (empty($GLOBALS['orange_shadow_allow_legacy_production_credentials'])) {
+            throw new RuntimeException(
+                (string) ($priv['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY)
+            );
+        }
+    }
+
+    // Disposable self-test / legacy override only.
+    if (!empty($GLOBALS['orange_shadow_allow_legacy_production_credentials'])) {
+        $settings = orange_backup_load_db_settings($projectRoot);
+        $host = (string) $settings['host'];
+        $prodUser = (string) $settings['user'];
+        $prodPass = (string) $settings['pass'];
+
+        $stagingUser = trim((string) ($env[ORANGE_RESTORE_ENV_STAGING_DB_USER] ?? ''));
+        $stagingPass = (string) ($env[ORANGE_RESTORE_ENV_STAGING_DB_PASS] ?? '');
+        if ($stagingUser !== ''
+            && preg_match('/^[A-Za-z0-9_]+$/', $stagingUser) === 1
+            && strcasecmp($stagingUser, $prodUser) !== 0
+        ) {
+            return [
+                'host' => $host,
+                'user' => $stagingUser,
+                'pass' => $stagingPass,
+                'mode' => 'staging_optional',
+            ];
+        }
+
+        if ($prodUser === '') {
+            throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
+        }
+
+        return [
+            'host' => $host,
+            'user' => $prodUser,
+            'pass' => $prodPass,
+            'mode' => 'trusted_app',
+        ];
+    }
+
+    throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY);
 }
 
 function orange_restore_shadow_bootstrap_ack_path(string $workRoot, string $jobId): string
@@ -542,6 +594,102 @@ function orange_restore_shadow_probe_target_readiness(
         }
     }
 
+    // Private-engine path (authoritative): capability proven on loopback private instance only.
+    $ctx = orange_restore_shadow_private_engine_context();
+    if ($ctx['work_root'] !== '' && $ctx['job_id'] !== '') {
+        try {
+            if (orange_restore_private_engine_runtime_healthy($ctx['work_root'], $ctx['job_id'])) {
+                $creds = orange_restore_shadow_connection_credentials($env, $projectRoot);
+                $port = (int) ($creds['port'] ?? 0);
+                $dsn = 'mysql:host=' . $creds['host']
+                    . ($port > 0 ? ';port=' . (string) $port : '')
+                    . ';charset=utf8mb4';
+                $pdo = new PDO($dsn, $creds['user'], $creds['pass'], [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                ]);
+                $st = $pdo->prepare(
+                    'SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1'
+                );
+                $st->execute([$shadowDb]);
+                $exists = (string) ($st->fetchColumn() ?: '') !== '';
+                if (!$exists) {
+                    return [
+                        'ok' => false,
+                        'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+                        'source' => (string) $resolved['source'],
+                        'credential_mode' => 'private_shadow_engine',
+                        'can_create' => false,
+                        'can_use' => false,
+                        'schema_exists' => false,
+                        'database_capability' => 'unavailable',
+                        'privilege_classes' => ['PRIVATE_ENGINE_SCHEMA_MISSING'],
+                        'shadow_db_identity_hash' => $identity,
+                    ];
+                }
+
+                return [
+                    'ok' => true,
+                    'code' => 'ok',
+                    'source' => (string) $resolved['source'],
+                    'credential_mode' => 'private_shadow_engine',
+                    'can_create' => true,
+                    'can_use' => true,
+                    'schema_exists' => true,
+                    'database_capability' => 'available',
+                    'privilege_classes' => ['PRIVATE_ENGINE_RUNTIME'],
+                    'shadow_db_identity_hash' => $identity,
+                ];
+            }
+
+            return [
+                'ok' => false,
+                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+                'source' => (string) $resolved['source'],
+                'credential_mode' => 'private_shadow_engine',
+                'can_create' => false,
+                'can_use' => false,
+                'schema_exists' => false,
+                'database_capability' => 'unavailable',
+                'privilege_classes' => [],
+                'shadow_db_identity_hash' => $identity,
+            ];
+        } catch (Throwable $e) {
+            $safe = orange_restore_shadow_normalize_failure_code(trim($e->getMessage()));
+
+            return [
+                'ok' => false,
+                'code' => str_starts_with($safe, 'STEP7_PRIVATE_ENGINE_')
+                    ? $safe
+                    : ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+                'source' => (string) $resolved['source'],
+                'credential_mode' => 'private_shadow_engine',
+                'can_create' => false,
+                'can_use' => false,
+                'schema_exists' => false,
+                'database_capability' => 'unavailable',
+                'privilege_classes' => [],
+                'shadow_db_identity_hash' => $identity,
+            ];
+        }
+    }
+
+    // Legacy Production GRANT probe — disposable self-tests only.
+    if (empty($GLOBALS['orange_shadow_allow_legacy_production_credentials'])) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+            'source' => (string) $resolved['source'],
+            'credential_mode' => '',
+            'can_create' => false,
+            'can_use' => false,
+            'schema_exists' => false,
+            'database_capability' => 'unavailable',
+            'privilege_classes' => [],
+            'shadow_db_identity_hash' => $identity,
+        ];
+    }
+
     try {
         $creds = orange_restore_shadow_connection_credentials($env, $projectRoot);
         $dsn = 'mysql:host=' . $creds['host'] . ';charset=utf8mb4';
@@ -551,7 +699,6 @@ function orange_restore_shadow_probe_target_readiness(
         ]);
         $pdo->exec('SET NAMES utf8mb4');
 
-        // Read-only: does sibling schema already exist?
         $st = $pdo->prepare('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1');
         $st->execute([$shadowDb]);
         $exists = (string) ($st->fetchColumn() ?: '') !== '';
@@ -590,9 +737,7 @@ function orange_restore_shadow_probe_target_readiness(
         $eval = orange_restore_shadow_evaluate_grant_capability($grantLines, $shadowDb);
         $canCreate = !empty($eval['can_create']);
         $canUse = $exists ? !empty($eval['can_use_existing']) : $canCreate;
-        // If schema exists, prove USE via information_schema only (no USE/CREATE).
         if ($exists && !$canUse) {
-            // Presence in SCHEMATA under current login often implies visibility; still require grant class.
             $canUse = false;
         }
         $ok = ($exists && $canUse) || (!$exists && $canCreate);
@@ -1254,7 +1399,20 @@ function orange_restore_shadow_ensure_database(string $projectRoot, array $env, 
 
     try {
         $creds = orange_restore_shadow_connection_credentials($env, $projectRoot);
-        $dsn = 'mysql:host=' . $creds['host'] . ';charset=utf8mb4';
+        // NO_PRODUCTION_MYSQL_PROVISIONING_01 — private engine only unless legacy test flag.
+        if (($creds['mode'] ?? '') !== 'private_shadow_engine'
+            && empty($GLOBALS['orange_shadow_allow_legacy_production_credentials'])) {
+            return [
+                'ok' => false,
+                'created' => false,
+                'shadow_db' => $shadowDb,
+                'message' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+            ];
+        }
+        $port = (int) ($creds['port'] ?? 0);
+        $dsn = 'mysql:host=' . $creds['host']
+            . ($port > 0 ? ';port=' . (string) $port : '')
+            . ';charset=utf8mb4';
         $pdo = new PDO($dsn, $creds['user'], $creds['pass'], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -1268,6 +1426,15 @@ function orange_restore_shadow_ensure_database(string $projectRoot, array $env, 
 
         $created = false;
         if (!$exists) {
+            // On private engine, schema is created during provision; runtime user may lack CREATE.
+            if (($creds['mode'] ?? '') === 'private_shadow_engine') {
+                return [
+                    'ok' => false,
+                    'created' => false,
+                    'shadow_db' => $shadowDb,
+                    'message' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY,
+                ];
+            }
             $pdo->exec(
                 'CREATE DATABASE ' . $quoted
                 . ' CHARACTER SET ' . ORANGE_RESTORE_SHADOW_CHARSET
@@ -1285,7 +1452,8 @@ function orange_restore_shadow_ensure_database(string $projectRoot, array $env, 
         ];
     } catch (Throwable $e) {
         $safe = orange_restore_shadow_normalize_failure_code(trim($e->getMessage()));
-        if ($safe === trim($e->getMessage()) && $safe !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE) {
+        if ($safe === trim($e->getMessage()) && $safe !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+            && !str_starts_with($safe, 'STEP7_PRIVATE_ENGINE_')) {
             $safe = 'shadow_db_create_failed';
         }
 
@@ -1324,7 +1492,10 @@ function orange_restore_shadow_connect_pdo(string $projectRoot, array $env, stri
         throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
     }
     $creds = orange_restore_shadow_connection_credentials($env, $projectRoot);
-    $dsn = 'mysql:host=' . $creds['host'] . ';dbname=' . $shadowDb . ';charset=utf8mb4';
+    $port = (int) ($creds['port'] ?? 0);
+    $dsn = 'mysql:host=' . $creds['host']
+        . ($port > 0 ? ';port=' . (string) $port : '')
+        . ';dbname=' . $shadowDb . ';charset=utf8mb4';
     try {
         $pdo = new PDO($dsn, $creds['user'], $creds['pass'], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -1346,6 +1517,13 @@ function orange_restore_shadow_connect_pdo(string $projectRoot, array $env, stri
     // Dedicated staging user keeps the historic privilege fence.
     if (($creds['mode'] ?? '') === 'staging_optional') {
         orange_restore_staging_assert_no_production_privileges($pdo, $shadowDb, $productionDb);
+    }
+    // Private engine: host must remain loopback.
+    if (($creds['mode'] ?? '') === 'private_shadow_engine') {
+        $host = (string) ($creds['host'] ?? '');
+        if ($host !== '127.0.0.1' && $host !== '::1') {
+            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED);
+        }
     }
 
     return $pdo;
@@ -1784,6 +1962,12 @@ function orange_restore_shadow_run_cli(
             $attemptId = 's7_' . bin2hex(random_bytes(8));
             $meta['attempt_id'] = $attemptId;
         }
+
+        // Bind private-engine context for worker import (loopback DSN only).
+        $GLOBALS['orange_restore_private_engine_context'] = [
+            'work_root' => $workRoot,
+            'job_id' => $jobId,
+        ];
 
         // Authoritative resolver only — never orange_restore_staging_db_name / mandatory env.
         // Prefer job-bound meta persisted by parent pre-spawn; else auto/override resolve.

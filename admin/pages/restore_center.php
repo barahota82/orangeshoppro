@@ -1380,15 +1380,23 @@ body.rc-modal-open{overflow:hidden!important}
         const readiness = diag.step7_shadow_target_readiness && typeof diag.step7_shadow_target_readiness === 'object'
             ? diag.step7_shadow_target_readiness
             : null;
-        if (readiness || diag.ready_token || diag.ready_for_controlled_step7_attempt) {
+        if (readiness || diag.ready_token || diag.ready_for_controlled_step7_attempt
+            || diag.ready_for_private_shadow_provisioning) {
             html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">جاهزية خطوة استعادة قاعدة الظل</h4>';
-            const ready = !!(diag.ready_for_controlled_step7_attempt
+            const token = String(diag.ready_token || (readiness && readiness.ready_token) || '');
+            const readyControlled = !!(diag.ready_for_controlled_step7_attempt
                 || (readiness && readiness.ready_for_controlled_step7_attempt)
-                || String(diag.ready_token || (readiness && readiness.ready_token) || '') === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT');
+                || token === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT');
+            const readyProvision = !!(diag.ready_for_private_shadow_provisioning
+                || (readiness && readiness.ready_for_private_shadow_provisioning)
+                || token === 'READY_FOR_PRIVATE_SHADOW_PROVISIONING');
+            const tokenLabel = readyControlled
+                ? 'READY_FOR_CONTROLLED_STEP7_ATTEMPT'
+                : (readyProvision ? 'READY_FOR_PRIVATE_SHADOW_PROVISIONING' : (token || 'NOT_READY'));
             const cap = readiness ? String(readiness.database_capability || 'unavailable') : 'unavailable';
             const match = readiness ? !!readiness.parent_worker_target_identity_match : false;
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
-                + '<li><strong>' + (ready ? 'READY_FOR_CONTROLLED_STEP7_ATTEMPT' : 'NOT_READY') + '</strong></li>'
+                + '<li><strong>' + esc(tokenLabel) + '</strong></li>'
                 + '<li>قدرة قاعدة البيانات: ' + esc(cap === 'available' ? 'available' : 'unavailable') + '</li>'
                 + '<li>تطابق هدف الأب/العامل: ' + (match ? 'نعم' : 'لا') + '</li>'
                 + '<li>المصدر: ' + esc((readiness && readiness.source) ? String(readiness.source) : '—') + '</li>'
@@ -1407,7 +1415,8 @@ body.rc-modal-open{overflow:hidden!important}
             + '<li>التشخيص من مركز الاسترداد فقط.</li>'
             + '<li>لا تُعرض أسرار أو مسارات حساسة.</li>'
             + '<li>يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.</li>'
-            + '<li>لا تضغط خطوة استعادة قاعدة الظل إلا عند READY_FOR_CONTROLLED_STEP7_ATTEMPT مع database capability=available.</li>'
+            + '<li>READY_FOR_PRIVATE_SHADOW_PROVISIONING: يمكن الضغط لتجهيز المحرك الخاص ثم الاستيراد.</li>'
+            + '<li>READY_FOR_CONTROLLED_STEP7_ATTEMPT: المحرك الخاص جاهز — اضغط خطوة استعادة قاعدة الظل مرة واحدة.</li>'
             + '</ul>';
         return html;
     }

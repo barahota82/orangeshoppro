@@ -591,3 +591,28 @@ and mirror events from filesystem audit; DB becomes authoritative read surface.
 Minimum audit fields (owner policy §8): operator, timestamp, source package,
 package checksum, package version, schema revision, country/full, staging target,
 production merge approval, duration, result.
+
+================================================================================
+Step 7 — Application-owned private shadow engine (Owner 2026-08-12)
+================================================================================
+
+**Registers:** PRIVATE_SHADOW_ENGINE_01, NO_PRODUCTION_MYSQL_PROVISIONING_01,
+JOB_OWNED_PRIVATE_DATADIR_01, LOOPBACK_ONLY_01, NO_OWNER_ACTION_01,
+PROTECTED_WORKING_BASELINE_01.
+
+**Architecture (final):** Restore Job → application-owned private MySQL/MariaDB
+instance → private job datadir outside webroot → loopback/local-socket-only →
+job-owned shadow DB → restricted shadow runtime user → source import → Step7 ready.
+Separate from Production MySQL service/datadir/port/socket/users/lifecycle.
+No Production MySQL CREATE DATABASE / privilege provisioning required.
+
+**تنفيذ:**
+- `includes/backup/restore/restore_private_shadow_engine.php` — discover mysqld/mariadbd
+  under Production connection read-only `@@basedir` only; secure init; loopback bind;
+  restricted runtime user; secret option files with ACL (never Git/browser/args/logs).
+- `includes/backup/restore/restore_shadow_db.php` — Step7 adapters prefer private engine DSN.
+- `includes/backup/restore/restore_center_orchestrator.php` — preflight/provision before
+  spawn; readiness tokens `READY_FOR_PRIVATE_SHADOW_PROVISIONING` /
+  `READY_FOR_CONTROLLED_STEP7_ATTEMPT`; distinct `STEP7_PRIVATE_ENGINE_*` codes;
+  tracks PHP worker PID and private engine PID separately.
+- Self-test: `scripts/self_test_restore_center_step7_private_shadow_engine.php`.

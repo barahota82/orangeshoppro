@@ -26,8 +26,9 @@ require_once __DIR__ . '/restore_worker_runtime.php';
 require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
+require_once __DIR__ . '/restore_private_shadow_engine.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v8-shadow-target';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v9-private-shadow-engine';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
 const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
@@ -59,6 +60,8 @@ if (!defined('ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE')) {
 const ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE = 'STEP7_UNKNOWN_START_FAILURE';
 /** Owner readiness token — only when all Step-7 gates are proven green. */
 const ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT = 'READY_FOR_CONTROLLED_STEP7_ATTEMPT';
+/** Owner readiness token — private engine binary discoverable; provision not yet done (zero-mutation). */
+// Alias: ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING (restore_private_shadow_engine.php)
 
 /**
  * Pending statuses that must never remain without a verified worker consumer.
@@ -1171,6 +1174,7 @@ function orange_restore_center_step7_classify_start_failure(string $code): strin
             || str_contains($code, 'ORANGE_RESTORE_STAGING_DB')
             || str_contains($code, 'ORANGE_RESTORE_SHADOW_DB')
             || str_contains($code, 'is not configured') => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+        str_starts_with($code, 'STEP7_PRIVATE_ENGINE_') => $code,
         str_starts_with($code, 'STEP7_') => $code,
         default => ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE,
     };
@@ -1199,8 +1203,20 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED => 'تعذر إقلاع عامل استعادة قاعدة الظل بعد الجدولة. لم يُعتمد التنفيذ.',
         ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE => 'هدف قاعدة الظل معروف، لكن صلاحية إنشاء/استخدام قاعدة الظل غير متاحة لحساب التطبيق. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED),
         ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE => 'تعذر بدء استعادة قاعدة الظل. أعد المحاولة من شاشة الاسترداد.',
     ];
+
+    if (str_starts_with($safeCode, 'STEP7_PRIVATE_ENGINE_')) {
+        return orange_restore_private_engine_operator_reason_ar($safeCode);
+    }
 
     return $messages[$safeCode] ?? $messages[ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE];
 }
@@ -1228,6 +1244,13 @@ function orange_restore_center_shadow_pre_spawn_readiness(
     if (isset($GLOBALS['orange_shadow_env_override']) && is_array($GLOBALS['orange_shadow_env_override'])) {
         $env = array_merge($env, $GLOBALS['orange_shadow_env_override']);
     }
+
+    // Bind private-engine context for parent preflight/provision (NO Production CREATE DATABASE).
+    $GLOBALS['orange_restore_private_engine_context'] = [
+        'work_root' => $workRoot,
+        'job_id' => $jobId,
+    ];
+
     $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
     if (!($resolved['ok'] ?? false) || trim((string) ($resolved['shadow_db'] ?? '')) === '') {
         return [
@@ -1244,10 +1267,11 @@ function orange_restore_center_shadow_pre_spawn_readiness(
                 'database_capability' => 'unavailable',
                 'shadow_db_identity_hash' => '',
                 'parent_worker_target_identity_match' => false,
+                'private_engine' => true,
             ],
         ];
     }
-    // Persist job-bound target BEFORE spawn so worker consumes the same identity.
+    // Persist job-bound target BEFORE provision/spawn so worker consumes the same identity.
     try {
         $meta = orange_restore_shadow_bind_resolved_target($meta, $resolved, $jobId);
         orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
@@ -1266,18 +1290,84 @@ function orange_restore_center_shadow_pre_spawn_readiness(
                 'database_capability' => 'unavailable',
                 'shadow_db_identity_hash' => (string) ($resolved['identity_hash'] ?? ''),
                 'parent_worker_target_identity_match' => false,
+                'private_engine' => true,
             ],
         ];
     }
+
+    // Private-engine preflight/provision BEFORE claim/spawn (NO_PRODUCTION_MYSQL_PROVISIONING_01).
+    $enginePid = 0;
+    try {
+        $provision = orange_restore_private_engine_provision(
+            $projectRoot,
+            $workRoot,
+            $jobId,
+            (string) $resolved['shadow_db']
+        );
+        if (empty($provision['ok']) || empty($provision['ready'])) {
+            $pCode = (string) ($provision['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+            if (!str_starts_with($pCode, 'STEP7_PRIVATE_ENGINE_')) {
+                $pCode = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
+            }
+
+            return [
+                'ok' => false,
+                'code' => $pCode,
+                'attempt_id' => $attemptId,
+                'readiness' => [
+                    'ok' => false,
+                    'code' => $pCode,
+                    'source' => (string) ($resolved['source'] ?? 'unavailable'),
+                    'credential_mode' => 'private_shadow_engine',
+                    'can_create' => false,
+                    'can_use' => false,
+                    'database_capability' => 'unavailable',
+                    'shadow_db_identity_hash' => (string) ($resolved['identity_hash'] ?? ''),
+                    'parent_worker_target_identity_match' => false,
+                    'private_engine' => true,
+                    'engine_pid' => (int) ($provision['engine_pid'] ?? 0),
+                ],
+            ];
+        }
+        $enginePid = (int) ($provision['engine_pid'] ?? 0);
+        $meta['private_engine_ready'] = true;
+        $meta['private_engine_pid'] = $enginePid;
+        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+    } catch (Throwable $e) {
+        $pCode = orange_restore_shadow_normalize_failure_code(trim($e->getMessage()));
+        if (!str_starts_with($pCode, 'STEP7_PRIVATE_ENGINE_')) {
+            $pCode = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
+        }
+
+        return [
+            'ok' => false,
+            'code' => $pCode,
+            'attempt_id' => $attemptId,
+            'readiness' => [
+                'ok' => false,
+                'code' => $pCode,
+                'source' => (string) ($resolved['source'] ?? 'unavailable'),
+                'credential_mode' => 'private_shadow_engine',
+                'can_create' => false,
+                'can_use' => false,
+                'database_capability' => 'unavailable',
+                'shadow_db_identity_hash' => (string) ($resolved['identity_hash'] ?? ''),
+                'parent_worker_target_identity_match' => false,
+                'private_engine' => true,
+            ],
+        ];
+    }
+
     $probe = orange_restore_shadow_probe_target_readiness($projectRoot, $env, $jobId, $meta);
     $identity = (string) ($probe['shadow_db_identity_hash'] ?? ($meta['shadow_db_identity_hash'] ?? ''));
     $parentWorkerMatch = $identity !== ''
         && hash_equals($identity, (string) ($meta['shadow_db_identity_hash'] ?? ''));
     if (!($probe['ok'] ?? false)) {
-        $failCode = (string) ($probe['code'] ?? ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE);
-        if ($failCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+        $failCode = (string) ($probe['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY);
+        if (!str_starts_with($failCode, 'STEP7_PRIVATE_ENGINE_')
+            && $failCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
             && $failCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE) {
-            $failCode = ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE;
+            $failCode = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY;
         }
 
         return [
@@ -1288,12 +1378,14 @@ function orange_restore_center_shadow_pre_spawn_readiness(
                 'ok' => false,
                 'code' => $failCode,
                 'source' => (string) ($probe['source'] ?? 'unavailable'),
-                'credential_mode' => (string) ($probe['credential_mode'] ?? ''),
+                'credential_mode' => (string) ($probe['credential_mode'] ?? 'private_shadow_engine'),
                 'can_create' => !empty($probe['can_create']),
                 'can_use' => !empty($probe['can_use']),
                 'database_capability' => (string) ($probe['database_capability'] ?? 'unavailable'),
                 'shadow_db_identity_hash' => $identity,
                 'parent_worker_target_identity_match' => $parentWorkerMatch,
+                'private_engine' => true,
+                'engine_pid' => $enginePid,
             ],
         ];
     }
@@ -1302,16 +1394,20 @@ function orange_restore_center_shadow_pre_spawn_readiness(
         'ok' => true,
         'code' => 'ok',
         'attempt_id' => $attemptId,
+        'engine_pid' => $enginePid,
         'readiness' => [
             'ok' => true,
             'code' => 'ok',
             'source' => (string) ($probe['source'] ?? ''),
-            'credential_mode' => (string) ($probe['credential_mode'] ?? ''),
+            'credential_mode' => (string) ($probe['credential_mode'] ?? 'private_shadow_engine'),
             'can_create' => !empty($probe['can_create']),
             'can_use' => !empty($probe['can_use']),
             'database_capability' => (string) ($probe['database_capability'] ?? 'available'),
             'shadow_db_identity_hash' => $identity,
             'parent_worker_target_identity_match' => $parentWorkerMatch,
+            'private_engine' => true,
+            'engine_pid' => $enginePid,
+            'ready_token' => ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT,
         ],
     ];
 }
@@ -1794,9 +1890,9 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             $projectRootDiag = dirname(__DIR__, 3);
             $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
             $env = orange_backup_load_env_array($projectRootDiag);
-            // Read-only resolve + honest capability probe (no CREATE/DROP).
+            // Zero-mutation: private-engine preflight (no provision) + target resolve only.
             $resolved = orange_restore_shadow_resolve_target($env, $projectRootDiag, $jobId, $meta);
-            $probe = orange_restore_shadow_probe_target_readiness($projectRootDiag, $env, $jobId, $meta);
+            $enginePub = orange_restore_private_engine_public_readiness($projectRootDiag, $workRoot, $jobId);
             $ack = orange_restore_shadow_load_bootstrap_ack($workRoot, $jobId);
             $pub = orange_restore_fw_public_row($job);
             $requestable = !empty($pub['shadow_restore_requestable']);
@@ -1805,45 +1901,61 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
             ], true);
-            $identity = (string) ($probe['shadow_db_identity_hash']
+            $identity = (string) ($enginePub['shadow_db_identity_hash']
                 ?? ($resolved['identity_hash'] ?? ''));
             $boundHash = trim((string) ($meta['shadow_db_identity_hash'] ?? ''));
             $parentWorkerMatch = $identity !== '' && ($boundHash === '' || hash_equals($identity, $boundHash));
-            $capability = (string) ($probe['database_capability'] ?? 'unavailable');
             $targetOk = (bool) ($resolved['ok'] ?? false);
-            $capOk = (bool) ($probe['ok'] ?? false) && $capability === 'available';
-            $allGreen = $targetOk && $capOk && $parentWorkerMatch && $requestable && !$running;
-            if ($allGreen) {
+            $binaryOk = !empty($enginePub['binary_available']);
+            $engineReady = !empty($enginePub['engine_ready']);
+            $capability = $engineReady ? 'available' : 'unavailable';
+
+            if (!$binaryOk) {
+                $readyToken = '';
+            } elseif ($engineReady && $targetOk && $requestable && !$running) {
                 $readyToken = ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
+            } elseif ($binaryOk && $targetOk && $requestable && !$running) {
+                $readyToken = ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
+            } else {
+                $readyToken = (string) ($enginePub['ready_token'] ?? '');
             }
+
+            $allGreen = $readyToken === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
             $shadowReadiness = [
                 'ok' => $allGreen,
                 'code' => $allGreen
                     ? 'ok'
-                    : (string) (!$targetOk
-                        ? ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
-                        : (!$capOk
-                            ? ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
-                            : ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE)),
-                'source' => (string) ($resolved['source'] ?? ($probe['source'] ?? 'unavailable')),
-                'shadow_db_identity_hash' => $identity,
+                    : (string) (!$binaryOk
+                        ? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE
+                        : (!$targetOk
+                            ? ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+                            : ($engineReady
+                                ? 'ok'
+                                : ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING))),
+                'source' => (string) ($resolved['source'] ?? 'unavailable'),
+                'shadow_db_identity_hash' => $identity !== ''
+                    ? $identity
+                    : (string) ($resolved['identity_hash'] ?? ''),
                 'attempt_id' => (string) ($meta['attempt_id'] ?? ''),
                 'bootstrap_acked' => is_array($ack) && !empty($ack['ready']),
                 'requestable' => $requestable,
                 'execution_running' => $running,
                 'database_capability' => $capability,
-                'can_create' => !empty($probe['can_create']),
-                'can_use' => !empty($probe['can_use']),
-                'credential_mode' => (string) ($probe['credential_mode'] ?? ''),
-                'parent_worker_target_identity_match' => $parentWorkerMatch,
+                'can_create' => $engineReady,
+                'can_use' => $engineReady,
+                'credential_mode' => $engineReady ? 'private_shadow_engine' : '',
+                'parent_worker_target_identity_match' => $parentWorkerMatch || $boundHash === '',
                 'ready_for_controlled_step7_attempt' => $allGreen,
+                'ready_for_private_shadow_provisioning' => $readyToken
+                    === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING,
                 'ready_token' => $readyToken,
+                'private_engine' => $enginePub,
                 'read_only' => true,
             ];
         } catch (Throwable) {
             $shadowReadiness = [
                 'ok' => false,
-                'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE,
                 'source' => 'unavailable',
                 'shadow_db_identity_hash' => '',
                 'attempt_id' => '',
@@ -1856,6 +1968,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                 'credential_mode' => '',
                 'parent_worker_target_identity_match' => false,
                 'ready_for_controlled_step7_attempt' => false,
+                'ready_for_private_shadow_provisioning' => false,
                 'ready_token' => '',
                 'read_only' => true,
             ];
@@ -1896,6 +2009,8 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         'step7_attempt_clusters' => $guidedWorker === 'shadow_db' ? array_values($attemptClusters) : [],
         'step7_shadow_target_readiness' => $shadowReadiness,
         'ready_for_controlled_step7_attempt' => $readyToken === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT,
+        'ready_for_private_shadow_provisioning' => $readyToken
+            === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING,
         'ready_token' => $readyToken,
         'log_tails' => $logSnippets,
         'notes_ar' => [
@@ -1904,8 +2019,9 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             'أحدث محاولة تخص المرحلة الحالية حسب حالة المهمة؛ أحداث المراحل السابقة تُعرض كتاريخية فقط.',
             'يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.',
             'تحديث الحالة (Refresh) لا يُحسب محاولة جديدة لخطوة استعادة قاعدة الظل.',
-            'قسم جاهزية هدف قاعدة الظل للقراءة فقط ولا ينشئ محاولة جديدة.',
-            'READY_FOR_CONTROLLED_STEP7_ATTEMPT يظهر فقط عندما يكون الهدف والقدرة على قاعدة البيانات متطابقين وجاهزين.',
+            'قسم جاهزية هدف قاعدة الظل للقراءة فقط ولا ينشئ محاولة جديدة ولا يشغّل المحرك الخاص.',
+            'READY_FOR_PRIVATE_SHADOW_PROVISIONING يظهر عندما يكون محرك الظل الخاص قابلاً للاكتشاف وقبل التجهيز.',
+            'READY_FOR_CONTROLLED_STEP7_ATTEMPT يظهر فقط بعد جاهزية المحرك الخاص وهدف قاعدة الظل.',
         ],
     ];
 }
@@ -1988,15 +2104,18 @@ function orange_restore_center_run_worker(
         orange_restore_center_discard_stale_launch_artifact($workRoot, $jobId, $workerKey);
 
         $attemptId = '';
+        $privateEnginePid = 0;
         if ($workerKey === 'shadow_db') {
-            // Fail closed BEFORE spawn when target or DB capability is not proven.
+            // Fail closed BEFORE spawn: private-engine provision + readiness proven.
             $pre = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jobId);
             $attemptId = (string) ($pre['attempt_id'] ?? '');
+            $privateEnginePid = (int) ($pre['engine_pid'] ?? ($pre['readiness']['engine_pid'] ?? 0));
             if (empty($pre['ok'])) {
-                $preCode = (string) ($pre['code'] ?? ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
-                if ($preCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+                $preCode = (string) ($pre['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+                if (!str_starts_with($preCode, 'STEP7_PRIVATE_ENGINE_')
+                    && $preCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
                     && $preCode !== ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE) {
-                    $preCode = ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
+                    $preCode = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
                 }
                 throw new RuntimeException($preCode);
             }
@@ -2056,6 +2175,8 @@ function orange_restore_center_run_worker(
             'worker' => $workerKey,
             'script' => $relative,
             'pid' => $pid,
+            'php_worker_pid' => $pid,
+            'private_engine_pid' => $workerKey === 'shadow_db' ? $privateEnginePid : 0,
             'state' => 'running',
             'started_at' => gmdate('c'),
             'job_status_at_schedule' => $jobStatus,
