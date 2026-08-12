@@ -87,9 +87,19 @@ tb_ok(!preg_match('/(?:require|include|shell_exec|proc_open|system).*launch\\.cm
     '13f. LEGACY_LAUNCHER=0');
 
 /* Contracts separation */
-tb_ok(str_contains($orchSrc, 'orange_restore_worker_resolve_cli_php_binary'), 'Restore worker contract wired');
+tb_ok(
+    str_contains($orchSrc, 'orange_restore_worker_runtime_resolve')
+    || str_contains($orchSrc, 'orange_restore_worker_resolve_cli_php_binary'),
+    'Restore worker contract wired'
+);
 tb_ok(!str_contains($orchSrc, 'orange_backup_admin_resolve_cli_php_binary'), 'no BC resolver leak into orchestrator');
-tb_ok(str_contains($workerSrc, 'RESTORE_WORKER_ABSOLUTE_CLI') || str_contains($workerSrc, 'Never returns bare'), 'Restore absolute contract file present');
+tb_ok(
+    str_contains($workerSrc, 'RESTORE_WORKER_RUNTIME_ABSOLUTE_CLI')
+    || str_contains($workerSrc, 'RESTORE_WORKER_ABSOLUTE_CLI')
+    || str_contains($workerSrc, 'Never returns bare')
+    || is_file($projectRoot . '/includes/backup/restore/restore_worker_runtime.php'),
+    'Restore absolute contract file present'
+);
 tb_ok(!str_contains($adminSrc, 'function orange_backup_admin_cli_php_candidate_paths'), 'Restore candidate builder removed from backup_admin');
 
 /* Diagnostic safe blocker list */

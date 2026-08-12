@@ -22,11 +22,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../backup_environment.php';
+require_once __DIR__ . '/restore_worker_runtime.php';
 require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v6-stage-diag';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v7-php-cli-runtime';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
 const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
@@ -98,6 +99,103 @@ function orange_restore_center_worker_dispatch_failure_phase_map(): array
 }
 
 /**
+ * After pre-exec dispatch compensation, keep nested shadow_restore_status aligned with top-level.
+ * Does not delete historical attempts. Does not invent a new Step-7 request.
+ *
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_center_sync_shadow_restore_nested_status(
+    string $workRoot,
+    string $jobId,
+    array $job
+): array {
+    $status = (string) ($job['status'] ?? '');
+    $nested = (string) ($job['shadow_restore_status'] ?? '');
+    if ($status !== ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED) {
+        return $job;
+    }
+    if ($nested !== '' && $nested !== ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING) {
+        return $job;
+    }
+    // Only reconcile stale pending (or empty) nested status after top-level failed with no execution.
+    if (!empty($job['execution_started'])) {
+        return $job;
+    }
+    $job['shadow_restore_status'] = ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED;
+    orange_restore_fw_write($workRoot, $job);
+
+    // Nested shadow meta (same relative name as restore_shadow_db) — no Backup Center coupling.
+    $metaPath = orange_restore_fw_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . 'shadow_restore.json';
+    if (is_file($metaPath)) {
+        $raw = (string) @file_get_contents($metaPath);
+        $meta = json_decode($raw, true);
+        if (is_array($meta)) {
+            $metaStatus = (string) ($meta['status'] ?? '');
+            if ($metaStatus === '' || $metaStatus === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING) {
+                $meta['status'] = ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED;
+                $meta['execution_started'] = false;
+                $meta['cli_needed'] = false;
+                $json = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                if ($json !== false) {
+                    @file_put_contents($metaPath, $json . "\n", LOCK_EX);
+                }
+            }
+        }
+    }
+
+    return $job;
+}
+
+/**
+ * Refresh-time reconciliation: top-level shadow_restore_failed vs stale nested pending.
+ * Safe for Owner Refresh — does not create a new attempt / request / spawn.
+ *
+ * @return array<string, mixed>|null Updated job or null when unchanged
+ */
+function orange_restore_center_reconcile_stale_shadow_restore_public_state(
+    string $workRoot,
+    string $jobId
+): ?array {
+    try {
+        $job = orange_restore_fw_read($workRoot, $jobId);
+    } catch (Throwable $e) {
+        return null;
+    }
+    $status = (string) ($job['status'] ?? '');
+    $nested = (string) ($job['shadow_restore_status'] ?? '');
+    if ($status !== ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED) {
+        return null;
+    }
+    if ($nested !== ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING && $nested !== '') {
+        return null;
+    }
+    if (!empty($job['execution_started'])) {
+        return null;
+    }
+    $before = $nested;
+    $updated = orange_restore_center_sync_shadow_restore_nested_status($workRoot, $jobId, $job);
+    $after = (string) ($updated['shadow_restore_status'] ?? '');
+    if ($after === $before) {
+        return null;
+    }
+    orange_restore_fw_audit_append($workRoot, $jobId, [
+        'event' => 'restore_center_stale_shadow_restore_status_reconciled',
+        'result' => 'ok',
+        'worker' => 'shadow_db',
+        'from_shadow_restore_status' => $before !== '' ? $before : 'empty',
+        'to_shadow_restore_status' => $after,
+        'job_status' => $status,
+        'execution_started' => false,
+        'scheduling_attempted' => false,
+        'refresh_only' => true,
+        'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
+    ]);
+
+    return $updated;
+}
+
+/**
  * If job is stuck in an unconsumed pending state after schedule failure, move to existing failed/retryable status.
  *
  * @return array<string, mixed>|null Updated job or null when no compensation applied
@@ -121,6 +219,11 @@ function orange_restore_center_compensate_unconsumed_pending(
     }
     $status = (string) ($job['status'] ?? '');
     if ($status !== $pendingMap[$workerKey]) {
+        // Already failed at top-level but nested pending may still be stale (Owner live shape).
+        if ($workerKey === 'shadow_db' && $status === ($failedMap[$workerKey] ?? '')) {
+            return orange_restore_center_reconcile_stale_shadow_restore_public_state($workRoot, $jobId);
+        }
+
         return null;
     }
     $failed = $failedMap[$workerKey];
@@ -136,6 +239,9 @@ function orange_restore_center_compensate_unconsumed_pending(
         'Worker dispatch failed — retry from Restore Center',
         'restore_center_dispatch_compensated'
     );
+    if ($workerKey === 'shadow_db') {
+        $updated = orange_restore_center_sync_shadow_restore_nested_status($workRoot, $jobId, $updated);
+    }
     $compensateAudit = [
         'event' => 'restore_center_pending_without_worker_compensated',
         'result' => 'fail',
@@ -150,6 +256,7 @@ function orange_restore_center_compensate_unconsumed_pending(
     if ($workerKey === 'shadow_db') {
         $compensateAudit['safe_failure_code'] = orange_restore_center_step7_classify_start_failure($reason);
         $compensateAudit['stage'] = 'shadow_restore';
+        $compensateAudit['shadow_restore_status'] = (string) ($updated['shadow_restore_status'] ?? '');
     }
     orange_restore_fw_audit_append($workRoot, $jobId, $compensateAudit);
 
@@ -1155,7 +1262,9 @@ function orange_restore_center_attach_verified_schedule(
  */
 function orange_restore_center_diagnostics(string $workRoot, string $jobId): array
 {
-    $job = orange_restore_fw_read($workRoot, $jobId);
+    // Refresh-only public-state reconcile (no new Step-7 attempt).
+    $reconciled = orange_restore_center_reconcile_stale_shadow_restore_public_state($workRoot, $jobId);
+    $job = is_array($reconciled) ? $reconciled : orange_restore_fw_read($workRoot, $jobId);
     $status = (string) ($job['status'] ?? '');
     $guidedWorker = orange_restore_center_guided_worker_key_from_status($status);
     $familyMap = orange_restore_center_stage_audit_event_family_map();
@@ -1187,6 +1296,8 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
     $currentStageEvents = [];
     $historicalEvents = [];
     $latestCurrent = null;
+    $step7AttemptCount = 0;
+    $attemptClusters = [];
     $auditPath = orange_restore_fw_audit_file_path($workRoot, $jobId);
     if (is_file($auditPath)) {
         $lines = @file($auditPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -1305,8 +1416,17 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                     $item['safe_failure_code'] = (string) $code;
                 }
 
+                // Refresh / nested-status reconcile is never an Owner attempt.
+                if ($event === 'restore_center_stale_shadow_restore_status_reconciled'
+                    || !empty($row['refresh_only'])) {
+                    $item['is_step7_attempt'] = false;
+                    $item['refresh_only'] = true;
+                }
+
                 if ($isCurrentFamily) {
-                    if ($latestCurrent === null) {
+                    if ($latestCurrent === null
+                        && $event !== 'restore_center_stale_shadow_restore_status_reconciled'
+                        && empty($row['refresh_only'])) {
                         $latestCurrent = $item;
                     }
                     if (count($currentStageEvents) < 12) {
@@ -1320,6 +1440,64 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             }
         }
     }
+
+    // Dedup Step-7 attempt clusters: requested + schedule_failed + compensated = one attempt.
+    // Refresh / nested-status reconcile events never open a cluster.
+    $attemptClusters = [];
+    $clusterSeq = 0;
+    $openCluster = null;
+    foreach (array_reverse($currentStageEvents) as $evRow) {
+        if (($evRow['worker'] ?? '') !== 'shadow_db' || !empty($evRow['refresh_only'])) {
+            continue;
+        }
+        $evName = (string) ($evRow['event'] ?? '');
+        if ($evName === 'restore_center_stale_shadow_restore_status_reconciled') {
+            continue;
+        }
+        if ($evName === 'shadow_restore_requested') {
+            $clusterSeq++;
+            $openCluster = $clusterSeq;
+            $attemptClusters[$openCluster] = [
+                'attempt_index' => $openCluster,
+                'events' => [],
+                'safe_failure_code' => '',
+                'result' => '',
+            ];
+        } elseif ($openCluster === null) {
+            // Trailing compensate/fail without a request opener — attach to prior attempt if any.
+            if ($clusterSeq === 0) {
+                $clusterSeq++;
+                $attemptClusters[$clusterSeq] = [
+                    'attempt_index' => $clusterSeq,
+                    'events' => [],
+                    'safe_failure_code' => '',
+                    'result' => '',
+                ];
+            }
+            $openCluster = $clusterSeq;
+        }
+        if ($openCluster === null) {
+            continue;
+        }
+        $attemptClusters[$openCluster]['events'][] = $evName;
+        if (!empty($evRow['safe_failure_code'])) {
+            $attemptClusters[$openCluster]['safe_failure_code'] = (string) $evRow['safe_failure_code'];
+        }
+        if ((string) ($evRow['result'] ?? '') !== '') {
+            $attemptClusters[$openCluster]['result'] = (string) $evRow['result'];
+        }
+        // Close after terminal outcome; subsequent compensate in same cluster still appends above
+        // until the next shadow_restore_requested opens a new cluster.
+        if (in_array($evName, [
+            'shadow_restore_failed',
+            'restore_center_worker_scheduled',
+            'shadow_restore_ready',
+            'restore_center_pending_without_worker_compensated',
+        ], true)) {
+            $openCluster = null;
+        }
+    }
+    $step7AttemptCount = count($attemptClusters);
 
     // Current stage first; prior stages remain labeled historical. Never delete history.
     $recent = array_slice(array_merge($currentStageEvents, $historicalEvents), 0, 16);
@@ -1374,18 +1552,22 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
     return [
         'job_id' => $jobId,
         'job_status' => $status,
+        'shadow_restore_status' => (string) ($job['shadow_restore_status'] ?? ''),
         'guided_stage_worker' => $guidedWorker,
         'package_type' => (string) ($job['package_type'] ?? ''),
         'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
         'workers' => $workers,
         'recent_orchestration_events' => $recent,
         'latest_attempt_diagnostic' => $latestCurrent,
+        'step7_attempt_count' => $guidedWorker === 'shadow_db' ? $step7AttemptCount : 0,
+        'step7_attempt_clusters' => $guidedWorker === 'shadow_db' ? array_values($attemptClusters) : [],
         'log_tails' => $logSnippets,
         'notes_ar' => [
             'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
             'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا رموز الانتقال الداخلية.',
             'أحدث محاولة تخص المرحلة الحالية حسب حالة المهمة؛ أحداث المراحل السابقة تُعرض كتاريخية فقط.',
             'يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.',
+            'تحديث الحالة (Refresh) لا يُحسب محاولة جديدة لخطوة استعادة قاعدة الظل.',
         ],
     ];
 }
@@ -1431,14 +1613,20 @@ function orange_restore_center_run_worker(
     try {
         $relative = orange_restore_center_assert_worker_key($workerKey);
         $script = orange_restore_center_resolve_worker_script($projectRoot, $relative);
-        try {
-            $phpBinary = orange_restore_worker_resolve_cli_php_binary($projectRoot);
-        } catch (Throwable $resolveEx) {
-            throw new RuntimeException(
-                orange_restore_center_normalize_failure_code(trim($resolveEx->getMessage()))
-            );
+        $resolve = orange_restore_worker_runtime_resolve($projectRoot);
+        if (empty($resolve['ok']) || trim((string) ($resolve['php_binary'] ?? '')) === '') {
+            throw new RuntimeException('php_cli_binary_unavailable');
         }
-        if (!orange_restore_worker_php_cli_path_is_absolute($phpBinary) || !is_file($phpBinary)) {
+        $phpBinary = trim((string) $resolve['php_binary']);
+        // Absolute contract required. is_file may be false under open_basedir for trusted sibling layout;
+        // spawn layer distinguishes PROCESS_SPAWN_FAILED / WORKER_BOOTSTRAP_FAILED thereafter.
+        if (!orange_restore_worker_runtime_path_is_absolute($phpBinary)) {
+            throw new RuntimeException('restore_center_worker_executable_unavailable');
+        }
+        if (!is_file($phpBinary)
+            && ($resolve['accepted_via'] ?? '') !== 'cgi_sibling_trust'
+            && ($resolve['accepted_via'] ?? '') !== 'cgi_sibling_layout_trust'
+            && ($resolve['accepted_via'] ?? '') !== 'sapi_probe_without_is_file') {
             throw new RuntimeException('restore_center_worker_executable_unavailable');
         }
         $logPath = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
@@ -1549,12 +1737,11 @@ function orange_restore_center_run_worker(
                 $failAudit['spawn_succeeded'] = false;
                 $failAudit['execution_started'] = false;
             }
-            if (($code === 'restore_center_worker_executable_unavailable'
+            if ($code === 'restore_center_worker_executable_unavailable'
                     || $code === 'php_cli_binary_unavailable'
-                    || ($failAudit['safe_failure_code'] ?? '') === ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE)
-                && function_exists('orange_backup_admin_cli_php_safe_resolve_diag')) {
-                // Categories only — no raw paths (Owner UI must stay path-free).
-                $failAudit['resolve_diag'] = orange_backup_admin_cli_php_safe_resolve_diag($projectRoot);
+                    || ($failAudit['safe_failure_code'] ?? '') === ORANGE_RESTORE_STEP7_PHP_CLI_UNAVAILABLE) {
+                // Restore-only categories — no raw paths (Owner UI must stay path-free).
+                $failAudit['resolve_diag'] = orange_restore_worker_runtime_safe_diag($projectRoot);
             }
             orange_restore_fw_audit_append($workRoot, $jobId, $failAudit);
             // Never leave unconsumed pending after a failed schedule attempt.

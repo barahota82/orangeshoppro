@@ -35,7 +35,11 @@ pr_ok(!isset(orange_restore_center_worker_catalog()['pre_restore_backup']), 'Ste
 pr_ok(!str_contains($req, 'orange_backup_admin_resolve_cli_php_binary'), 'STEP6_LEGACY_PHP_RESOLVER_CALLER_COUNT=0');
 pr_ok(!str_contains($req, 'orange_restore_worker_resolve_cli_php_binary'), 'Step6 request no restore worker resolver');
 pr_ok(!str_contains($req, 'orange_restore_center_resolve'), 'Step6 request no restore resolver');
-pr_ok(str_contains($orch, 'orange_restore_worker_resolve_cli_php_binary'), 'Restore worker resolver retained for other workers');
+pr_ok(
+    str_contains($orch, 'orange_restore_worker_runtime_resolve')
+    || str_contains($orch, 'orange_restore_worker_resolve_cli_php_binary'),
+    'Restore worker resolver retained for other workers'
+);
 pr_ok(!str_contains($orch, 'orange_backup_admin_resolve_cli_php_binary'), 'RESTORE_EXECUTABLE_POLICY_LEAK_INTO_BACKUP_COUNT=0 (orch→BC)');
 pr_ok(str_contains($workerCli, 'php_cli_is_windows_cgi_sibling') || str_contains($workerCli, 'sibling'), 'Attempt-3 sibling trust retained in Restore worker contract');
 pr_ok(str_contains($admin, 'bare "php" fallback') || str_contains($admin, "return 'php';"), 'Backup Center b47cbe86 bare-php contract present');
