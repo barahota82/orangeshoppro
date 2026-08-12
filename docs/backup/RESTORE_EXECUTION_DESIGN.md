@@ -564,7 +564,7 @@ Fail → rollback_preparing.
 
 - **Code:** `includes/backup/restore/restore_shadow_db.php`; CLI `scripts/backup/restore_shadow_db.php --job=`; POST `request-shadow-restore.php` (metadata only); GET `shadow-restore.php` (status/report)  
 - **Reuses:** staging credential fences (`restore_staging_target.php`), `orange_restore_sql_runner_import_gzip()`, approved Full `manifest.dump_file` gzip SQL  
-- **Shadow name:** existing job-bound meta → optional `ORANGE_RESTORE_SHADOW_DB` / `ORANGE_RESTORE_STAGING_DB` override → automatic per-job `orange_restore_shadow_<hash>` — never equals production; staging env is **not** mandatory for Step 7  
+- **Shadow name (authoritative):** job-bound meta → automatic per-job `orange_restore_shadow_<hash>` → optional trusted `ORANGE_RESTORE_SHADOW_DB` / `ORANGE_RESTORE_STAGING_DB` override → fail closed — never equals production; staging env is **not** mandatory for Step 7; worker must not perform mandatory env-only lookup after resolver succeeds; honest DB capability via read-only SHOW GRANTS / information_schema (distinct `STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE`)  
 - **Effects:** create/wipe/import into shadow DB only; writes `{job}/shadow_restore.json` + `{job}/shadow_restore_report.json`; stops at `shadow_restore_ready` / `shadow_restore_failed`  
 - **Verify:** schema objects (tables/views/routines/triggers/events), row counts, charset/collation; compare vs package + read-only production inventory  
 - **Must not:** production writes, cutover, app config switch, file restore, maintenance enable, rollback execution, HTTP-side SQL import  

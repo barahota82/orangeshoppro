@@ -155,7 +155,16 @@ $override = orange_restore_shadow_resolve_target(
     $jobId,
     null
 );
-s7t_ok(($override['source'] ?? '') === 'trusted_override_shadow', 'optional override preferred');
+// Authoritative order: job-bound → automatic_per_job → optional override.
+s7t_ok(($override['source'] ?? '') === 'automatic_per_job', 'auto before optional override');
+
+$overrideOnly = orange_restore_shadow_resolve_target(
+    [ORANGE_RESTORE_ENV_SHADOW_DB => 'orange_restore_shadow_override_s7t'],
+    $projectRoot,
+    '',
+    null
+);
+s7t_ok(($overrideOnly['source'] ?? '') === 'trusted_override_shadow', 'override when no job id/auto');
 
 $bound = orange_restore_shadow_resolve_target(
     [ORANGE_RESTORE_ENV_SHADOW_DB => 'orange_restore_shadow_override_s7t'],

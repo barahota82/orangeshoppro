@@ -1200,11 +1200,28 @@ body.rc-modal-open{overflow:hidden!important}
         document.addEventListener('keydown', rcResultDialogKeyHandler, true);
         try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
     }
+    /** Dedup Owner failure dialogs: one row per attempt/stage/safe category (OWNER_DUPLICATE_FAILURE_MESSAGE_01). */
+    let rcLastFailureDialogKey = '';
+    let rcLastFailureDialogAt = 0;
     /** CENTERED_SYSTEM_DIALOG / CENTERED_OPERATION_RESULT_DIALOG — never a top-page card. */
-    function showRcTerminalMessage(msg, ok, sourceBtn) {
+    function showRcTerminalMessage(msg, ok, sourceBtn, dedupKey) {
         clearRcJourneyInlineMessage();
         const success = !!ok;
         const text = operatorMessage(msg);
+        if (!success) {
+            const key = String(dedupKey || text || '').trim();
+            const now = Date.now();
+            if (key && key === rcLastFailureDialogKey && (now - rcLastFailureDialogAt) < 8000) {
+                return;
+            }
+            if (key) {
+                rcLastFailureDialogKey = key;
+                rcLastFailureDialogAt = now;
+            }
+        } else {
+            rcLastFailureDialogKey = '';
+            rcLastFailureDialogAt = 0;
+        }
         openRcCenteredResultShell({
             title: success ? 'نتيجة العملية' : 'تعذر إتمام العملية',
             bodyHtml: '<p class="rc-result-dialog-summary">' + esc(text || 'تعذر تنفيذ العملية.') + '</p>',
@@ -1360,6 +1377,23 @@ body.rc-modal-open{overflow:hidden!important}
             });
             html += '</tbody></table>';
         }
+        const readiness = diag.step7_shadow_target_readiness && typeof diag.step7_shadow_target_readiness === 'object'
+            ? diag.step7_shadow_target_readiness
+            : null;
+        if (readiness || diag.ready_token || diag.ready_for_controlled_step7_attempt) {
+            html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">جاهزية خطوة استعادة قاعدة الظل</h4>';
+            const ready = !!(diag.ready_for_controlled_step7_attempt
+                || (readiness && readiness.ready_for_controlled_step7_attempt)
+                || String(diag.ready_token || (readiness && readiness.ready_token) || '') === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT');
+            const cap = readiness ? String(readiness.database_capability || 'unavailable') : 'unavailable';
+            const match = readiness ? !!readiness.parent_worker_target_identity_match : false;
+            html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
+                + '<li><strong>' + (ready ? 'READY_FOR_CONTROLLED_STEP7_ATTEMPT' : 'NOT_READY') + '</strong></li>'
+                + '<li>قدرة قاعدة البيانات: ' + esc(cap === 'available' ? 'available' : 'unavailable') + '</li>'
+                + '<li>تطابق هدف الأب/العامل: ' + (match ? 'نعم' : 'لا') + '</li>'
+                + '<li>المصدر: ' + esc((readiness && readiness.source) ? String(readiness.source) : '—') + '</li>'
+                + '</ul>';
+        }
         const tails = Array.isArray(diag.log_tails) ? diag.log_tails : [];
         if (tails.length) {
             html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">مقتطفات سجل التشغيل (مُنقّاة)</h4>';
@@ -1373,6 +1407,7 @@ body.rc-modal-open{overflow:hidden!important}
             + '<li>التشخيص من مركز الاسترداد فقط.</li>'
             + '<li>لا تُعرض أسرار أو مسارات حساسة.</li>'
             + '<li>يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.</li>'
+            + '<li>لا تضغط خطوة استعادة قاعدة الظل إلا عند READY_FOR_CONTROLLED_STEP7_ATTEMPT مع database capability=available.</li>'
             + '</ul>';
         return html;
     }
@@ -3412,11 +3447,15 @@ body.rc-modal-open{overflow:hidden!important}
                     ambiguous = true;
                     await reconcileAfterStageAmbiguity(t, lockKey);
                 } else {
+                    const failText = reason && reason.indexOf('تعمل بالفعل') !== -1
+                        ? reason
+                        : operatorJobMessage(reason || RC_SHADOW_FAIL_MSG);
+                    const failCode = (e && e.code) ? String(e.code) : '';
                     showRcTerminalMessage(
-                        reason && reason.indexOf('تعمل بالفعل') !== -1
-                            ? reason
-                            : operatorJobMessage(reason || RC_SHADOW_FAIL_MSG),
-                        false
+                        failText,
+                        false,
+                        null,
+                        String(jobId) + '::shadow_db::' + failCode + '::' + failText
                     );
                     endStageActionLock(lockKey);
                     await loadAll();

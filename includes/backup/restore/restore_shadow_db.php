@@ -42,6 +42,10 @@ const ORANGE_RESTORE_SHADOW_EXPECTED_SCHEMA_REVISION = 124;
 if (!defined('ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE')) {
     define('ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE', 'STEP7_SHADOW_DB_TARGET_UNAVAILABLE');
 }
+/** Owner-safe Step-7: resolved target exists but CREATE/USE privilege not proven. */
+if (!defined('ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE')) {
+    define('ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE', 'STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE');
+}
 
 /**
  * Safe Owner Arabic messages for Step-7 shadow restore (no paths/SQL/DB names).
@@ -78,6 +82,8 @@ function orange_restore_shadow_operator_message_ar(string $code): string
         'shadow_db_ownership_mismatch' => 'تعذر إنشاء بيئة قاعدة الظل. الهدف لا يخص هذه المهمة.',
         'shadow_db_target_unavailable' => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
+        'shadow_db_capability_unavailable' => 'هدف قاعدة الظل معروف، لكن صلاحية إنشاء/استخدام قاعدة الظل غير متاحة لحساب التطبيق. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE => 'هدف قاعدة الظل معروف، لكن صلاحية إنشاء/استخدام قاعدة الظل غير متاحة لحساب التطبيق. لم يبدأ التنفيذ.',
         'cli_only' => 'تعذر تنفيذ العملية.',
         'package_incompatible' => 'تعذر استيراد بيانات الحزمة إلى قاعدة الظل. الحزمة غير متوافقة.',
     ];
@@ -101,6 +107,10 @@ function orange_restore_shadow_normalize_failure_code(string $code): string
     if ($code === '') {
         return 'shadow_restore_failed';
     }
+    if ($code === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+        || $code === 'shadow_db_capability_unavailable') {
+        return ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE;
+    }
     if ($code === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
         || $code === 'shadow_db_target_unavailable'
         || $code === 'shadow_db_create_failed'
@@ -119,6 +129,13 @@ function orange_restore_shadow_normalize_failure_code(string $code): string
         || str_contains($code, '.env.php')
         || preg_match('/\bDB_(?:NAME|USER|PASS|HOST)\b/', $code) === 1) {
         return ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
+    }
+    // SQL privilege / access-denied shapes → capability (not env/target naming).
+    if (preg_match('/\b(1044|1045|1142|1227)\b/', $code) === 1
+        || preg_match('/access denied/i', $code) === 1
+        || preg_match('/CREATE\s+DATABASE/i', $code) === 1
+        || str_contains($code, 'shadow_db_capability')) {
+        return ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE;
     }
 
     return $code;
@@ -172,8 +189,9 @@ function orange_restore_shadow_automatic_db_name(string $jobId): string
 }
 
 /**
- * Resolve Step-7 shadow DB target.
- * Order: existing job-bound meta → optional trusted override → automatic per-job → fail closed.
+ * Authoritative Restore-only Step-7 shadow DB target resolver (single authority).
+ * Order: job-bound meta → automatic per-job → optional trusted override → fail closed.
+ * Staging/shadow env is never mandatory. Never equals production.
  *
  * @param array<string, mixed> $env
  * @param array<string, mixed>|null $meta
@@ -182,7 +200,8 @@ function orange_restore_shadow_automatic_db_name(string $jobId): string
  *   shadow_db:string,
  *   source:string,
  *   code:string,
- *   production_db:string
+ *   production_db:string,
+ *   identity_hash:string
  * }
  */
 function orange_restore_shadow_resolve_target(
@@ -195,20 +214,13 @@ function orange_restore_shadow_resolve_target(
     $candidates = [];
     $productionCollision = false;
 
+    // 1) Job-bound (parent-persisted or prior successful bind).
     $bound = trim((string) ($meta['shadow_db'] ?? ''));
     if ($bound !== '') {
         $candidates[] = ['name' => $bound, 'source' => 'job_bound'];
     }
 
-    $overrideShadow = trim((string) ($env[ORANGE_RESTORE_ENV_SHADOW_DB] ?? ''));
-    if ($overrideShadow !== '') {
-        $candidates[] = ['name' => $overrideShadow, 'source' => 'trusted_override_shadow'];
-    }
-    $overrideStaging = trim((string) ($env[ORANGE_RESTORE_ENV_STAGING_DB] ?? ''));
-    if ($overrideStaging !== '') {
-        $candidates[] = ['name' => $overrideStaging, 'source' => 'trusted_override_staging'];
-    }
-
+    // 2) Automatic per-job (authoritative default — no env required).
     if (trim($jobId) !== '') {
         try {
             $candidates[] = [
@@ -218,6 +230,16 @@ function orange_restore_shadow_resolve_target(
         } catch (Throwable) {
             // continue to fail-closed below
         }
+    }
+
+    // 3) Optional trusted override only (never mandatory).
+    $overrideShadow = trim((string) ($env[ORANGE_RESTORE_ENV_SHADOW_DB] ?? ''));
+    if ($overrideShadow !== '') {
+        $candidates[] = ['name' => $overrideShadow, 'source' => 'trusted_override_shadow'];
+    }
+    $overrideStaging = trim((string) ($env[ORANGE_RESTORE_ENV_STAGING_DB] ?? ''));
+    if ($overrideStaging !== '') {
+        $candidates[] = ['name' => $overrideStaging, 'source' => 'trusted_override_staging'];
     }
 
     foreach ($candidates as $candidate) {
@@ -237,6 +259,7 @@ function orange_restore_shadow_resolve_target(
             'source' => $source,
             'code' => 'ok',
             'production_db' => $productionDb,
+            'identity_hash' => orange_restore_shadow_target_identity_hash($name, $jobId),
         ];
     }
 
@@ -248,7 +271,24 @@ function orange_restore_shadow_resolve_target(
             ? 'shadow_db_equals_production'
             : ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
         'production_db' => $productionDb,
+        'identity_hash' => '',
     ];
+}
+
+/**
+ * Stable non-secret identity for parent/worker target match (never exposes DB name).
+ */
+function orange_restore_shadow_target_identity_hash(string $shadowDb, string $jobId): string
+{
+    $shadowDb = trim($shadowDb);
+    if ($shadowDb === '') {
+        return '';
+    }
+
+    return hash(
+        'sha256',
+        strtolower($shadowDb) . '|' . trim($jobId) . '|' . ORANGE_RESTORE_SHADOW_RECORD_VERSION
+    );
 }
 
 /**
@@ -360,7 +400,88 @@ function orange_restore_shadow_load_bootstrap_ack(string $workRoot, string $jobI
 }
 
 /**
- * Read-only readiness probe (create/use sibling shadow DB). Never touches production schema.
+ * Persist authoritative shadow target onto job meta (parent pre-spawn / worker bind).
+ *
+ * @param array<string, mixed> $meta
+ * @param array<string, mixed> $resolved from orange_restore_shadow_resolve_target()
+ * @return array<string, mixed>
+ */
+function orange_restore_shadow_bind_resolved_target(array $meta, array $resolved, string $jobId): array
+{
+    if (!($resolved['ok'] ?? false) || trim((string) ($resolved['shadow_db'] ?? '')) === '') {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
+    }
+    $meta['shadow_db'] = (string) $resolved['shadow_db'];
+    $meta['production_db'] = (string) ($resolved['production_db'] ?? '');
+    $meta['shadow_db_source'] = (string) ($resolved['source'] ?? '');
+    $meta['shadow_db_identity_hash'] = (string) ($resolved['identity_hash']
+        ?? orange_restore_shadow_target_identity_hash((string) $resolved['shadow_db'], $jobId));
+    $meta['owner_job_id'] = $jobId;
+    $meta['framework_job_id'] = (string) ($meta['framework_job_id'] ?? $jobId);
+
+    return $meta;
+}
+
+/**
+ * Evaluate SHOW GRANTS lines for CREATE / schema-use capability (redacted classes only).
+ *
+ * @param list<string> $grantLines
+ * @return array{can_create:bool,can_use_existing:bool,privilege_classes:list<string>}
+ */
+function orange_restore_shadow_evaluate_grant_capability(array $grantLines, string $shadowDb): array
+{
+    $canCreate = false;
+    $canUseExisting = false;
+    $classes = [];
+    $shadowNeedle = '`' . str_replace('`', '``', $shadowDb) . '`';
+
+    foreach ($grantLines as $grant) {
+        $grant = trim((string) $grant);
+        if ($grant === '' || preg_match('/^GRANT\b/i', $grant) !== 1) {
+            continue;
+        }
+        if (preg_match('/\bALL PRIVILEGES\b/i', $grant) === 1 && preg_match('/\bON\s+\*\.\*/i', $grant) === 1) {
+            $canCreate = true;
+            $canUseExisting = true;
+            $classes[] = 'ALL_ON_GLOBAL';
+            continue;
+        }
+        if (preg_match('/\bCREATE\b/i', $grant) === 1 && preg_match('/\bON\s+\*\.\*/i', $grant) === 1) {
+            $canCreate = true;
+            $classes[] = 'CREATE_ON_GLOBAL';
+        }
+        if (preg_match('/\bON\s+\*\.\*/i', $grant) === 1
+            && preg_match('/\b(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|INDEX)\b/i', $grant) === 1) {
+            $classes[] = 'GLOBAL_DML_DDL';
+            if (preg_match('/\b(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b/i', $grant) === 1) {
+                $canUseExisting = true;
+            }
+        }
+        if (stripos($grant, ' ON ' . $shadowNeedle . '.') !== false
+            || stripos($grant, ' ON ' . $shadowNeedle . '.*') !== false
+            || preg_match(
+                '/\sON\s+(?:`' . preg_quote(str_replace('`', '``', $shadowDb), '/') . '`|'
+                . preg_quote($shadowDb, '/') . ')\s*\./i',
+                $grant
+            ) === 1) {
+            $canUseExisting = true;
+            $classes[] = 'SCHEMA_SCOPED';
+            if (preg_match('/\b(ALL PRIVILEGES|CREATE|DROP|ALTER|INSERT|UPDATE|DELETE|SELECT)\b/i', $grant) === 1) {
+                $classes[] = 'SCHEMA_DML_DDL';
+            }
+        }
+    }
+
+    return [
+        'can_create' => $canCreate,
+        'can_use_existing' => $canUseExisting,
+        'privilege_classes' => array_values(array_unique($classes)),
+    ];
+}
+
+/**
+ * Honest read-only capability probe (SHOW GRANTS + information_schema). Never CREATE/DROP/USE-mutate.
+ * Distinct codes: target unavailable vs capability unavailable.
  *
  * @param array<string, mixed> $env
  * @param array<string, mixed>|null $meta
@@ -371,6 +492,9 @@ function orange_restore_shadow_load_bootstrap_ack(string $workRoot, string $jobI
  *   credential_mode:string,
  *   can_create:bool,
  *   can_use:bool,
+ *   schema_exists:bool,
+ *   database_capability:string,
+ *   privilege_classes:list<string>,
  *   shadow_db_identity_hash:string
  * }
  */
@@ -389,15 +513,16 @@ function orange_restore_shadow_probe_target_readiness(
             'credential_mode' => '',
             'can_create' => false,
             'can_use' => false,
+            'schema_exists' => false,
+            'database_capability' => 'unavailable',
+            'privilege_classes' => [],
             'shadow_db_identity_hash' => '',
         ];
     }
     $shadowDb = (string) $resolved['shadow_db'];
     $productionDb = (string) $resolved['production_db'];
-    $identity = hash(
-        'sha256',
-        strtolower($shadowDb) . '|' . $jobId . '|' . ORANGE_RESTORE_SHADOW_RECORD_VERSION
-    );
+    $identity = (string) ($resolved['identity_hash']
+        ?? orange_restore_shadow_target_identity_hash($shadowDb, $jobId));
 
     if (isset($GLOBALS['orange_shadow_readiness_override']) && is_callable($GLOBALS['orange_shadow_readiness_override'])) {
         /** @var callable $fn */
@@ -406,6 +531,12 @@ function orange_restore_shadow_probe_target_readiness(
         if (is_array($over)) {
             $over['shadow_db_identity_hash'] = $identity;
             $over['source'] = (string) ($over['source'] ?? $resolved['source']);
+            $over['database_capability'] = (string) ($over['database_capability']
+                ?? (!empty($over['ok']) ? 'available' : 'unavailable'));
+            $over['privilege_classes'] = is_array($over['privilege_classes'] ?? null)
+                ? $over['privilege_classes']
+                : [];
+            $over['schema_exists'] = !empty($over['schema_exists']);
 
             return $over;
         }
@@ -419,29 +550,63 @@ function orange_restore_shadow_probe_target_readiness(
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('SET NAMES utf8mb4');
-        $quoted = '`' . str_replace('`', '``', $shadowDb) . '`';
+
+        // Read-only: does sibling schema already exist?
         $st = $pdo->prepare('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1');
         $st->execute([$shadowDb]);
         $exists = (string) ($st->fetchColumn() ?: '') !== '';
-        $created = false;
-        if (!$exists) {
-            $pdo->exec(
-                'CREATE DATABASE ' . $quoted
-                . ' CHARACTER SET ' . ORANGE_RESTORE_SHADOW_CHARSET
-                . ' COLLATE ' . ORANGE_RESTORE_SHADOW_COLLATION
-            );
-            $created = true;
-        }
-        $pdo->exec('USE ' . $quoted);
-        $current = (string) ($pdo->query('SELECT DATABASE()')->fetchColumn() ?: '');
-        if ($current === '' || strcasecmp($current, $shadowDb) !== 0 || strcasecmp($current, $productionDb) === 0) {
+        if ($exists && strcasecmp($shadowDb, $productionDb) === 0) {
             return [
                 'ok' => false,
                 'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
                 'source' => (string) $resolved['source'],
                 'credential_mode' => (string) $creds['mode'],
-                'can_create' => $created || $exists,
+                'can_create' => false,
                 'can_use' => false,
+                'schema_exists' => true,
+                'database_capability' => 'unavailable',
+                'privilege_classes' => [],
+                'shadow_db_identity_hash' => $identity,
+            ];
+        }
+
+        $grantLines = [];
+        try {
+            $grantSt = $pdo->query('SHOW GRANTS FOR CURRENT_USER()');
+            if ($grantSt !== false) {
+                while ($row = $grantSt->fetch(PDO::FETCH_NUM)) {
+                    if (is_array($row) && isset($row[0])) {
+                        $line = trim((string) $row[0]);
+                        if ($line !== '') {
+                            $grantLines[] = $line;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable) {
+            $grantLines = [];
+        }
+
+        $eval = orange_restore_shadow_evaluate_grant_capability($grantLines, $shadowDb);
+        $canCreate = !empty($eval['can_create']);
+        $canUse = $exists ? !empty($eval['can_use_existing']) : $canCreate;
+        // If schema exists, prove USE via information_schema only (no USE/CREATE).
+        if ($exists && !$canUse) {
+            // Presence in SCHEMATA under current login often implies visibility; still require grant class.
+            $canUse = false;
+        }
+        $ok = ($exists && $canUse) || (!$exists && $canCreate);
+        if (!$ok) {
+            return [
+                'ok' => false,
+                'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE,
+                'source' => (string) $resolved['source'],
+                'credential_mode' => (string) $creds['mode'],
+                'can_create' => $canCreate,
+                'can_use' => $canUse,
+                'schema_exists' => $exists,
+                'database_capability' => 'unavailable',
+                'privilege_classes' => $eval['privilege_classes'],
                 'shadow_db_identity_hash' => $identity,
             ];
         }
@@ -451,20 +616,29 @@ function orange_restore_shadow_probe_target_readiness(
             'code' => 'ok',
             'source' => (string) $resolved['source'],
             'credential_mode' => (string) $creds['mode'],
-            'can_create' => true,
+            'can_create' => $canCreate || $exists,
             'can_use' => true,
+            'schema_exists' => $exists,
+            'database_capability' => 'available',
+            'privilege_classes' => $eval['privilege_classes'],
             'shadow_db_identity_hash' => $identity,
         ];
     } catch (Throwable $e) {
-        unset($e);
+        $safe = orange_restore_shadow_normalize_failure_code(trim($e->getMessage()));
+        $code = $safe === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+            ? ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+            : ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE;
 
         return [
             'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+            'code' => $code,
             'source' => (string) $resolved['source'],
             'credential_mode' => '',
             'can_create' => false,
             'can_use' => false,
+            'schema_exists' => false,
+            'database_capability' => 'unavailable',
+            'privilege_classes' => [],
             'shadow_db_identity_hash' => $identity,
         ];
     }
@@ -1611,12 +1785,15 @@ function orange_restore_shadow_run_cli(
             $meta['attempt_id'] = $attemptId;
         }
 
+        // Authoritative resolver only — never orange_restore_staging_db_name / mandatory env.
+        // Prefer job-bound meta persisted by parent pre-spawn; else auto/override resolve.
         $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
         if (!($resolved['ok'] ?? false)) {
             throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
         }
-        $shadowDb = (string) $resolved['shadow_db'];
-        $productionDb = (string) $resolved['production_db'];
+        $meta = orange_restore_shadow_bind_resolved_target($meta, $resolved, $jobId);
+        $shadowDb = (string) $meta['shadow_db'];
+        $productionDb = (string) $meta['production_db'];
         if ($shadowDb === '' || strcasecmp($shadowDb, $productionDb) === 0) {
             throw new RuntimeException('shadow_db_equals_production');
         }
@@ -1626,13 +1803,10 @@ function orange_restore_shadow_run_cli(
             'attempt_id' => $attemptId,
             'pid' => getmypid(),
             'owner' => $owner,
-            'target_source' => (string) $resolved['source'],
+            'target_source' => (string) ($meta['shadow_db_source'] ?? $resolved['source']),
+            'shadow_db_identity_hash' => (string) ($meta['shadow_db_identity_hash'] ?? ''),
             'ready' => true,
         ]);
-        $meta['shadow_db'] = $shadowDb;
-        $meta['production_db'] = $productionDb;
-        $meta['shadow_db_source'] = (string) $resolved['source'];
-        $meta['owner_job_id'] = $jobId;
         $meta['bootstrap_acked'] = true;
         $meta['status'] = ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING;
         $meta['cli_needed'] = false;
@@ -1690,7 +1864,20 @@ function orange_restore_shadow_run_cli(
 
         $ensured = orange_restore_shadow_ensure_database($projectRoot, $env, $shadowDb);
         if (!($ensured['ok'] ?? false)) {
-            throw new RuntimeException('shadow_db_create_failed');
+            $ensureMsg = trim((string) ($ensured['message'] ?? 'shadow_db_create_failed'));
+            $ensureCode = orange_restore_shadow_normalize_failure_code($ensureMsg);
+            if ($ensureCode === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+                || $ensureCode === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+                || $ensureCode === 'shadow_db_create_failed') {
+                throw new RuntimeException(
+                    $ensureCode === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+                        ? ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+                        : ($ensureCode !== '' ? $ensureCode : 'shadow_db_create_failed')
+                );
+            }
+            throw new RuntimeException(
+                $ensureCode !== '' ? $ensureCode : ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+            );
         }
 
         $pdo = orange_restore_shadow_connect_pdo($projectRoot, $env, $shadowDb);
