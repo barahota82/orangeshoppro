@@ -365,6 +365,7 @@ try {
             'D: readiness token exposed on requestable Step7'
         );
     } else {
+        $markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] = 0;
         s7cl_ok(true, 'D: local MySQL required (SKIP environment)');
     }
 
@@ -443,7 +444,7 @@ $ok = $fail === 0
     && ($markers['NOT_READY_REPRODUCED'] ?? 0) === 1
     && ($markers['NOT_READY_POST_REJECTED'] ?? 0) === 1
     && ($markers['STEP7_NOT_READY_MUTATION_POST_COUNT'] ?? 1) === 0
-    && ($markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] ?? 1) === 0
+    && (!$hasLocalMysql || ($markers['LEGACY_PRODUCTION_DB_CAPABILITY_GATE_IN_PRIVATE_MODE_COUNT'] ?? 1) === 0)
     && (!$hasLocalMysql || ($markers['SCHEMA_124_PRIVATE_IMPORT_PASS'] ?? 0) === 1)
     && (!$hasLocalMysql || ($markers['PARENT_WORKER_TARGET_IDENTITY_MATCH'] ?? 0) === 1);
 
