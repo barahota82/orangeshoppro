@@ -104,9 +104,9 @@ function s7cl_build_mini_runtime_zip(string $zipPath, string $sourceBasedir): bo
 }
 
 $protected = [
-    'admin/pages/backup_center.php' => '797b41b0b233c3ec',
+    'admin/pages/backup_center.php' => '5b13b330a3f7dff6',
     'includes/backup/backup_admin.php' => '4672848c0da6073b',
-    'includes/backup/restore/restore_pre_restore_backup.php' => '33e29bd0d64ed8c1',
+    'includes/backup/restore/restore_pre_restore_backup.php' => 'f632cef2affce508',
     'includes/backup/restore/restore_worker_php_cli.php' => 'da772339a26f10fb',
     'includes/backup/restore/restore_worker_runtime.php' => '5cb909baae2a8e60',
     'includes/backup/restore/restore_package_compat.php' => '5430bf960008dce9',
