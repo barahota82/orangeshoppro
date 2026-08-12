@@ -38,6 +38,7 @@ require_once $projectRoot . '/includes/backup/restore/restore_execution_orchestr
 
 $pass = 0;
 $fail = 0;
+$environmentBlocked = false;
 $markers = [];
 $matrix = [];
 
@@ -360,8 +361,19 @@ try {
         $markers['DISPOSABLE_SHADOW_DROPPED'] = 0;
     }
 } catch (Throwable $e) {
-    s7t_ok(false, 'genuine path: ' . orange_restore_shadow_normalize_failure_code($e->getMessage()));
-    $matrix['D.shadow_target_capable'] = 'BLOCKED';
+    $rawMessage = (string) $e->getMessage();
+    $normalized = orange_restore_shadow_normalize_failure_code($rawMessage);
+    if (!is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')
+        && ($normalized === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+            || str_contains($rawMessage, 'Missing .env.php'))) {
+        $environmentBlocked = true;
+        $markers['ENVIRONMENT_BLOCKED'] = 1;
+        $matrix['D.shadow_target_capable'] = 'BLOCKED_ENV';
+        echo "ENVIRONMENT_BLOCKED: Step 7 genuine DB import requires server-only .env.php/local DB credentials\n";
+    } else {
+        s7t_ok(false, 'genuine path: ' . $normalized);
+        $matrix['D.shadow_target_capable'] = 'BLOCKED';
+    }
 } finally {
     unset(
         $GLOBALS['orange_shadow_production_db_override'],
@@ -386,6 +398,7 @@ file_put_contents($ev . DIRECTORY_SEPARATOR . 'shadow_target_matrix.json', json_
     'markers' => $markers,
     'PASS' => $pass,
     'FAIL' => $fail,
+    'environment_blocked' => $environmentBlocked ? 1 : 0,
     'genuine_disposable_import' => $genuineOk ? 1 : 0,
     'failure_then_success' => $failureThenSuccess ? 1 : 0,
     'php_binary_used' => is_file($phpBin) ? 'laragon_or_cli' : 'unknown',
@@ -405,4 +418,11 @@ file_put_contents($ev . DIRECTORY_SEPARATOR . 'registers.json', json_encode([
 echo "PASS={$pass} FAIL={$fail}\n";
 echo 'GENUINE=' . ($genuineOk ? '1' : '0') . "\n";
 echo 'FAIL_THEN_SUCCESS=' . ($failureThenSuccess ? '1' : '0') . "\n";
-exit(($fail > 0 || !$failureThenSuccess) ? 1 : 0);
+echo 'ENVIRONMENT_BLOCKED=' . ($environmentBlocked ? '1' : '0') . "\n";
+if ($fail > 0) {
+    exit(1);
+}
+if ($environmentBlocked && !$failureThenSuccess) {
+    exit(2);
+}
+exit(!$failureThenSuccess ? 1 : 0);
