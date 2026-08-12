@@ -27,10 +27,12 @@ require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v7-php-cli-runtime';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v8-shadow-target';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
 const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
 const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
+const ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_WAIT_MS = 5000;
+const ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_POLL_MS = 100;
 
 /** Owner-safe Step-7 start failure codes (no paths/secrets). */
 const ORANGE_RESTORE_STEP7_WRONG_STATE = 'STEP7_WRONG_STATE';
@@ -48,6 +50,9 @@ const ORANGE_RESTORE_STEP7_PROCESS_EXECUTION_UNAVAILABLE = 'STEP7_PROCESS_EXECUT
 const ORANGE_RESTORE_STEP7_LAUNCH_ARTIFACT_FAILED = 'STEP7_LAUNCH_ARTIFACT_FAILED';
 const ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED = 'STEP7_PROCESS_SPAWN_FAILED';
 const ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED = 'STEP7_WORKER_BOOTSTRAP_FAILED';
+if (!defined('ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE')) {
+    define('ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE', 'STEP7_SHADOW_DB_TARGET_UNAVAILABLE');
+}
 const ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE = 'STEP7_UNKNOWN_START_FAILURE';
 
 /**
@@ -721,6 +726,13 @@ function orange_restore_center_claim_blocks_schedule(?array $claim, array $job, 
         return false;
     }
 
+    $failedMap = orange_restore_center_worker_dispatch_failure_status_map();
+    $failedStatus = (string) ($failedMap[$workerKey] ?? '');
+    // FAILED_BUT_ACTIVE_PUBLIC_STATE_01: terminal failed must never stay blocked by a dead claim.
+    if ($failedStatus !== '' && $status === $failedStatus && !$alive) {
+        return false;
+    }
+
     if ($alive) {
         return true;
     }
@@ -737,7 +749,12 @@ function orange_restore_center_claim_blocks_schedule(?array $claim, array $job, 
         return $age < ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS;
     }
 
-    // Schedulable again (failed / pending / entry): brief grace against double-schedule right after spawn.
+    // Pending / entry only: brief grace against double-schedule right after spawn.
+    // Do not apply grace for failed (retryable) — Owner must see requestable immediately.
+    if ($failedStatus !== '' && $status === $failedStatus) {
+        return false;
+    }
+
     return $age < ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS;
 }
 
@@ -897,6 +914,13 @@ function orange_restore_center_classify_worker_log_bootstrap(string $logPath): s
         || preg_match('/command not found/i', $raw) === 1
         || preg_match('/No such file or directory/i', $raw) === 1) {
         return 'restore_center_worker_executable_unavailable';
+    }
+    if (preg_match('/SHADOW_RESTORE_RESULT:\s*FAIL/i', $raw) === 1
+        || preg_match('/CODE:\s*STEP7_SHADOW_DB_TARGET_UNAVAILABLE/i', $raw) === 1
+        || preg_match('/ORANGE_RESTORE_STAGING_DB/i', $raw) === 1
+        || preg_match('/ORANGE_RESTORE_SHADOW_DB/i', $raw) === 1
+        || preg_match('/is not configured/i', $raw) === 1) {
+        return ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
     }
 
     return '';
@@ -1128,6 +1152,12 @@ function orange_restore_center_step7_classify_start_failure(string $code): strin
             || $code === 'restore_center_spawn_job_arg_rejected' => ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED,
         $code === 'restore_center_worker_bootstrap_failed' => ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED,
         $code === 'shadow_restore_lock_active' => ORANGE_RESTORE_STEP7_CLAIM_CONFLICT,
+        $code === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+            || $code === 'shadow_db_target_unavailable'
+            || $code === 'shadow_db_create_failed'
+            || str_contains($code, 'ORANGE_RESTORE_STAGING_DB')
+            || str_contains($code, 'ORANGE_RESTORE_SHADOW_DB')
+            || str_contains($code, 'is not configured') => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
         str_starts_with($code, 'STEP7_') => $code,
         default => ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE,
     };
@@ -1154,10 +1184,138 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_LAUNCH_ARTIFACT_FAILED => 'تعذر تجهيز تشغيل المرحلة الداخلي على الخادم.',
         ORANGE_RESTORE_STEP7_PROCESS_SPAWN_FAILED => 'تعذر إنشاء عملية العامل الداخلي. لم يبدأ أي تنفيذ.',
         ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED => 'تعذر إقلاع عامل استعادة قاعدة الظل بعد الجدولة. لم يُعتمد التنفيذ.',
+        ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE => 'تعذر بدء استعادة قاعدة الظل. أعد المحاولة من شاشة الاسترداد.',
     ];
 
     return $messages[$safeCode] ?? $messages[ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE];
+}
+
+/**
+ * Pre-spawn shadow DB target readiness (fail closed before process creation).
+ *
+ * @return array{ok:bool,code:string,attempt_id:string,readiness:array<string,mixed>}
+ */
+function orange_restore_center_shadow_pre_spawn_readiness(
+    string $projectRoot,
+    string $workRoot,
+    string $jobId
+): array {
+    if (!function_exists('orange_restore_shadow_probe_target_readiness')) {
+        require_once __DIR__ . '/restore_shadow_db.php';
+    }
+    $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
+    $attemptId = trim((string) ($meta['attempt_id'] ?? ''));
+    if ($attemptId === '') {
+        $attemptId = 's7_' . bin2hex(random_bytes(8));
+        $meta['attempt_id'] = $attemptId;
+    }
+    $env = orange_backup_load_env_array($projectRoot);
+    if (isset($GLOBALS['orange_shadow_env_override']) && is_array($GLOBALS['orange_shadow_env_override'])) {
+        $env = array_merge($env, $GLOBALS['orange_shadow_env_override']);
+    }
+    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    if (($resolved['ok'] ?? false) && trim((string) ($resolved['shadow_db'] ?? '')) !== '') {
+        $meta['shadow_db'] = (string) $resolved['shadow_db'];
+        $meta['production_db'] = (string) ($resolved['production_db'] ?? '');
+        $meta['shadow_db_source'] = (string) ($resolved['source'] ?? '');
+        try {
+            orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+        } catch (Throwable) {
+            // non-fatal; worker will re-bind
+        }
+    }
+    $probe = orange_restore_shadow_probe_target_readiness($projectRoot, $env, $jobId, $meta);
+    if (!($probe['ok'] ?? false)) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+            'attempt_id' => $attemptId,
+            'readiness' => [
+                'ok' => false,
+                'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+                'source' => (string) ($probe['source'] ?? 'unavailable'),
+                'credential_mode' => (string) ($probe['credential_mode'] ?? ''),
+                'can_create' => false,
+                'can_use' => false,
+                'shadow_db_identity_hash' => (string) ($probe['shadow_db_identity_hash'] ?? ''),
+            ],
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'code' => 'ok',
+        'attempt_id' => $attemptId,
+        'readiness' => [
+            'ok' => true,
+            'code' => 'ok',
+            'source' => (string) ($probe['source'] ?? ''),
+            'credential_mode' => (string) ($probe['credential_mode'] ?? ''),
+            'can_create' => !empty($probe['can_create']),
+            'can_use' => !empty($probe['can_use']),
+            'shadow_db_identity_hash' => (string) ($probe['shadow_db_identity_hash'] ?? ''),
+        ],
+    ];
+}
+
+/**
+ * Bounded wait for shadow worker bootstrap ack or terminal failure (Owner E/F).
+ *
+ * @return array{acked:bool,failed:bool,code:string,attempt_id:string}
+ */
+function orange_restore_center_await_shadow_bootstrap_ack(
+    string $workRoot,
+    string $jobId,
+    string $attemptId,
+    string $logPath,
+    int $waitMs = ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_WAIT_MS
+): array {
+    if (!function_exists('orange_restore_shadow_load_bootstrap_ack')) {
+        require_once __DIR__ . '/restore_shadow_db.php';
+    }
+    $deadline = microtime(true) + (max(200, $waitMs) / 1000.0);
+    do {
+        $ack = orange_restore_shadow_load_bootstrap_ack($workRoot, $jobId);
+        if (is_array($ack) && !empty($ack['ready'])) {
+            $ackAttempt = trim((string) ($ack['attempt_id'] ?? ''));
+            if ($attemptId === '' || $ackAttempt === '' || hash_equals($attemptId, $ackAttempt)) {
+                return [
+                    'acked' => true,
+                    'failed' => false,
+                    'code' => 'ok',
+                    'attempt_id' => $ackAttempt !== '' ? $ackAttempt : $attemptId,
+                ];
+            }
+        }
+        $bootFail = orange_restore_center_classify_worker_log_bootstrap($logPath);
+        if ($bootFail !== '') {
+            return [
+                'acked' => false,
+                'failed' => true,
+                'code' => $bootFail,
+                'attempt_id' => $attemptId,
+            ];
+        }
+        usleep(ORANGE_RESTORE_CENTER_SHADOW_BOOTSTRAP_POLL_MS * 1000);
+    } while (microtime(true) < $deadline);
+
+    $bootFail = orange_restore_center_classify_worker_log_bootstrap($logPath);
+    if ($bootFail !== '') {
+        return [
+            'acked' => false,
+            'failed' => true,
+            'code' => $bootFail,
+            'attempt_id' => $attemptId,
+        ];
+    }
+
+    return [
+        'acked' => false,
+        'failed' => true,
+        'code' => ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED,
+        'attempt_id' => $attemptId,
+    ];
 }
 
 /**
@@ -1230,9 +1388,20 @@ function orange_restore_center_attach_verified_schedule(
     } catch (Throwable $e) {
         $code = trim($e->getMessage());
         if ($code === 'restore_center_worker_already_running') {
+            $liveJob = orange_restore_fw_read($workRoot, $jobId);
+            $liveStatus = (string) ($liveJob['status'] ?? '');
+            $failedMap = orange_restore_center_worker_dispatch_failure_status_map();
+            // Never promote a terminal failed/compensated stage into a false "scheduled" success.
+            if ($workerKey === 'shadow_db'
+                && isset($failedMap[$workerKey])
+                && $liveStatus === $failedMap[$workerKey]
+            ) {
+                throw new RuntimeException(ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE, 0, $e);
+            }
             $requestResult['scheduled'] = true;
             $requestResult['detached'] = true;
-            $requestResult['job'] = orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId));
+            $requestResult['bootstrap_acked'] = true;
+            $requestResult['job'] = orange_restore_fw_public_row($liveJob);
             $requestResult['message'] = 'التنفيذ يعمل بالفعل على الخادم.';
 
             return $requestResult;
@@ -1244,9 +1413,14 @@ function orange_restore_center_attach_verified_schedule(
     $requestResult['detached'] = !empty($scheduled['detached']);
     $requestResult['pid'] = (int) ($scheduled['pid'] ?? 0);
     $requestResult['worker'] = $workerKey;
+    $requestResult['bootstrap_acked'] = !empty($scheduled['bootstrap_acked'])
+        || ($workerKey !== 'shadow_db' && !empty($scheduled['scheduled']));
+    $requestResult['attempt_id'] = (string) ($scheduled['attempt_id'] ?? '');
     $requestResult['job'] = orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId));
     $requestResult['message'] = (string) ($scheduled['diagnostics']['reason_ar']
-        ?? 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.');
+        ?? ($workerKey === 'shadow_db'
+            ? 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.'
+            : 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.'));
     $requestResult['diagnostics'] = is_array($scheduled['diagnostics'] ?? null)
         ? $scheduled['diagnostics']
         : ['code' => 'ok', 'reason_ar' => $requestResult['message']];
@@ -1542,11 +1716,64 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         // Strip absolute path-like segments for operator safety.
         $text = (string) preg_replace('#[A-Za-z]:\\\\[^\s\'"]+#', '[path]', $text);
         $text = (string) preg_replace('#/(?:var|home|usr|opt|httpdocs|inetpub)[^\s\'"]+#i', '[path]', $text);
+        // RAW_ENVIRONMENT_NAME_EXPOSURE_01 — never surface env key names to Owner diagnostics.
+        $text = (string) preg_replace('/ORANGE_RESTORE_[A-Z0-9_]+/', '[env]', $text);
+        $text = (string) preg_replace('/\bDB_(?:NAME|USER|PASS|HOST)\b/', '[env]', $text);
+        $text = (string) preg_replace('/\.env\.php/', '[config]', $text);
         $logSnippets[] = [
             'worker' => $workerKey,
             'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
             'tail' => trim($text) !== '' ? trim($text) : '(empty)',
         ];
+    }
+
+    $shadowReadiness = null;
+    if ($guidedWorker === 'shadow_db') {
+        try {
+            if (!function_exists('orange_restore_shadow_resolve_target')) {
+                require_once __DIR__ . '/restore_shadow_db.php';
+            }
+            $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
+            $env = orange_backup_load_env_array(dirname(__DIR__, 3));
+            // Read-only resolve only (no CREATE) for diagnostic display.
+            $resolved = orange_restore_shadow_resolve_target($env, dirname(__DIR__, 3), $jobId, $meta);
+            $ack = orange_restore_shadow_load_bootstrap_ack($workRoot, $jobId);
+            $shadowReadiness = [
+                'ok' => (bool) ($resolved['ok'] ?? false),
+                'code' => (string) (($resolved['ok'] ?? false) ? 'ok' : ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE),
+                'source' => (string) ($resolved['source'] ?? 'unavailable'),
+                'shadow_db_identity_hash' => ((string) ($resolved['shadow_db'] ?? '') !== '')
+                    ? hash(
+                        'sha256',
+                        strtolower((string) $resolved['shadow_db']) . '|' . $jobId . '|'
+                        . (defined('ORANGE_RESTORE_SHADOW_RECORD_VERSION')
+                            ? ORANGE_RESTORE_SHADOW_RECORD_VERSION
+                            : 'shadow')
+                    )
+                    : '',
+                'attempt_id' => (string) ($meta['attempt_id'] ?? ''),
+                'bootstrap_acked' => is_array($ack) && !empty($ack['ready']),
+                'requestable' => !empty(orange_restore_fw_public_row($job)['shadow_restore_requestable']),
+                'execution_running' => in_array($status, [
+                    ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+                    ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
+                    ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
+                ], true),
+                'read_only' => true,
+            ];
+        } catch (Throwable) {
+            $shadowReadiness = [
+                'ok' => false,
+                'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
+                'source' => 'unavailable',
+                'shadow_db_identity_hash' => '',
+                'attempt_id' => '',
+                'bootstrap_acked' => false,
+                'requestable' => !empty(orange_restore_fw_public_row($job)['shadow_restore_requestable']),
+                'execution_running' => false,
+                'read_only' => true,
+            ];
+        }
     }
 
     return [
@@ -1561,13 +1788,15 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         'latest_attempt_diagnostic' => $latestCurrent,
         'step7_attempt_count' => $guidedWorker === 'shadow_db' ? $step7AttemptCount : 0,
         'step7_attempt_clusters' => $guidedWorker === 'shadow_db' ? array_values($attemptClusters) : [],
+        'step7_shadow_target_readiness' => $shadowReadiness,
         'log_tails' => $logSnippets,
         'notes_ar' => [
             'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
-            'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا رموز الانتقال الداخلية.',
+            'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا أسماء قواعد البيانات ولا مفاتيح البيئة.',
             'أحدث محاولة تخص المرحلة الحالية حسب حالة المهمة؛ أحداث المراحل السابقة تُعرض كتاريخية فقط.',
             'يُرفض التنفيذ إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كانت المرحلة تعمل.',
             'تحديث الحالة (Refresh) لا يُحسب محاولة جديدة لخطوة استعادة قاعدة الظل.',
+            'قسم جاهزية هدف قاعدة الظل للقراءة فقط ولا ينشئ محاولة جديدة.',
         ],
     ];
 }
@@ -1609,6 +1838,7 @@ function orange_restore_center_run_worker(
     $mutexHandle = null;
     $pid = 0;
     $jobStatus = '';
+    $attemptId = '';
 
     try {
         $relative = orange_restore_center_assert_worker_key($workerKey);
@@ -1648,6 +1878,23 @@ function orange_restore_center_run_worker(
         // Retry must never reuse a prior failed attempt's launch.cmd (bare "php" leftover).
         orange_restore_center_discard_stale_launch_artifact($workRoot, $jobId, $workerKey);
 
+        $attemptId = '';
+        if ($workerKey === 'shadow_db') {
+            // Fail closed BEFORE spawn when shadow DB target cannot be prepared.
+            $pre = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jobId);
+            $attemptId = (string) ($pre['attempt_id'] ?? '');
+            if (empty($pre['ok'])) {
+                throw new RuntimeException(ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE);
+            }
+            // Clear stale bootstrap ack from a previous attempt.
+            $ackPath = function_exists('orange_restore_shadow_bootstrap_ack_path')
+                ? orange_restore_shadow_bootstrap_ack_path($workRoot, $jobId)
+                : '';
+            if ($ackPath !== '' && is_file($ackPath)) {
+                @unlink($ackPath);
+            }
+        }
+
         $spawned = orange_restore_center_spawn_detached(
             [$phpBinary, $script, '--job=' . $jobId],
             $logPath,
@@ -1671,6 +1918,25 @@ function orange_restore_center_run_worker(
             // Log present without executable-missing markers: accept short-lived launcher PID.
         }
 
+        $bootstrapAcked = false;
+        if ($workerKey === 'shadow_db') {
+            // Owner E/F: never record scheduled/success after child terminal failure;
+            // "started" only after bootstrap readiness ack.
+            $await = orange_restore_center_await_shadow_bootstrap_ack(
+                $workRoot,
+                $jobId,
+                $attemptId,
+                $logPath
+            );
+            if (!empty($await['failed']) || empty($await['acked'])) {
+                throw new RuntimeException(
+                    (string) ($await['code'] ?? ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED)
+                );
+            }
+            $bootstrapAcked = true;
+            $attemptId = (string) ($await['attempt_id'] ?? $attemptId);
+        }
+
         $claim = [
             'job_id' => $jobId,
             'worker' => $workerKey,
@@ -1683,6 +1949,8 @@ function orange_restore_center_run_worker(
             'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             'detached' => true,
+            'attempt_id' => $attemptId,
+            'bootstrap_acked' => $bootstrapAcked,
         ];
         orange_restore_center_write_run_claim($claimPath, $claim);
 
@@ -1696,6 +1964,8 @@ function orange_restore_center_run_worker(
             'job_status' => $jobStatus,
             'operator_username' => $operatorUsername,
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
+            'attempt_id' => $attemptId,
+            'bootstrap_acked' => $bootstrapAcked,
         ]);
     } catch (Throwable $e) {
         $code = orange_restore_center_normalize_failure_code(trim($e->getMessage()));
@@ -1754,7 +2024,9 @@ function orange_restore_center_run_worker(
             // Remove only bare/stale launch leftovers — never a fresh absolute regenerated launch.
             if ($code === 'restore_center_worker_executable_unavailable'
                 || $code === 'restore_center_spawn_failed'
-                || $code === 'restore_center_worker_bootstrap_failed') {
+                || $code === 'restore_center_worker_bootstrap_failed'
+                || $code === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
+                || $code === ORANGE_RESTORE_STEP7_WORKER_BOOTSTRAP_FAILED) {
                 try {
                     orange_restore_center_discard_stale_launch_artifact($workRoot, $jobId, $workerKey);
                 } catch (Throwable $ignoredDiscard) {
@@ -1762,8 +2034,11 @@ function orange_restore_center_run_worker(
                 }
             }
         }
-        if (trim($e->getMessage()) !== $code) {
-            throw new RuntimeException($code, 0, $e);
+        $safeThrow = $workerKey === 'shadow_db'
+            ? orange_restore_center_step7_classify_start_failure($code)
+            : $code;
+        if (trim($e->getMessage()) !== $safeThrow) {
+            throw new RuntimeException($safeThrow, 0, $e);
         }
         throw $e;
     } finally {
@@ -1776,6 +2051,8 @@ function orange_restore_center_run_worker(
         'ok' => true,
         'detached' => true,
         'scheduled' => true,
+        'bootstrap_acked' => $workerKey !== 'shadow_db' ? true : true,
+        'attempt_id' => isset($attemptId) ? (string) $attemptId : '',
         'worker' => $workerKey,
         'script' => $relative,
         'pid' => $pid,
@@ -1786,7 +2063,9 @@ function orange_restore_center_run_worker(
         'message' => 'Worker scheduled on server. Continues independently of the browser.',
         'diagnostics' => [
             'code' => 'ok',
-            'reason_ar' => 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.',
+            'reason_ar' => $workerKey === 'shadow_db'
+                ? 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.'
+                : 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.',
             'job_status' => $jobStatus,
             'worker' => $workerKey,
         ],

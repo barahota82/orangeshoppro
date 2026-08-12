@@ -72,7 +72,10 @@ return [
     // Phase 2B.1 — Full Disaster Restore → STAGING (CLI only; server-only secrets).
     // Staging DB/user must differ from production DB_NAME / DB_USER. Staging user: zero production privileges.
     // Supported restore packages: manifest.export_backend=php_pdo only (see ORANGE_BACKUP_RECOVERY_RUNBOOK.md).
+    // Optional Step-7 override only (auto job-bound shadow DB is default; never equals DB_NAME).
     // 'ORANGE_RESTORE_STAGING_DB' => 'orange_restore_staging',
+    // 'ORANGE_RESTORE_SHADOW_DB' => 'orange_restore_shadow_override',
+    // Optional dedicated staging user (≠ DB_USER). If omitted, Step-7 uses trusted app DB credentials for sibling shadow schema only.
     // 'ORANGE_RESTORE_STAGING_DB_USER' => 'orange_restore_staging',
     // 'ORANGE_RESTORE_STAGING_DB_PASS' => 'strong_staging_password',
     // 'ORANGE_RESTORE_WORK_DIR' => 'D:\\orange_backups\\restore_work',

@@ -410,7 +410,18 @@ function orange_restore_prod_rollback_validate_entry(
     // Reject shadow DB as source at gate (identity confusion).
     try {
         $env = orange_backup_load_env_array($projectRoot);
-        $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+        $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+            ? orange_restore_shadow_load_meta($workRoot, $jobId)
+            : null;
+        $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+        if ($shadowDb === '') {
+            $shadowDb = orange_restore_shadow_db_name(
+                $env,
+                $projectRoot,
+                $jobId,
+                is_array($shadowMeta) ? $shadowMeta : null
+            );
+        }
         $productionDb = orange_restore_production_db_name($projectRoot);
         if (strcasecmp($shadowDb, $productionDb) === 0) {
             return ['ok' => false, 'code' => 'shadow_db_equals_production', 'details' => $details];
@@ -777,7 +788,18 @@ function orange_restore_prod_rollback_run_cli(array $options): array
     $productionDb = $creds['db'];
     $shadowDb = '';
     try {
-        $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+        $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+            ? orange_restore_shadow_load_meta($workRoot, $jobId)
+            : null;
+        $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+        if ($shadowDb === '') {
+            $shadowDb = orange_restore_shadow_db_name(
+                $env,
+                $projectRoot,
+                $jobId,
+                is_array($shadowMeta) ? $shadowMeta : null
+            );
+        }
     } catch (Throwable) {
         $shadowDb = '';
     }

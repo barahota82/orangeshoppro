@@ -320,13 +320,28 @@ function orange_restore_prod_import_validate_entry(
     // Reject shadow/staging name confusion at gate level.
     $env = orange_backup_load_env_array($projectRoot);
     try {
-        $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+        $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+            ? orange_restore_shadow_load_meta($workRoot, $jobId)
+            : null;
+        $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+        if ($shadowDb === '') {
+            $shadowDb = orange_restore_shadow_db_name(
+                $env,
+                $projectRoot,
+                $jobId,
+                is_array($shadowMeta) ? $shadowMeta : null
+            );
+        }
         $productionDb = orange_restore_production_db_name($projectRoot);
         if (strcasecmp($shadowDb, $productionDb) === 0) {
             return ['ok' => false, 'code' => 'shadow_db_equals_production', 'details' => $details];
         }
     } catch (Throwable $e) {
-        return ['ok' => false, 'code' => trim($e->getMessage()) ?: 'db_identity_invalid', 'details' => $details];
+        $safe = function_exists('orange_restore_shadow_normalize_failure_code')
+            ? orange_restore_shadow_normalize_failure_code(trim($e->getMessage()))
+            : (trim($e->getMessage()) ?: 'db_identity_invalid');
+
+        return ['ok' => false, 'code' => $safe !== '' ? $safe : 'db_identity_invalid', 'details' => $details];
     }
 
     return ['ok' => true, 'code' => 'ok', 'details' => $details];
@@ -358,7 +373,18 @@ function orange_restore_prod_import_export_shadow(array $options): array
     /** @var array<string, mixed> $env */
     $env = is_array($options['env'] ?? null) ? $options['env'] : orange_backup_load_env_array($projectRoot);
 
-    $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+    $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+        ? orange_restore_shadow_load_meta($workRoot, $jobId)
+        : null;
+    $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+    if ($shadowDb === '') {
+        $shadowDb = orange_restore_shadow_db_name(
+            $env,
+            $projectRoot,
+            $jobId,
+            is_array($shadowMeta) ? $shadowMeta : null
+        );
+    }
     $productionDb = orange_restore_production_db_name($projectRoot);
     $shadowPdo = $options['shadow_pdo_override'] ?? null;
     $pdo = $shadowPdo instanceof PDO
@@ -725,7 +751,18 @@ function orange_restore_prod_import_run_cli(array $options): array
 
     $creds = orange_restore_merge_credentials($env, $projectRoot);
     $productionDb = $creds['db'];
-    $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+    $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+        ? orange_restore_shadow_load_meta($workRoot, $jobId)
+        : null;
+    $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+    if ($shadowDb === '') {
+        $shadowDb = orange_restore_shadow_db_name(
+            $env,
+            $projectRoot,
+            $jobId,
+            is_array($shadowMeta) ? $shadowMeta : null
+        );
+    }
     if (strcasecmp($productionDb, $shadowDb) === 0) {
         throw new RuntimeException('shadow_db_equals_production');
     }

@@ -41,15 +41,17 @@ try {
     );
 
     $scheduled = !empty($result['scheduled']);
+    $bootstrapAcked = !empty($result['bootstrap_acked']);
     $idempotent = (bool) ($result['idempotent'] ?? false);
     $message = (string) ($result['message'] ?? '');
-    if ($scheduled) {
-        $message = 'تم بدء استعادة قاعدة الظل على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
+    // Owner F: "started" only after bootstrap/readiness ack — never on bare spawn.
+    if ($scheduled && $bootstrapAcked) {
+        $message = 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
     } elseif ($idempotent && $message === '') {
         $message = 'استعادة قاعدة الظل قيد التنفيذ أو مكتملة مسبقاً.';
     } elseif ($message === '' || str_contains($message, 'CLI') || str_contains($message, 'php scripts')) {
         $message = $scheduled
-            ? 'تم بدء استعادة قاعدة الظل على الخادم.'
+            ? 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع.'
             : 'تعذر بدء استعادة قاعدة الظل.';
     }
 
@@ -59,6 +61,8 @@ try {
         'execution_started' => false,
         'production_touched' => false,
         'scheduled' => $scheduled,
+        'bootstrap_acked' => $bootstrapAcked,
+        'attempt_id' => (string) ($result['attempt_id'] ?? ''),
         'detached' => !empty($result['detached']),
         'cli_needed' => false,
         'cli_command' => '',

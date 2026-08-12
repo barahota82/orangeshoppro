@@ -889,7 +889,12 @@ function orange_restore_shadow_verify_run_cli(
         $productionDb = orange_restore_shadow_production_db_name($projectRoot);
         $shadowDb = (string) ($shadowMeta['shadow_db'] ?? '');
         if ($shadowDb === '') {
-            $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+            $shadowDb = orange_restore_shadow_db_name(
+                $env,
+                $projectRoot,
+                $jobId,
+                is_array($shadowMeta) ? $shadowMeta : null
+            );
         }
         if (strcasecmp($shadowDb, $productionDb) === 0) {
             throw new RuntimeException('Shadow database must not equal production database.');

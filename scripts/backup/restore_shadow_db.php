@@ -59,9 +59,13 @@ try {
         exit(0);
     }
 
+    $failCode = (string) ($result['code'] ?? 'shadow_restore_failed');
+    if (function_exists('orange_restore_shadow_normalize_failure_code')) {
+        $failCode = orange_restore_shadow_normalize_failure_code($failCode);
+    }
     echo 'SHADOW_RESTORE_RESULT: FAIL' . PHP_EOL;
     echo 'JOB_ID: ' . (string) ($result['job_id'] ?? $jobId) . PHP_EOL;
-    echo 'CODE: ' . (string) ($result['code'] ?? 'shadow_restore_failed') . PHP_EOL;
+    echo 'CODE: ' . $failCode . PHP_EOL;
     echo 'SHADOW_DB: ' . (string) ($result['shadow_db'] ?? '') . PHP_EOL;
     echo 'VERIFY: FAIL' . PHP_EOL;
     echo 'PRODUCTION_TOUCHED: NO' . PHP_EOL;
@@ -69,6 +73,9 @@ try {
     exit(1);
 } catch (Throwable $e) {
     $code = trim($e->getMessage()) ?: 'shadow_restore_failed';
+    if (function_exists('orange_restore_shadow_normalize_failure_code')) {
+        $code = orange_restore_shadow_normalize_failure_code($code);
+    }
     fwrite(STDERR, 'ERROR: ' . $code . PHP_EOL);
     echo 'SHADOW_RESTORE_RESULT: FAIL' . PHP_EOL;
     echo 'JOB_ID: ' . $jobId . PHP_EOL;

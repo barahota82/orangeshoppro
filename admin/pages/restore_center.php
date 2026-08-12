@@ -1515,7 +1515,7 @@ body.rc-modal-open{overflow:hidden!important}
     const RC_SCHEDULED_MSG = 'تم بدء التنفيذ على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
     const RC_PRE_BACKUP_OK_MSG = 'اكتملت النسخة الاحتياطية الإلزامية قبل الاسترداد وهي جاهزة وآمنة للرجوع.';
     const RC_PRE_BACKUP_FAIL_MSG = 'تعذر إكمال النسخة الاحتياطية الإلزامية قبل الاسترداد.\nلم تُربط أي حزمة، ويمكن إعادة المحاولة من شاشة الاسترداد.';
-    const RC_SHADOW_SCHEDULED_MSG = 'تم بدء استعادة قاعدة الظل على الخادم. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
+    const RC_SHADOW_SCHEDULED_MSG = 'تم بدء استعادة قاعدة الظل بعد تأكيد الإقلاع. يمكنك مغادرة الصفحة، وسيستمر التنفيذ.';
     const RC_SHADOW_FAIL_MSG = 'تعذر بدء استعادة قاعدة الظل.';
 
     function deriveReadiness(ov, maint) {

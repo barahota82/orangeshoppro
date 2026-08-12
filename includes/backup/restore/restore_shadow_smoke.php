@@ -1539,7 +1539,13 @@ function orange_restore_shadow_smoke_execute_pipeline(
 ): array {
     unset($backupRoot);
     $env = orange_backup_load_env_array($projectRoot);
-    $shadowDb = orange_restore_shadow_db_name($env, $projectRoot);
+    $shadowMeta = function_exists('orange_restore_shadow_load_meta')
+        ? orange_restore_shadow_load_meta($workRoot, $jobId)
+        : null;
+    $shadowDb = trim((string) (($shadowMeta['shadow_db'] ?? '') ?: ''));
+    if ($shadowDb === '') {
+        $shadowDb = orange_restore_shadow_db_name($env, $projectRoot, $jobId, is_array($shadowMeta) ? $shadowMeta : null);
+    }
     $productionDb = orange_restore_shadow_production_db_name($projectRoot);
     if (strcasecmp($shadowDb, $productionDb) === 0) {
         throw new RuntimeException('production_db_identity_rejected');
