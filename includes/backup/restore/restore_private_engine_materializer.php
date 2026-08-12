@@ -432,6 +432,7 @@ function orange_restore_private_engine_extract_and_verify(
                 throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
             }
             $prefixes = $manifest['file_allowlist_prefixes'] ?? [];
+            $allowedZipEntries = [];
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $stat = $zip->statIndex($i);
                 $name = str_replace('\\', '/', (string) ($stat['name'] ?? ''));
@@ -458,8 +459,13 @@ function orange_restore_private_engine_extract_and_verify(
                     // Soft: skip unexpected files rather than execute them; still extract known prefixes only.
                     continue;
                 }
+                $allowedZipEntries[] = (string) ($stat['name'] ?? '');
             }
-            if (!$zip->extractTo($staging)) {
+            if ($allowedZipEntries === []) {
+                $zip->close();
+                throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED);
+            }
+            if (!$zip->extractTo($staging, $allowedZipEntries)) {
                 $zip->close();
                 throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
             }
