@@ -693,6 +693,27 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
     return ctype_digit($raw) ? (int) $raw : 0;
 }
 
+function orange_restore_private_engine_stop_daemon(int $pid, string $pidFile = ''): void
+{
+    $pidFromFile = $pidFile !== '' ? orange_restore_private_engine_read_pid_file($pidFile) : 0;
+    if ($pidFromFile > 0) {
+        $pid = $pidFromFile;
+    }
+    if ($pid <= 0) {
+        return;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        @exec('taskkill /PID ' . (string) $pid . ' /F /T 2>nul');
+    } else {
+        @exec('kill -TERM ' . (string) $pid . ' 2>/dev/null');
+        usleep(500000);
+        @exec('kill -KILL ' . (string) $pid . ' 2>/dev/null');
+    }
+    if ($pidFile !== '') {
+        @unlink($pidFile);
+    }
+}
+
 /**
  * Zero-mutation preflight: resolve runtime source (no download/datadir/credentials).
  *
@@ -977,6 +998,7 @@ function orange_restore_private_engine_provision(
     ];
     // skip-networking conflicts with TCP bootstrap on some builds; keep bind-address loopback-only.
 
+    @unlink($pidFile);
     try {
         $enginePid = orange_restore_private_engine_spawn_daemon($mysqld, $bootstrapArgs, $errorLog);
     } catch (Throwable) {
@@ -998,6 +1020,8 @@ function orange_restore_private_engine_provision(
         usleep(300000);
     }
     if (!$up) {
+        orange_restore_private_engine_stop_daemon($enginePid, $pidFile);
+
         return [
             'ok' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
@@ -1069,6 +1093,11 @@ function orange_restore_private_engine_provision(
             ? orange_restore_shadow_target_identity_hash($shadowDb, $jobId)
             : hash('sha256', strtolower($shadowDb) . '|' . $jobId);
 
+        // Persist port first; only mark state ready after all private side-channel files are hardened.
+        $portFile = $root . DIRECTORY_SEPARATOR . '.engine_port';
+        file_put_contents($portFile, (string) $port . "\n", LOCK_EX);
+        orange_restore_private_engine_harden_secret_file($portFile);
+
         orange_restore_private_engine_write_state($workRoot, $jobId, [
             'ready' => true,
             'engine_pid' => $pidFromFile > 0 ? $pidFromFile : $enginePid,
@@ -1081,10 +1110,6 @@ function orange_restore_private_engine_provision(
             'provisioned_at' => gmdate('c'),
             // Internal-only port retained in side channel file, not state JSON for browser.
         ]);
-        // Persist port for worker reconnect without exposing via public state.
-        $portFile = $root . DIRECTORY_SEPARATOR . '.engine_port';
-        file_put_contents($portFile, (string) $port . "\n", LOCK_EX);
-        orange_restore_private_engine_harden_secret_file($portFile);
 
         return [
             'ok' => true,
@@ -1094,6 +1119,9 @@ function orange_restore_private_engine_provision(
         ];
     } catch (Throwable $e) {
         @unlink($bootOpt);
+        @unlink($root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_SECRET_FILE);
+        @unlink($root . DIRECTORY_SEPARATOR . '.engine_port');
+        orange_restore_private_engine_stop_daemon($enginePid, $pidFile);
         $code = trim($e->getMessage());
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;

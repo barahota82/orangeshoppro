@@ -110,11 +110,8 @@ function orange_restore_private_engine_tools_root(string $projectRoot, ?array $e
         return realpath($root) ?: $root;
     }
 
-    $projectReal = realpath($projectRoot) ?: $projectRoot;
-    $drive = preg_match('/^([A-Za-z]:)/', $projectReal, $m) ? $m[1] : '';
-    $root = $drive !== ''
-        ? ($drive . DIRECTORY_SEPARATOR . 'orange_restore_private_tools')
-        : (dirname($projectReal) . DIRECTORY_SEPARATOR . 'orange_restore_private_tools');
+    $backupRoot = orange_backup_resolve_root($env);
+    $root = $backupRoot . DIRECTORY_SEPARATOR . '.orange_restore_private_tools';
     orange_backup_assert_outside_web_root($root);
     if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
         throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
