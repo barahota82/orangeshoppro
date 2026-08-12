@@ -17,7 +17,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$evDir = 'D:\\orange_restore_step7_php_cli_repair_evidence';
+$evDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_php_cli_repair_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_php_cli_repair_evidence';
 if (!is_dir($evDir)) {
     mkdir($evDir, 0777, true);
 }
