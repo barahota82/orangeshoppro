@@ -13,7 +13,19 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$evDir = 'D:\\orange_restore_step7_architecture_reset_evidence';
+
+function s7a_evidence_dir(): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:\\orange_restore_step7_architecture_reset_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'orange_restore_step7_architecture_reset_evidence';
+}
+
+$evDir = s7a_evidence_dir();
 if (!is_dir($evDir)) {
     mkdir($evDir, 0777, true);
 }
@@ -218,6 +230,7 @@ $summary = [
     'ARCHITECTURE_REJECTED' => ['A_COUNTRY_CRP_SHADOW', 'B_DEDICATED_STAGING_CHANNEL'],
     'stage_matrix' => $stageMatrix,
     'UNKNOWN_SHARED_DEP_COUNT' => $unknown,
+    'evidence_dir' => $evDir,
     'lines' => $lines,
     'at' => gmdate('c'),
 ];
