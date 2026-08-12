@@ -456,6 +456,53 @@ function orange_restore_private_engine_run_capture(string $binary, array $args, 
     ];
 }
 
+function orange_restore_private_engine_process_alive(int $pid): bool
+{
+    if ($pid <= 0) {
+        return false;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        @exec('tasklist /FI ' . escapeshellarg('PID eq ' . (string) $pid) . ' /NH', $out, $code);
+        if ($code !== 0) {
+            return false;
+        }
+        foreach ($out as $line) {
+            if (preg_match('/\b' . preg_quote((string) $pid, '/') . '\b/', (string) $line) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    if (function_exists('posix_kill')) {
+        return @posix_kill($pid, 0) || posix_get_last_error() === 1; // EPERM means alive but not signalable.
+    }
+
+    return is_dir('/proc/' . (string) $pid);
+}
+
+function orange_restore_private_engine_stop_process(int $pid): void
+{
+    if ($pid <= 0) {
+        return;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        @exec('taskkill /PID ' . (string) $pid . ' /F /T 2>nul');
+
+        return;
+    }
+
+    @exec('kill ' . (string) $pid . ' 2>/dev/null');
+    $deadline = microtime(true) + 3.0;
+    while (microtime(true) < $deadline) {
+        if (!orange_restore_private_engine_process_alive($pid)) {
+            return;
+        }
+        usleep(100000);
+    }
+    @exec('kill -9 ' . (string) $pid . ' 2>/dev/null');
+}
+
 /**
  * Spawn mysqld detached; returns OS PID when available (0 if unknown).
  *
@@ -766,6 +813,8 @@ function orange_restore_private_engine_provision(
         usleep(300000);
     }
     if (!$up) {
+        orange_restore_private_engine_stop_process($enginePid);
+
         return [
             'ok' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
@@ -861,6 +910,7 @@ function orange_restore_private_engine_provision(
             'ready' => true,
         ];
     } catch (Throwable $e) {
+        orange_restore_private_engine_stop_process($enginePid);
         @unlink($bootOpt);
         $code = trim($e->getMessage());
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
@@ -874,6 +924,16 @@ function orange_restore_private_engine_provision(
             'ready' => false,
         ];
     }
+}
+
+function orange_restore_private_engine_sql_quote(PDO $pdo, string $value): string
+{
+    $quoted = $pdo->quote($value);
+    if (!is_string($quoted)) {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED);
+    }
+
+    return $quoted;
 }
 
 /**
@@ -900,26 +960,47 @@ function orange_restore_private_engine_bootstrap_users_pdo(
                 [$runtimeUser, $runtimePass],
             ] as [$u, $p]
         ) {
+            $qUser = orange_restore_private_engine_sql_quote($pdo, $u);
+            $qHost = orange_restore_private_engine_sql_quote($pdo, $host);
+            $qPass = orange_restore_private_engine_sql_quote($pdo, $p);
             try {
-                $pdo->exec("CREATE USER '{$u}'@'{$host}' IDENTIFIED BY '{$p}'");
+                $pdo->exec("CREATE USER {$qUser}@{$qHost} IDENTIFIED BY {$qPass}");
             } catch (Throwable) {
                 try {
-                    $pdo->exec("ALTER USER '{$u}'@'{$host}' IDENTIFIED BY '{$p}'");
+                    $pdo->exec("ALTER USER {$qUser}@{$qHost} IDENTIFIED BY {$qPass}");
                 } catch (Throwable) {
                     // continue — other host may still succeed
                 }
             }
         }
+        $qAdminUser = orange_restore_private_engine_sql_quote($pdo, $adminUser);
+        $qRuntimeUser = orange_restore_private_engine_sql_quote($pdo, $runtimeUser);
+        $qHost = orange_restore_private_engine_sql_quote($pdo, $host);
         try {
-            $pdo->exec("GRANT ALL PRIVILEGES ON *.* TO '{$adminUser}'@'{$host}' WITH GRANT OPTION");
+            $pdo->exec("GRANT ALL PRIVILEGES ON *.* TO {$qAdminUser}@{$qHost} WITH GRANT OPTION");
         } catch (Throwable) {
             // ignore host-specific grant miss
         }
         try {
-            $pdo->exec("GRANT ALL PRIVILEGES ON {$quotedShadow}.* TO '{$runtimeUser}'@'{$host}'");
+            $pdo->exec("GRANT ALL PRIVILEGES ON {$quotedShadow}.* TO {$qRuntimeUser}@{$qHost}");
         } catch (Throwable) {
             // ignore host-specific grant miss
         }
+    }
+    $rootLocked = false;
+    $qRoot = orange_restore_private_engine_sql_quote($pdo, 'root');
+    $qRootPass = orange_restore_private_engine_sql_quote($pdo, $adminPass);
+    foreach (['localhost', '127.0.0.1', '::1'] as $rootHost) {
+        $qRootHost = orange_restore_private_engine_sql_quote($pdo, $rootHost);
+        try {
+            $pdo->exec("ALTER USER {$qRoot}@{$qRootHost} IDENTIFIED BY {$qRootPass}");
+            $rootLocked = true;
+        } catch (Throwable) {
+            // Some builds create only root@localhost; missing host rows are acceptable.
+        }
+    }
+    if (!$rootLocked) {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED);
     }
     $pdo->exec('FLUSH PRIVILEGES');
 }
