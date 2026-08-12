@@ -607,12 +607,25 @@ Separate from Production MySQL service/datadir/port/socket/users/lifecycle.
 No Production MySQL CREATE DATABASE / privilege provisioning required.
 
 **تنفيذ:**
-- `includes/backup/restore/restore_private_shadow_engine.php` — discover mysqld/mariadbd
-  under Production connection read-only `@@basedir` only; secure init; loopback bind;
-  restricted runtime user; secret option files with ACL (never Git/browser/args/logs).
+- `includes/backup/restore/restore_private_shadow_engine.php` — authoritative resolver +
+  job-owned private instance (loopback bind; restricted runtime user; secret option files
+  with ACL; never Git/browser/args/logs). Never CREATE DATABASE on Production MySQL.
+- `includes/backup/restore/restore_private_engine_runtime_manifest.php` — one pinned
+  portable runtime manifest (vendor/version/OS/arch/HTTPS URL/SHA-256/license/allowlist).
+- `includes/backup/restore/restore_private_engine_local_discovery.php` — host category
+  (LOCAL_SAME_HOST/LOCAL_LOOPBACK/REMOTE/UNKNOWN); Windows SCM/registry discovery;
+  shared private tools root outside webroot; no PATH/where/scan/Plesk hardcoding.
+- `includes/backup/restore/restore_private_engine_materializer.php` — delivery order
+  A release-cache → B vendor-assets → C pinned first-use HTTPS (TLS verify + SHA-256 +
+  atomic + install mutex). Shared verified runtime + per-job datadir.
+- Resolver order: materialized portable → local service/registry → materialize →
+  `@@basedir` only when DB host is local → fail closed.
 - `includes/backup/restore/restore_shadow_db.php` — Step7 adapters prefer private engine DSN.
 - `includes/backup/restore/restore_center_orchestrator.php` — preflight/provision before
   spawn; readiness tokens `READY_FOR_PRIVATE_SHADOW_PROVISIONING` /
-  `READY_FOR_CONTROLLED_STEP7_ATTEMPT`; distinct `STEP7_PRIVATE_ENGINE_*` codes;
-  tracks PHP worker PID and private engine PID separately.
-- Self-test: `scripts/self_test_restore_center_step7_private_shadow_engine.php`.
+  `READY_FOR_CONTROLLED_STEP7_ATTEMPT`; parent/worker target parity; historical log not
+  current cause; distinct `STEP7_PRIVATE_ENGINE_*` codes; tracks PHP worker PID and
+  private engine PID separately.
+- Self-tests: `scripts/self_test_restore_center_step7_private_shadow_engine.php`,
+  `scripts/self_test_restore_center_step7_engine_supply.php`.
+- License notice: `docs/backup/THIRD_PARTY_NOTICES_RESTORE_PRIVATE_ENGINE.txt`.

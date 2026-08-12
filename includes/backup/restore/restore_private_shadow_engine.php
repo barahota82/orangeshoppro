@@ -12,9 +12,16 @@ declare(strict_types=1);
  *   LOOPBACK_ONLY_01
  *   NO_OWNER_ACTION_01
  *   PROTECTED_WORKING_BASELINE_01
+ *   AUTOMATED_RUNTIME_SUPPLY_REQUIRED_01
  *
- * Discovers mysqld/mariadbd only under Production connection read-only @@basedir.
- * Never uses PATH/where/which/scan/download/hardcoded host install paths.
+ * Authoritative resolver order (§14):
+ *   1) verified materialized portable runtime
+ *   2) trusted local service/registry executable
+ *   3) pinned portable materialization (A/B/C)
+ *   4) @@basedir only when DB host is LOCAL_SAME_HOST / LOCAL_LOOPBACK
+ *   5) fail closed
+ *
+ * Never uses PATH/where/which/scan/hardcoded Plesk paths.
  * Never CREATE DATABASE on Production MySQL.
  */
 
@@ -39,6 +46,14 @@ const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED = 'STEP7_PRIVATE_ENGI
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY = 'STEP7_PRIVATE_ENGINE_NOT_READY';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED = 'STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED = 'STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED = 'STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED = 'STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE = 'STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE';
+
+// Supply-chain helpers (after constants — avoid circular redefinition).
+require_once __DIR__ . '/restore_private_engine_runtime_manifest.php';
+require_once __DIR__ . '/restore_private_engine_local_discovery.php';
+require_once __DIR__ . '/restore_private_engine_materializer.php';
 
 /** Readiness: binary discoverable, engine not yet provisioned (zero-mutation diagnostic). */
 const ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING = 'READY_FOR_PRIVATE_SHADOW_PROVISIONING';
@@ -57,6 +72,9 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY => 'محرك قاعدة الظل الخاص غير جاهز بعد. حدّث الحالة ثم أعد المحاولة من نفس الخطوة.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NETWORK_POLICY_FAILED => 'تعذر تطبيق سياسة الشبكة المحلية لمحرك قاعدة الظل الخاص. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED => 'تعذر تجهيز مستخدم التشغيل المقيّد لقاعدة الظل. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED => 'تعذر توريد محرك قاعدة الظل المحمول الموثوق. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHECKSUM_FAILED => 'فشل التحقق من سلامة حزمة محرك قاعدة الظل. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_CHANNEL_UNAVAILABLE => 'لا تتوفر قناة آمنة لتوريد محرك قاعدة الظل على هذا الخادم. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING => 'الجاهزية: يمكن تجهيز محرك قاعدة الظل الخاص عند الضغط على خطوة استعادة قاعدة الظل.',
     ];
 
@@ -157,12 +175,12 @@ function orange_restore_private_engine_resolve_binaries_under_basedir(string $ba
 }
 
 /**
- * Read-only @@basedir discovery via application Production connection credentials.
- * No CREATE/DROP/GRANT. Test override: orange_restore_private_engine_basedir_override.
+ * Legacy @@basedir-only discovery (read-only Production connection).
+ * Used only when host is local, or as an internal helper. Not the authoritative resolver.
  *
- * @return array{ok:bool,code:string,basedir:string,mysqld:string,mysql:string,family:string,version_prefix:string}
+ * @return array{ok:bool,code:string,basedir:string,mysqld:string,mysql:string,family:string,version_prefix:string,source:string}
  */
-function orange_restore_private_engine_discover_binaries(string $projectRoot): array
+function orange_restore_private_engine_discover_binaries_legacy_basedir(string $projectRoot): array
 {
     $empty = [
         'ok' => false,
@@ -172,6 +190,7 @@ function orange_restore_private_engine_discover_binaries(string $projectRoot): a
         'mysql' => '',
         'family' => '',
         'version_prefix' => '',
+        'source' => 'production_basedir',
     ];
 
     if (isset($GLOBALS['orange_restore_private_engine_basedir_override'])
@@ -184,6 +203,7 @@ function orange_restore_private_engine_discover_binaries(string $projectRoot): a
             return $empty;
         }
         $resolved['version_prefix'] = 'override';
+        $resolved['source'] = 'test_basedir_override';
 
         return $resolved;
     }
@@ -213,11 +233,173 @@ function orange_restore_private_engine_discover_binaries(string $projectRoot): a
             return $empty;
         }
         $resolved['version_prefix'] = substr($version, 0, 12);
+        $resolved['source'] = 'production_basedir';
 
         return $resolved;
     } catch (Throwable) {
         return $empty;
     }
+}
+
+/**
+ * Authoritative Restore-only private-engine executable resolver (§14).
+ * When $allowMaterialize is false (readiness diagnostic): never download/extract.
+ *
+ * @return array{
+ *   ok:bool,
+ *   code:string,
+ *   basedir:string,
+ *   mysqld:string,
+ *   mysql:string,
+ *   family:string,
+ *   version_prefix:string,
+ *   source:string,
+ *   materializable:bool,
+ *   channel:string,
+ *   db_host_category:string
+ * }
+ */
+function orange_restore_private_engine_resolve_runtime(
+    string $projectRoot,
+    bool $allowMaterialize = false
+): array {
+    $hostInfo = orange_restore_private_engine_classify_db_host($projectRoot);
+    $base = [
+        'ok' => false,
+        'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE,
+        'basedir' => '',
+        'mysqld' => '',
+        'mysql' => '',
+        'family' => '',
+        'version_prefix' => '',
+        'source' => 'unavailable',
+        'materializable' => false,
+        'channel' => 'none',
+        'db_host_category' => (string) ($hostInfo['category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+    ];
+
+    // Test basedir override remains highest for disposable suites.
+    if (isset($GLOBALS['orange_restore_private_engine_basedir_override'])
+        && is_string($GLOBALS['orange_restore_private_engine_basedir_override'])
+        && trim($GLOBALS['orange_restore_private_engine_basedir_override']) !== '') {
+        $legacy = orange_restore_private_engine_discover_binaries_legacy_basedir($projectRoot);
+        if ($legacy['ok'] ?? false) {
+            return array_merge($base, $legacy, [
+                'ok' => true,
+                'code' => 'ok',
+                'materializable' => false,
+                'channel' => 'test_override',
+                'db_host_category' => $base['db_host_category'],
+            ]);
+        }
+    }
+
+    // 1) Verified previously materialized portable runtime.
+    $mat = orange_restore_private_engine_discover_materialized_runtime($projectRoot);
+    if ($mat['ok'] ?? false) {
+        return array_merge($base, $mat, [
+            'ok' => true,
+            'code' => 'ok',
+            'materializable' => false,
+            'channel' => 'verified_portable_cached',
+            'db_host_category' => $base['db_host_category'],
+        ]);
+    }
+
+    // 2) Trusted local service/registry executable (read-only; never alter service).
+    $svc = orange_restore_private_engine_discover_local_service_binaries();
+    if ($svc['ok'] ?? false) {
+        return array_merge($base, $svc, [
+            'ok' => true,
+            'code' => 'ok',
+            'materializable' => false,
+            'channel' => 'local_service',
+            'db_host_category' => $base['db_host_category'],
+        ]);
+    }
+
+    // Channel probe (no download).
+    $probe = orange_restore_private_engine_runtime_channel_probe($projectRoot);
+    $materializable = !empty($probe['ok']) && !empty($probe['materializable']);
+
+    // 3) Materialize pinned portable runtime when allowed (provision path only).
+    if ($allowMaterialize && $materializable) {
+        $built = orange_restore_private_engine_materialize_portable_runtime($projectRoot);
+        if ($built['ok'] ?? false) {
+            return array_merge($base, $built, [
+                'ok' => true,
+                'code' => 'ok',
+                'materializable' => false,
+                'channel' => (string) ($built['channel'] ?? 'pinned_https_first_use'),
+                'db_host_category' => $base['db_host_category'],
+            ]);
+        }
+        $code = (string) ($built['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED);
+        if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_SUPPLY_FAILED;
+        }
+
+        return array_merge($base, [
+            'code' => $code,
+            'materializable' => false,
+            'channel' => (string) ($probe['channel'] ?? 'none'),
+        ]);
+    }
+
+    // 4) @@basedir only when DB host is local.
+    if (!empty($hostInfo['is_local'])) {
+        $basedirHit = orange_restore_private_engine_discover_binaries_legacy_basedir($projectRoot);
+        if (($basedirHit['ok'] ?? false)
+            && (($basedirHit['source'] ?? '') !== 'test_basedir_override'
+                || isset($GLOBALS['orange_restore_private_engine_basedir_override']))) {
+            // Accept local basedir when binaries resolve on this machine.
+            if (is_file((string) ($basedirHit['mysqld'] ?? ''))) {
+                return array_merge($base, $basedirHit, [
+                    'ok' => true,
+                    'code' => 'ok',
+                    'source' => 'verified_local_basedir',
+                    'materializable' => $materializable,
+                    'channel' => $materializable ? (string) ($probe['channel'] ?? 'none') : 'local_basedir',
+                    'db_host_category' => $base['db_host_category'],
+                ]);
+            }
+        }
+    }
+
+    // Fail closed — but advertise materializable for readiness when channel is safe.
+    if ($materializable && !$allowMaterialize) {
+        return array_merge($base, [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE,
+            'materializable' => true,
+            'channel' => (string) ($probe['channel'] ?? 'pinned_https_first_use'),
+            'source' => 'materializable_portable',
+            'family' => (string) (($probe['manifest_summary']['family'] ?? '') ?: ''),
+            'version_prefix' => (string) (($probe['manifest_summary']['version'] ?? '') ?: ''),
+        ]);
+    }
+
+    return array_merge($base, [
+        'materializable' => false,
+        'channel' => (string) ($probe['channel'] ?? 'none'),
+        'code' => !empty($probe['ok'])
+            ? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE
+            : (string) ($probe['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE),
+    ]);
+}
+
+/**
+ * Backward-compatible discover entry — authoritative resolver without materialize.
+ *
+ * @return array{ok:bool,code:string,basedir:string,mysqld:string,mysql:string,family:string,version_prefix:string,source?:string,materializable?:bool,channel?:string,db_host_category?:string}
+ */
+function orange_restore_private_engine_discover_binaries(string $projectRoot): array
+{
+    if (!empty($GLOBALS['orange_restore_private_engine_skip_authoritative_resolver'])) {
+        return orange_restore_private_engine_discover_binaries_legacy_basedir($projectRoot);
+    }
+
+    return orange_restore_private_engine_resolve_runtime($projectRoot, false);
 }
 
 /**
@@ -512,7 +694,7 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
 }
 
 /**
- * Zero-mutation preflight: discover binary + report provisioning readiness.
+ * Zero-mutation preflight: resolve runtime source (no download/datadir/credentials).
  *
  * @return array{
  *   ok:bool,
@@ -521,7 +703,13 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
  *   binary_available:bool,
  *   engine_ready:bool,
  *   family:string,
- *   shadow_db_identity_hash:string
+ *   shadow_db_identity_hash:string,
+ *   runtime_source:string,
+ *   materializable:bool,
+ *   channel:string,
+ *   db_host_category:string,
+ *   runtime_compatible:bool,
+ *   manifest:array<string,mixed>
  * }
  */
 function orange_restore_private_engine_preflight(
@@ -529,16 +717,42 @@ function orange_restore_private_engine_preflight(
     string $workRoot,
     string $jobId
 ): array {
-    $discovered = orange_restore_private_engine_discover_binaries($projectRoot);
-    if (!($discovered['ok'] ?? false)) {
+    $discovered = orange_restore_private_engine_resolve_runtime($projectRoot, false);
+    $materializable = !empty($discovered['materializable']);
+    $binaryOk = !empty($discovered['ok']);
+    $sourceReady = $binaryOk || $materializable;
+    $manifest = orange_restore_private_engine_runtime_manifest_public_summary();
+    $runtimeSource = 'unavailable';
+    if ($binaryOk) {
+        $src = (string) ($discovered['source'] ?? '');
+        if (str_contains($src, 'portable') || ($discovered['channel'] ?? '') === 'verified_portable_cached') {
+            $runtimeSource = 'verified_portable_artifact';
+        } elseif (str_contains($src, 'service') || ($discovered['channel'] ?? '') === 'local_service') {
+            $runtimeSource = 'verified_local_service_binary';
+        } elseif (str_contains($src, 'basedir')) {
+            $runtimeSource = 'verified_local_service_binary';
+        } else {
+            $runtimeSource = 'verified_local_service_binary';
+        }
+    } elseif ($materializable) {
+        $runtimeSource = 'materializable_portable';
+    }
+
+    if (!$sourceReady) {
         return [
             'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE,
+            'code' => (string) ($discovered['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE),
             'ready_token' => '',
             'binary_available' => false,
             'engine_ready' => false,
-            'family' => '',
+            'family' => (string) ($discovered['family'] ?? ($manifest['family'] ?? '')),
             'shadow_db_identity_hash' => '',
+            'runtime_source' => 'unavailable',
+            'materializable' => false,
+            'channel' => (string) ($discovered['channel'] ?? 'none'),
+            'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+            'runtime_compatible' => !empty($manifest['sha256_pinned']),
+            'manifest' => $manifest,
         ];
     }
 
@@ -556,6 +770,12 @@ function orange_restore_private_engine_preflight(
             'engine_ready' => true,
             'family' => (string) ($discovered['family'] ?? ($state['family'] ?? '')),
             'shadow_db_identity_hash' => (string) ($state['shadow_db_identity_hash'] ?? ''),
+            'runtime_source' => $runtimeSource,
+            'materializable' => false,
+            'channel' => (string) ($discovered['channel'] ?? ''),
+            'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+            'runtime_compatible' => true,
+            'manifest' => $manifest,
         ];
     }
 
@@ -563,12 +783,18 @@ function orange_restore_private_engine_preflight(
         'ok' => true,
         'code' => 'ok',
         'ready_token' => ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING,
-        'binary_available' => true,
+        'binary_available' => $binaryOk || $materializable,
         'engine_ready' => false,
-        'family' => (string) ($discovered['family'] ?? ''),
+        'family' => (string) ($discovered['family'] ?? ($manifest['family'] ?? '')),
         'shadow_db_identity_hash' => is_array($state)
             ? (string) ($state['shadow_db_identity_hash'] ?? '')
             : '',
+        'runtime_source' => $runtimeSource,
+        'materializable' => $materializable,
+        'channel' => (string) ($discovered['channel'] ?? ''),
+        'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+        'runtime_compatible' => !empty($manifest['sha256_pinned']) || $binaryOk,
+        'manifest' => $manifest,
     ];
 }
 
@@ -656,11 +882,17 @@ function orange_restore_private_engine_provision(
         ];
     }
 
-    $discovered = orange_restore_private_engine_discover_binaries($projectRoot);
+    // Authoritative resolve WITH materialize when needed (never Production MySQL).
+    $discovered = orange_restore_private_engine_resolve_runtime($projectRoot, true);
     if (!($discovered['ok'] ?? false)) {
+        $code = (string) ($discovered['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE);
+        if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE;
+        }
+
         return [
             'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE,
+            'code' => $code,
             'engine_pid' => 0,
             'ready' => false,
         ];
@@ -1015,6 +1247,7 @@ function orange_restore_private_engine_public_readiness(
     string $jobId
 ): array {
     $pre = orange_restore_private_engine_preflight($projectRoot, $workRoot, $jobId);
+    $manifest = is_array($pre['manifest'] ?? null) ? $pre['manifest'] : [];
 
     return [
         'binary_available' => !empty($pre['binary_available']),
@@ -1027,5 +1260,17 @@ function orange_restore_private_engine_public_readiness(
         'no_production_mysql_provisioning' => true,
         'shadow_db_identity_hash' => (string) ($pre['shadow_db_identity_hash'] ?? ''),
         'read_only_diagnostic' => true,
+        'runtime_source' => (string) ($pre['runtime_source'] ?? 'unavailable'),
+        'runtime_verified' => in_array((string) ($pre['runtime_source'] ?? ''), [
+            'verified_portable_artifact',
+            'verified_local_service_binary',
+        ], true) || !empty($pre['engine_ready']),
+        'runtime_compatible' => !empty($pre['runtime_compatible']),
+        'materializable' => !empty($pre['materializable']),
+        'channel' => (string) ($pre['channel'] ?? 'none'),
+        'db_host_category' => (string) ($pre['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+        'runtime_vendor' => (string) ($manifest['vendor'] ?? ''),
+        'runtime_version' => (string) ($manifest['version'] ?? ''),
+        'sha256_pinned' => !empty($manifest['sha256_pinned']),
     ];
 }

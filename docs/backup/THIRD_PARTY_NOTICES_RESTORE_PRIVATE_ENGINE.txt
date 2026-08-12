@@ -1,0 +1,21 @@
+Orange Restore Center — Third-Party Notice (Private Shadow Engine Runtime)
+==========================================================================
+Scope: optional portable database runtime materialized outside webroot for
+Restore Step 7 private shadow engine only. Not part of Production MySQL.
+
+Component: MariaDB Server (Community)
+Vendor: MariaDB Foundation / MariaDB Corporation
+Pinned version (Windows/Linux x86_64 portable packages): 11.4.5
+License: GPL-2.0-only (see MariaDB packaging LICENSE/COPYING inside archive)
+Official checksum source: MariaDB published sha256sums for the pinned archive
+Official HTTPS archive host allowlist: archive.mariadb.org (and approved mirrors
+listed in restore_private_engine_runtime_manifest.php)
+
+Notes:
+- Orange does not redistribute the binary inside the Git repository by default.
+- On first controlled Step-7 provision (when no trusted local service binary
+  exists), the application may download the pinned archive over HTTPS, verify
+  SHA-256 before extraction/execution, and store it under the private tools root
+  outside the webroot.
+- Production MySQL/MariaDB service, datadir, users, and grants are never modified
+  by this runtime supply path.

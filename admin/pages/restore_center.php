@@ -1395,18 +1395,35 @@ body.rc-modal-open{overflow:hidden!important}
                 : (readyProvision ? 'READY_FOR_PRIVATE_SHADOW_PROVISIONING' : (token || 'NOT_READY'));
             const cap = readiness ? String(readiness.database_capability || 'unavailable') : 'unavailable';
             const match = readiness ? !!readiness.parent_worker_target_identity_match : false;
+            const runtimeSource = readiness
+                ? String(readiness.runtime_source || (readiness.private_engine && readiness.private_engine.runtime_source) || 'unavailable')
+                : 'unavailable';
+            const runtimeVerified = !!(readiness && (readiness.runtime_verified
+                || (readiness.private_engine && readiness.private_engine.runtime_verified)));
+            const runtimeCompatible = !!(readiness && (readiness.runtime_compatible
+                || (readiness.private_engine && readiness.private_engine.runtime_compatible)));
+            const hostCat = readiness
+                ? String(readiness.db_host_category || (readiness.private_engine && readiness.private_engine.db_host_category) || 'UNKNOWN')
+                : 'UNKNOWN';
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
                 + '<li><strong>' + esc(tokenLabel) + '</strong></li>'
                 + '<li>قدرة قاعدة البيانات: ' + esc(cap === 'available' ? 'available' : 'unavailable') + '</li>'
                 + '<li>تطابق هدف الأب/العامل: ' + (match ? 'نعم' : 'لا') + '</li>'
                 + '<li>المصدر: ' + esc((readiness && readiness.source) ? String(readiness.source) : '—') + '</li>'
+                + '<li>مصدر المحرك: ' + esc(runtimeSource) + '</li>'
+                + '<li>المحرك موثّق: ' + (runtimeVerified ? 'نعم' : 'لا') + '</li>'
+                + '<li>المحرك متوافق: ' + (runtimeCompatible ? 'نعم' : 'لا') + '</li>'
+                + '<li>فئة مضيف قاعدة الإنتاج: ' + esc(hostCat) + '</li>'
                 + '</ul>';
         }
         const tails = Array.isArray(diag.log_tails) ? diag.log_tails : [];
         if (tails.length) {
             html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">مقتطفات سجل التشغيل (مُنقّاة)</h4>';
             tails.forEach(function (t) {
-                html += '<p style="margin:8px 0 4px;"><strong>' + esc(stageNameAr(t.worker)) + '</strong></p>';
+                const hist = t.historical_only || t.not_current_cause
+                    ? ' <span class="muted">(تاريخي — ليس سبب المحاولة الحالية)</span>'
+                    : '';
+                html += '<p style="margin:8px 0 4px;"><strong>' + esc(stageNameAr(t.worker)) + '</strong>' + hist + '</p>';
                 html += '<pre class="rc-pre" style="max-height:160px;overflow:auto;white-space:pre-wrap;">'
                     + esc(t.tail || '') + '</pre>';
             });
