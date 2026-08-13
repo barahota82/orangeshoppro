@@ -1433,6 +1433,48 @@ body.rc-modal-open{overflow:hidden!important}
                 + '<li>فئة مضيف قاعدة الإنتاج: ' + esc(hostCat) + '</li>'
                 + '</ul>';
         }
+        const trace = diag.private_engine_live_trace && typeof diag.private_engine_live_trace === 'object'
+            ? diag.private_engine_live_trace
+            : null;
+        if (trace) {
+            html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">آثار محرك قاعدة الظل الخاص</h4>';
+            html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
+                + '<li><strong>التصنيف:</strong> ' + esc(String(trace.classification || '—')) + '</li>'
+                + '<li>قراءة فقط: ' + (trace.read_only ? 'نعم' : 'لا') + '</li>';
+            const miss = Array.isArray(trace.missing_artifact_categories) ? trace.missing_artifact_categories : [];
+            html += '<li>فئات ناقصة: ' + esc(miss.length ? miss.join('، ') : 'لا يوجد') + '</li>';
+            const sec = trace.sections && typeof trace.sections === 'object' ? trace.sections : {};
+            const fSafe = function (section, key) {
+                const row = sec[section] && sec[section][key] ? sec[section][key] : null;
+                if (!row || typeof row !== 'object') return '—';
+                const v = row.value;
+                const st = String(row.status || '');
+                let shown = '';
+                if (v === null || typeof v === 'undefined') shown = 'غائب';
+                else if (typeof v === 'boolean') shown = v ? 'نعم' : 'لا';
+                else if (typeof v === 'object') shown = JSON.stringify(v);
+                else shown = String(v);
+                return esc(shown) + (st ? ' <span class="muted">[' + esc(st) + ']</span>' : '');
+            };
+            html += '<li>حالة Step7: ' + fSafe('A_job_and_stage', 'current_canonical_job_status') + '</li>'
+                + '<li>أحدث رمز آمن: ' + fSafe('B_latest_step7_attempt', 'latest_safe_code') + '</li>'
+                + '<li>المطالبة: ' + fSafe('C_control_plane_ownership', 'claim_active_terminal_unknown') + '</li>'
+                + '<li>مصدر المحرك: ' + fSafe('D_private_runtime_supply', 'selected_runtime_source_category') + '</li>'
+                + '<li>مجلد البيانات: ' + fSafe('E_private_job_environment', 'datadir_state') + '</li>'
+                + '<li>فئة التهيئة: ' + fSafe('E_private_job_environment', 'initialization_exit_category') + '</li>'
+                + '<li>بدأ الاستيراد: ' + fSafe('F_step7_import_boundary', 'sql_import_started') + '</li>'
+                + '<li>قفل الخطوة 8: ' + fSafe('A_job_and_stage', 'step8_lock_state') + '</li>'
+                + '</ul>';
+            const report = String(trace.arabic_report || '');
+            if (report) {
+                html += '<p style="margin:8px 0 4px;"><strong>تقرير عربي قابل للنسخ</strong></p>';
+                html += '<textarea id="rc_private_engine_trace_report" class="rc-pre" readonly '
+                    + 'style="width:100%;min-height:140px;max-height:220px;overflow:auto;white-space:pre-wrap;font-size:.8rem;direction:rtl;">'
+                    + esc(report) + '</textarea>';
+                html += '<p style="margin:6px 0 0;"><button type="button" class="btn-link rc-btn-ghost" id="rc_private_engine_trace_copy">'
+                    + 'نسخ التقرير</button></p>';
+            }
+        }
         const tails = Array.isArray(diag.log_tails) ? diag.log_tails : [];
         if (tails.length) {
             html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">مقتطفات سجل التشغيل (مُنقّاة)</h4>';
@@ -1463,6 +1505,29 @@ body.rc-modal-open{overflow:hidden!important}
             if (j.csrf_token) state.csrf = j.csrf_token;
             el('rc_orch_diag_title').textContent = 'تشخيص تشغيل مراحل الاسترداد — ' + jobId;
             el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnostics(j.diagnostics || {});
+            const copyBtn = el('rc_private_engine_trace_copy');
+            const reportBox = el('rc_private_engine_trace_report');
+            if (copyBtn && reportBox) {
+                copyBtn.onclick = function () {
+                    const text = String(reportBox.value || reportBox.textContent || '');
+                    if (!text) return;
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).catch(function () {
+                            try {
+                                reportBox.focus();
+                                reportBox.select();
+                                document.execCommand('copy');
+                            } catch (eCopy) { /* ignore */ }
+                        });
+                    } else {
+                        try {
+                            reportBox.focus();
+                            reportBox.select();
+                            document.execCommand('copy');
+                        } catch (eCopy2) { /* ignore */ }
+                    }
+                };
+            }
             openRcModal('rc_orch_diag_modal');
         } finally {
             setBusy(false);

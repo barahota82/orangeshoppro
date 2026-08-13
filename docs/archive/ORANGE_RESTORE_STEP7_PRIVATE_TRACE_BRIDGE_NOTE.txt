@@ -1,0 +1,32 @@
+ORANGE — Restore Center Step 7 private-engine live trace bridge (runbook note)
+================================================================================
+Date: 2026-08-13
+Scope: read-only diagnostic exposure only — NOT Step-7 execution repair.
+
+Purpose
+-------
+After Result C (Batch1 forensic blocked without job private-engine artifacts),
+Restore Center can now surface a sanitized, immutable private-engine live trace
+for the current job through the existing authenticated diagnostic dialog.
+
+Owner route (Production)
+------------------------
+1) Open Restore Center for the preserved job (do not cancel).
+2) Refresh.
+3) Open «تشخيص تشغيل مراحل الاسترداد» / «تشخيص تشغيل المهمة».
+4) Scroll to section «آثار محرك قاعدة الظل الخاص».
+5) Copy the Arabic report.
+6) Do NOT press Step 7, do NOT cancel the job, do NOT start Step 8.
+
+Implementation (read-only)
+--------------------------
+- includes/backup/restore/restore_private_engine_trace.php
+- wired into orange_restore_center_diagnostics() → private_engine_live_trace
+- renderer append in admin/pages/restore_center.php (no layout/journey change)
+- tests: scripts/self_test_restore_center_step7_private_engine_trace.php
+
+Hard contract
+-------------
+Zero mutation on claim/mutex/PID/runtime/datadir/import. No Plesk/SSH required
+for the Owner to read existing job-local artifacts via Admin.
+Architecture remains C + E via D. Schema remains 124.

@@ -27,6 +27,7 @@ require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 require_once __DIR__ . '/restore_private_shadow_engine.php';
+require_once __DIR__ . '/restore_private_engine_trace.php';
 
 const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v10-attempt-contract';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
@@ -2339,6 +2340,32 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         'step7_action_enabled' => is_array($shadowReadiness)
             && !empty($shadowReadiness['step7_action_enabled']),
         'log_tails' => $logSnippets,
+        'private_engine_live_trace' => (static function () use ($workRoot, $jobId): array {
+            try {
+                $projectRootDiag = dirname(__DIR__, 3);
+
+                return orange_restore_private_engine_trace_snapshot($projectRootDiag, $workRoot, $jobId);
+            } catch (Throwable $e) {
+                return [
+                    'trace_version' => defined('ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION')
+                        ? ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION
+                        : 'step7-private-engine-trace-v1',
+                    'read_only' => true,
+                    'immutable_snapshot' => true,
+                    'classification' => 'TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
+                    'missing_artifact_categories' => ['trace_snapshot_exception'],
+                    'mutation_counters' => [
+                        'LIVE_JOB_MUTATION_COUNT' => 0,
+                    ],
+                    'arabic_report' => "تقرير آثار محرك قاعدة الظل الخاص (قراءة فقط)\n"
+                        . "تعذر إكمال لقطة الآثار بأمان.\n"
+                        . 'التصنيف: TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
+                    'notes_ar' => [
+                        'لقطة الآثار قراءة فقط — فُحصت بأمان دون تغيير حالة المهمة.',
+                    ],
+                ];
+            }
+        })(),
         'notes_ar' => [
             'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
             'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا أسماء قواعد البيانات ولا مفاتيح البيئة.',
@@ -2350,6 +2377,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             'READY_FOR_CONTROLLED_STEP7_ATTEMPT يظهر فقط بعد جاهزية المحرك الخاص وهدف قاعدة الظل.',
             'قدرة قاعدة الإنتاج (CREATE/SHOW GRANTS) ليست بوابة في وضع المحرك الخاص — تُعرض قدرة المحرك الخاص فقط.',
             'زر خطوة استعادة قاعدة الظل يُعطَّل ويرفض من الخادم إذا كانت الجاهزية NOT_READY حتى لو كانت الحالة قابلة للطلب.',
+            'قسم آثار محرك قاعدة الظل الخاص قراءة فقط ويعرض تصنيفاً آمناً حتى عند نقص الآثار.',
         ],
     ];
 }
