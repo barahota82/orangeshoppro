@@ -21,6 +21,8 @@ require_once $projectRoot . '/includes/backup/backup_pdo_export.php';
 
 $pass = 0;
 $fail = 0;
+$envBlocked = false;
+$skip = 0;
 $markers = [
     'LIVE_JOB_MUTATION_COUNT' => 0,
     'LIVE_STEP7_RETRY_COUNT' => 0,
@@ -45,6 +47,26 @@ function s7apg_ok(bool $c, string $l): void
     $c ? $pass++ : $fail++;
 }
 
+function s7apg_skip(string $l): void
+{
+    global $skip, $envBlocked;
+    $envBlocked = true;
+    $skip++;
+    echo "SKIP {$l}\n";
+}
+
+function s7apg_evidence_dir(): string
+{
+    $fromEnv = trim((string) getenv('ORANGE_STEP7_ACTUAL_PACKAGE_SQL_GATE_EVIDENCE'));
+    if ($fromEnv !== '') {
+        return rtrim($fromEnv, "\\/");
+    }
+
+    return DIRECTORY_SEPARATOR === '\\'
+        ? 'D:/orange_restore_step7_actual_package_sql_gate_evidence'
+        : sys_get_temp_dir() . '/orange_restore_step7_actual_package_sql_gate_evidence';
+}
+
 $policySrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_sql_import_policy.php');
 $engineSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_sql_compat_engine.php');
 $orchSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_center_orchestrator.php');
@@ -67,9 +89,16 @@ $markers['HIDDEN_POST_PREFLIGHT_SQL_GATE_COUNT'] = str_contains($policySrc, 'ora
 s7apg_ok($markers['DUPLICATE_ACTIVE_SQL_DETECTOR_COUNT'] === 0, 'no duplicate active private import detector');
 s7apg_ok($markers['HIDDEN_POST_PREFLIGHT_SQL_GATE_COUNT'] === 0, 'no hidden staging gate in private validate');
 
-$evidence = 'D:/orange_restore_step7_actual_package_sql_gate_evidence';
+$evidence = s7apg_evidence_dir();
 $genJson = $evidence . '/authoritative_full_package_generation.json';
-s7apg_ok(is_file($genJson), 'authoritative generation evidence present');
+if (!is_file($genJson)) {
+    echo "ENVIRONMENT_BLOCKED: actual package evidence missing at {$evidence}\n";
+    s7apg_skip('authoritative generation evidence present');
+    echo "SUMMARY pass={$pass} fail={$fail} skip={$skip}\n";
+    echo 'MARKERS ' . json_encode($markers, JSON_UNESCAPED_UNICODE) . "\n";
+    exit($fail > 0 ? 1 : 2);
+}
+s7apg_ok(true, 'authoritative generation evidence present');
 $gen = is_file($genJson) ? (json_decode((string) file_get_contents($genJson), true) ?: []) : [];
 $markers['AUTHORITATIVE_FULL_PACKAGE_GENERATED'] = (int) ($gen['AUTHORITATIVE_FULL_PACKAGE_GENERATED'] ?? 0);
 $markers['OLD_FAILURE_CLASS_REPRODUCED_ON_AUTHORITATIVE_PACKAGE'] = (int) ($gen['OLD_FAILURE_CLASS_REPRODUCED'] ?? 0);
@@ -172,19 +201,29 @@ try {
     $pdo = new PDO('mysql:host=127.0.0.1;port=3317;charset=utf8mb4', 'root', '', [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
-    $shadow = 'orange_auth_pkg_shadow';
-    $pdo->exec('DROP DATABASE IF EXISTS `' . str_replace('`', '``', $shadow) . '`');
-    $pdo->exec('CREATE DATABASE `' . str_replace('`', '``', $shadow) . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-    $pdo->exec('USE `' . str_replace('`', '``', $shadow) . '`');
-    $import = orange_restore_private_sql_import_gzip($pdo, $dumpPath, $shadow, $trusted, null, $trusted);
-    s7apg_ok(!empty($import['ok']), 'disposable private import ok');
-    s7apg_ok((int) ($import['statements_executed'] ?? 0) > 0, 'import executed statements');
-    $pdo->exec('DROP DATABASE IF EXISTS `' . str_replace('`', '``', $shadow) . '`');
-    $markers['GENUINE_PRIVATE_IMPORT_PASS'] = !empty($import['ok']) ? 1 : 0;
 } catch (Throwable $e) {
-    s7apg_ok(false, 'disposable private import ok');
-    s7apg_ok(false, 'import executed statements');
+    echo "ENVIRONMENT_BLOCKED: disposable MySQL endpoint unavailable\n";
+    s7apg_skip('disposable private import ok');
+    s7apg_skip('import executed statements');
     $markers['GENUINE_PRIVATE_IMPORT_PASS'] = 0;
+    $pdo = null;
+}
+if ($pdo instanceof PDO) {
+    try {
+        $shadow = 'orange_auth_pkg_shadow';
+        $pdo->exec('DROP DATABASE IF EXISTS `' . str_replace('`', '``', $shadow) . '`');
+        $pdo->exec('CREATE DATABASE `' . str_replace('`', '``', $shadow) . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        $pdo->exec('USE `' . str_replace('`', '``', $shadow) . '`');
+        $import = orange_restore_private_sql_import_gzip($pdo, $dumpPath, $shadow, $trusted, null, $trusted);
+        s7apg_ok(!empty($import['ok']), 'disposable private import ok');
+        s7apg_ok((int) ($import['statements_executed'] ?? 0) > 0, 'import executed statements');
+        $pdo->exec('DROP DATABASE IF EXISTS `' . str_replace('`', '``', $shadow) . '`');
+        $markers['GENUINE_PRIVATE_IMPORT_PASS'] = !empty($import['ok']) ? 1 : 0;
+    } catch (Throwable $e) {
+        s7apg_ok(false, 'disposable private import ok');
+        s7apg_ok(false, 'import executed statements');
+        $markers['GENUINE_PRIVATE_IMPORT_PASS'] = 0;
+    }
 }
 
 // Cleanup temp
@@ -203,6 +242,6 @@ if (is_dir($tmp)) {
 s7apg_ok(defined('ORANGE_RESTORE_SQL_COMPAT_ENGINE_COUNT_MARKER')
     && ORANGE_RESTORE_SQL_COMPAT_ENGINE_COUNT_MARKER === 1, 'AUTHORITATIVE_SQL_COMPATIBILITY_ENGINE_COUNT=1');
 
-echo "SUMMARY pass={$pass} fail={$fail}\n";
+echo "SUMMARY pass={$pass} fail={$fail} skip={$skip}\n";
 echo 'MARKERS ' . json_encode($markers, JSON_UNESCAPED_UNICODE) . "\n";
-exit($fail > 0 ? 1 : 0);
+exit($fail > 0 ? 1 : ($envBlocked ? 2 : 0));
