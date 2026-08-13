@@ -1,0 +1,12 @@
+Orange — Restore Step 7 terminal-partial recovery / readiness authority
+=======================================================================
+Last update: 2026-08-13
+
+Remaining defect (proven): F — MULTIPLE_PROVEN_RECONCILIATION_DEFECTS
+- historical attempt absences vs current capabilities
+- PARTIAL_OWNED_TERMINAL_ATTEMPT vs CURRENT without terminality
+- readiness/button/request parity via orange_restore_step7_retry_preflight
+
+After deploy: Owner Refresh + read-only diagnostic only.
+Do NOT press Step 7 until Owner validates the diagnostic fields listed
+in the task brief section 36.

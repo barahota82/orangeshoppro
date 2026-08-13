@@ -1217,6 +1217,14 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED),
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE),
         ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE),
+        ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE),
+        ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED),
+        ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN),
+        ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN),
+        ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY),
+        ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY),
+        ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN),
+        ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT),
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED),
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED),
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED),
@@ -1283,6 +1291,139 @@ function orange_restore_center_step7_genuine_active_attempt(
 }
 
 /**
+ * Authoritative read-only Step-7 retry preflight (zero filesystem/job writes).
+ * Used by diagnostic readiness, button authority, and request mutation gate.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_step7_retry_preflight(
+    string $projectRoot,
+    string $workRoot,
+    string $jobId
+): array {
+    if (!function_exists('orange_restore_private_engine_public_readiness')) {
+        require_once __DIR__ . '/restore_private_shadow_engine.php';
+    }
+    if (!function_exists('orange_restore_shadow_resolve_target')) {
+        require_once __DIR__ . '/restore_shadow_db.php';
+    }
+    $job = orange_restore_fw_read($workRoot, $jobId) ?: [];
+    $pub = orange_restore_fw_public_row($job);
+    $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
+    $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
+    $env = orange_backup_load_env_array($projectRoot);
+    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
+    $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
+        ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
+        : [];
+    $identity = (string) ($resolved['identity_hash'] ?? '');
+    $boundHash = trim((string) ($meta['shadow_db_identity_hash'] ?? ''));
+    $match = $identity !== '' && $boundHash !== '' && hash_equals($identity, $boundHash);
+    if (!$match
+        && ($resolved['ok'] ?? false)
+        && trim((string) ($meta['shadow_db'] ?? '')) !== ''
+        && hash_equals(
+            strtolower((string) ($resolved['shadow_db'] ?? '')),
+            strtolower(trim((string) ($meta['shadow_db'] ?? '')))
+        )) {
+        $match = true;
+    }
+    $status = (string) ($job['status'] ?? '');
+    $inflight = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
+    ], true);
+    $terminalFailed = $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED;
+    $requestable = !empty($pub['shadow_restore_requestable']);
+    $token = (string) ($engine['ready_token'] ?? '');
+    $datadirState = (string) ($engine['datadir_state'] ?? 'ABSENT');
+    $recoveryRequired = !empty($engine['datadir_recovery_required']);
+    $recoverySafe = !empty($engine['datadir_recovery_safe']);
+    $engineStateCap = array_key_exists('engine_state_capture_ready', $engine)
+        ? !empty($engine['engine_state_capture_ready'])
+        : true;
+    $initCap = array_key_exists('init_error_capture_ready', $engine)
+        ? !empty($engine['init_error_capture_ready'])
+        : true;
+    $runtimePersistable = (string) ($engine['runtime_source'] ?? '') !== 'unavailable'
+        && (string) ($engine['runtime_source'] ?? '') !== '';
+    $code = 'ok';
+    $green = false;
+    if (!empty($active['active'])) {
+        $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
+    } elseif (!($resolved['ok'] ?? false)) {
+        $code = ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
+    } elseif (!$match && $boundHash !== '') {
+        $code = ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH;
+    } elseif (!$engineStateCap) {
+        $code = ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY;
+    } elseif (!$initCap) {
+        $code = ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY;
+    } elseif ($datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+        $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
+    } elseif ($datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT' && !$recoverySafe) {
+        $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
+    } elseif (in_array($datadirState, ['UNOWNED', 'MALFORMED_OR_UNKNOWN', 'UNKNOWN'], true)) {
+        $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
+    } elseif (($attemptCtx['php_worker_liveness'] ?? '') === 'unknown'
+        || ($attemptCtx['private_db_liveness'] ?? '') === 'unknown') {
+        $code = ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN;
+    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT && $requestable && !$inflight) {
+        $green = true;
+        $code = 'ok';
+    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING && $requestable && !$inflight) {
+        $green = true;
+        $code = 'ok';
+    } elseif ((string) ($engine['code'] ?? '') !== '' && (string) ($engine['code'] ?? '') !== 'ok') {
+        $code = (string) $engine['code'];
+        $token = '';
+    } else {
+        $code = ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED;
+        $token = '';
+    }
+    if (!$green) {
+        $token = '';
+    }
+
+    return [
+        'ok' => $green,
+        'code' => $code,
+        'ready_token' => $token,
+        'read_only' => true,
+        'job_write_count' => 0,
+        'filesystem_mutation_count' => 0,
+        'state_requestable' => $requestable,
+        'active_attempt' => !empty($active['active']),
+        'latest_attempt_terminal' => $terminalFailed || !empty($attemptCtx['latest_attempt_terminal']),
+        'claim_status' => !empty($active['active']) ? 'active' : 'ABSENT_TERMINAL_OR_RELEASED',
+        'stage_mutex_status' => 'absent_or_released',
+        'runtime_install_mutex_status' => 'separate_from_step7_attempt',
+        'php_worker_liveness' => (string) ($attemptCtx['php_worker_liveness'] ?? 'unknown'),
+        'private_db_liveness' => (string) ($attemptCtx['private_db_liveness'] ?? 'unknown'),
+        'current_runtime_source' => (string) ($engine['runtime_source'] ?? 'unavailable'),
+        'current_runtime_verified' => !empty($engine['binary_available']) || !empty($engine['materializable']),
+        'current_runtime_compatible' => !empty($engine['runtime_compatible']),
+        'current_runtime_identity_persistable' => $runtimePersistable,
+        'datadir_category' => $datadirState,
+        'datadir_ownership_proven' => !empty($engine['ownership_proven']),
+        'partial_recovery_required' => $recoveryRequired,
+        'partial_recovery_safe' => $recoverySafe,
+        'recovery_mode' => $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
+        'engine_state_capture_capability' => $engineStateCap ? 'ready' : 'not_ready',
+        'initialization_result_error_capture_capability' => $initCap ? 'ready' : 'not_ready',
+        'source_package_ready' => trim((string) ($job['source_package_id'] ?? $job['package_id'] ?? '')) !== '',
+        'parent_worker_target_match' => $match && ($resolved['ok'] ?? false),
+        'parent_worker_runtime_match' => $match && (!empty($engine['binary_available']) || !empty($engine['materializable'])),
+        'step7_action_enabled' => $green && $requestable && !$inflight && empty($active['active']),
+        'engine' => $engine,
+        'active_attempt_detail' => $active,
+        'attempt_context' => $attemptCtx,
+    ];
+}
+
+/**
  * Fail closed before pending/attempt/worker when Step7 readiness is not green.
  *
  * ACTIVE is claim-based only. Pending/running status alone is never ACTIVE
@@ -1296,63 +1437,21 @@ function orange_restore_center_step7_mutation_readiness(
     string $workRoot,
     string $jobId
 ): array {
-    if (!function_exists('orange_restore_private_engine_public_readiness')) {
-        require_once __DIR__ . '/restore_private_shadow_engine.php';
-    }
-    if (!function_exists('orange_restore_shadow_resolve_target')) {
-        require_once __DIR__ . '/restore_shadow_db.php';
-    }
-    $job = orange_restore_fw_read($workRoot, $jobId);
-    $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
-    // Do not reject on ACTIVE here — caller uses idempotent same-attempt path.
-    // Surface diagnostic only so UI/tests can classify claim-based active vs class F.
-    $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
-    $env = orange_backup_load_env_array($projectRoot);
-    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
-    $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
-    $identity = (string) ($resolved['identity_hash'] ?? '');
-    $boundHash = trim((string) ($meta['shadow_db_identity_hash'] ?? ''));
-    $match = $identity !== '' && $boundHash !== '' && hash_equals($identity, $boundHash);
-    if (!$match
-        && ($resolved['ok'] ?? false)
-        && trim((string) ($meta['shadow_db'] ?? '')) !== ''
-        && hash_equals(
-            strtolower((string) ($resolved['shadow_db'] ?? '')),
-            strtolower(trim((string) ($meta['shadow_db'] ?? '')))
-        )) {
-        $match = true;
-    }
-    if (!($resolved['ok'] ?? false)) {
-        return [
-            'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
-            'ready_token' => '',
-            'engine' => $engine,
-            'active_attempt' => $active,
-        ];
-    }
-    if (!$match && $boundHash !== '') {
-        return [
-            'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH,
-            'ready_token' => '',
-            'engine' => $engine,
-            'active_attempt' => $active,
-        ];
-    }
-    $token = (string) ($engine['ready_token'] ?? '');
+    $pre = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId);
+    $active = is_array($pre['active_attempt_detail'] ?? null) ? $pre['active_attempt_detail'] : ['active' => false];
+    $engine = is_array($pre['engine'] ?? null) ? $pre['engine'] : [];
+    $job = orange_restore_fw_read($workRoot, $jobId) ?: [];
     $status = (string) ($job['status'] ?? '');
     $inflight = in_array($status, [
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
     ], true);
-    // Inflight without blocking claim (orphan pending) may proceed to idempotent attach.
-    // Green token required only when starting a new request from entry/failed statuses.
-    $green = $token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
-        || $token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
+    $token = (string) ($pre['ready_token'] ?? '');
+    $green = !empty($pre['ok']);
+
     if (!$green && !$inflight && empty($active['active'])) {
-        $code = (string) ($engine['code'] ?? ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED);
+        $code = (string) ($pre['code'] ?? ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED);
         if ($code === '' || $code === 'ok') {
             $code = ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED;
         }
@@ -1363,10 +1462,10 @@ function orange_restore_center_step7_mutation_readiness(
             'ready_token' => '',
             'engine' => $engine,
             'active_attempt' => $active,
+            'retry_preflight' => $pre,
         ];
     }
     if (!$green && $inflight && empty($active['active'])) {
-        // Orphan pending/running: allow schedule attach without re-advertising READY tokens.
         return [
             'ok' => true,
             'code' => 'ok',
@@ -1374,10 +1473,10 @@ function orange_restore_center_step7_mutation_readiness(
             'engine' => $engine,
             'active_attempt' => $active,
             'orphan_inflight_attach' => true,
+            'retry_preflight' => $pre,
         ];
     }
     if (!$green && !empty($active['active'])) {
-        // Genuinely active — HTTP will return idempotent same attempt (not a new start).
         return [
             'ok' => true,
             'code' => 'ok',
@@ -1385,6 +1484,7 @@ function orange_restore_center_step7_mutation_readiness(
             'engine' => $engine,
             'active_attempt' => $active,
             'idempotent_active' => true,
+            'retry_preflight' => $pre,
         ];
     }
 
@@ -1394,6 +1494,7 @@ function orange_restore_center_step7_mutation_readiness(
         'ready_token' => $token,
         'engine' => $engine,
         'active_attempt' => $active,
+        'retry_preflight' => $pre,
     ];
 }
 
@@ -2244,9 +2345,13 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                         : ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN);
             }
 
+            // Authoritative retry preflight overrides ad-hoc green/button (parity with request endpoint).
+            $retryPre = orange_restore_step7_retry_preflight($projectRootDiag, $workRoot, $jobId);
+            $readyToken = (string) ($retryPre['ready_token'] ?? '');
+            $failCode = (string) ($retryPre['code'] ?? $failCode);
             $provisionGreen = $readyToken === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
             $controlledGreen = $readyToken === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
-            $actionEnabled = ($provisionGreen || $controlledGreen) && $requestable && !$running;
+            $actionEnabled = !empty($retryPre['step7_action_enabled']);
             $shadowReadiness = [
                 'ok' => $controlledGreen,
                 'code' => $failCode,
@@ -2264,8 +2369,8 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                 'can_create' => $engineReady || $provisionGreen,
                 'can_use' => $engineReady,
                 'credential_mode' => $engineReady ? 'private_shadow_engine' : ($provisionGreen ? 'private_shadow_engine_pending' : ''),
-                'parent_worker_target_identity_match' => $parentWorkerMatch,
-                'parent_worker_runtime_identity_match' => $parentWorkerMatch && $binaryOk,
+                'parent_worker_target_identity_match' => !empty($retryPre['parent_worker_target_match']),
+                'parent_worker_runtime_identity_match' => !empty($retryPre['parent_worker_runtime_match']),
                 'ready_for_controlled_step7_attempt' => $controlledGreen,
                 'ready_for_private_shadow_provisioning' => $provisionGreen,
                 'ready_token' => $readyToken,
@@ -2278,6 +2383,13 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                 'tools_root_ready' => $toolsReady,
                 'process_execution_available' => $procOk,
                 'db_host_category' => (string) ($enginePub['db_host_category'] ?? 'UNKNOWN'),
+                'datadir_category' => (string) ($retryPre['datadir_category'] ?? ''),
+                'partial_recovery_required' => !empty($retryPre['partial_recovery_required']),
+                'partial_recovery_safe' => !empty($retryPre['partial_recovery_safe']),
+                'recovery_mode' => (string) ($retryPre['recovery_mode'] ?? 'none'),
+                'engine_state_capture_capability' => (string) ($retryPre['engine_state_capture_capability'] ?? 'not_ready'),
+                'initialization_result_error_capture_capability' => (string) ($retryPre['initialization_result_error_capture_capability'] ?? 'not_ready'),
+                'retry_preflight' => $retryPre,
                 'read_only' => true,
             ];
         } catch (Throwable) {

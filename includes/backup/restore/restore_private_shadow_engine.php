@@ -68,6 +68,14 @@ const ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN = 'STEP7_PRIVATE_READINESS_
 const ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED = 'STEP7_NOT_READY_MUTATION_REJECTED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE = 'STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE';
 const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE = 'STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE';
+const ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE = 'STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE';
+const ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED = 'STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED';
+const ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN = 'STEP7_DATADIR_OWNERSHIP_UNKNOWN';
+const ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN = 'STEP7_PRIVATE_PROCESS_STATE_UNKNOWN';
+const ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY = 'STEP7_ENGINE_STATE_CAPTURE_NOT_READY';
+const ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY = 'STEP7_INIT_ERROR_CAPTURE_NOT_READY';
+const ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN = 'STEP7_RETRY_PREFLIGHT_UNKNOWN';
+const ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT = 'STEP7_ACTIVE_ATTEMPT';
 
 // Supply-chain helpers (after constants — avoid circular redefinition).
 require_once __DIR__ . '/restore_private_engine_runtime_manifest.php';
@@ -111,6 +119,14 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
         ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED => 'خطوة استعادة قاعدة الظل غير جاهزة للتنفيذ. حدّث الجاهزية ولا تُنشأ محاولة جديدة.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE => 'فشل تهيئة سابق لمحرك الظل الخاص ما زال غير محلول. حدّث الحالة قبل إعادة المحاولة.',
         ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE => 'مصدر محرك الظل الخاص غير قابل للتثبيت في سجل المحاولة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE => 'مجلد بيانات جزئي من محاولة طرفية غير آمن للاسترداد التلقائي. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED => 'تعذر حجر مجلد البيانات الجزئي الطرفي بأمان. لم تبدأ التهيئة ولا الاستيراد.',
+        ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN => 'ملكية مجلد بيانات محرك الظل غير مؤكدة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN => 'حالة عملية محرك الظل أو عامل PHP غير مؤكدة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY => 'قدرة تسجيل حالة المحرك غير جاهزة في النشر الحالي. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY => 'قدرة التقاط نتيجة/سجل التهيئة غير جاهزة في النشر الحالي. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN => 'فشل التحقق المسبق لإعادة محاولة Step 7. حدّث الحالة.',
+        ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT => 'توجد محاولة Step 7 نشطة. لا تُقبل محاولة جديدة.',
         ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING => 'الجاهزية: يمكن تجهيز محرك قاعدة الظل الخاص عند الضغط على خطوة استعادة قاعدة الظل.',
     ];
 
@@ -627,17 +643,121 @@ function orange_restore_private_engine_init_ledger_write(string $workRoot, strin
  *
  * @return array{state:string,owned:bool,writable:bool,has_mysql_system:bool,entry_count:int}
  */
-function orange_restore_private_engine_classify_datadir(string $engineRoot, string $jobId, ?array $state = null): array
+/**
+ * Read-only attempt/control liveness context for datadir classification (no writes).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_private_engine_attempt_context(string $workRoot, string $jobId): array
 {
+    $job = [];
+    if (function_exists('orange_restore_fw_read')) {
+        try {
+            $job = orange_restore_fw_read($workRoot, $jobId);
+        } catch (Throwable) {
+            $job = [];
+        }
+    }
+    $status = (string) ($job['status'] ?? '');
+    $inflight = in_array($status, [
+        defined('ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING') ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING : 'shadow_restore_pending',
+        defined('ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING') ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING : 'shadow_restore_running',
+        defined('ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING') ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING : 'shadow_restore_verifying',
+    ], true);
+    $terminalFailed = $status === (defined('ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED')
+        ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED
+        : 'shadow_restore_failed');
+    $terminalReady = $status === (defined('ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY')
+        ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY
+        : 'shadow_restore_ready');
+
+    $phpAlive = 'dead';
+    $claimBlocks = false;
+    if (function_exists('orange_restore_center_worker_run_claim_path')
+        && function_exists('orange_restore_center_read_run_claim')
+        && function_exists('orange_restore_center_process_alive')) {
+        $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
+        $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
+        if (is_array($claim)) {
+            $pid = (int) ($claim['pid'] ?? 0);
+            $state = (string) ($claim['state'] ?? '');
+            if ($state !== 'released' && $pid > 0) {
+                $phpAlive = orange_restore_center_process_alive($pid) ? 'alive' : 'dead';
+                $claimBlocks = function_exists('orange_restore_center_claim_blocks_schedule')
+                    ? orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')
+                    : ($phpAlive === 'alive');
+            }
+        }
+    } elseif (function_exists('orange_restore_center_step7_genuine_active_attempt')) {
+        $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
+        $claimBlocks = !empty($active['active']);
+        $phpAlive = $claimBlocks ? 'alive' : 'dead';
+    }
+
+    $dbAlive = 'dead';
+    $state = orange_restore_private_engine_load_state($workRoot, $jobId);
+    $enginePid = is_array($state) ? (int) ($state['engine_pid'] ?? 0) : 0;
+    if ($enginePid > 0 && function_exists('orange_restore_center_process_alive')) {
+        $dbAlive = orange_restore_center_process_alive($enginePid) ? 'alive' : 'dead';
+    } elseif (orange_restore_private_engine_runtime_healthy($workRoot, $jobId)) {
+        $dbAlive = 'alive';
+    }
+
+    $activeAttempt = $claimBlocks || ($inflight && $phpAlive === 'alive');
+    $step8Depends = false;
+    if (function_exists('orange_restore_fw_public_row')) {
+        $pub = orange_restore_fw_public_row($job);
+        $step8Depends = empty($pub['shadow_restore_requestable'])
+            && !$terminalFailed
+            && $status !== ''
+            && !$terminalReady
+            && !$inflight;
+    }
+
+    return [
+        'active_attempt' => $activeAttempt,
+        'latest_attempt_terminal' => $terminalFailed || $terminalReady,
+        'php_worker_liveness' => $phpAlive,
+        'private_db_liveness' => $dbAlive,
+        'step8_depends_on_datadir' => $step8Depends,
+        'job_status' => $status,
+    ];
+}
+
+/**
+ * Classify private datadir with ownership + attempt terminality.
+ *
+ * $attemptContext keys (all optional):
+ *   active_attempt, latest_attempt_terminal, php_worker_liveness, private_db_liveness,
+ *   step8_depends_on_datadir (bool)
+ *
+ * @param array<string, mixed>|null $state
+ * @param array<string, mixed>|null $attemptContext
+ * @return array{
+ *   state:string,owned:bool,writable:bool,has_mysql_system:bool,entry_count:int,
+ *   recovery_required:bool,recovery_safe:bool,ownership_proven:bool
+ * }
+ */
+function orange_restore_private_engine_classify_datadir(
+    string $engineRoot,
+    string $jobId,
+    ?array $state = null,
+    ?array $attemptContext = null
+): array {
+    $base = [
+        'recovery_required' => false,
+        'recovery_safe' => false,
+        'ownership_proven' => false,
+    ];
     $dataDir = $engineRoot . DIRECTORY_SEPARATOR . 'data';
     if (!is_dir($engineRoot) || !is_dir($dataDir)) {
-        return [
+        return array_merge($base, [
             'state' => 'ABSENT',
             'owned' => false,
             'writable' => is_dir($engineRoot) ? @is_writable($engineRoot) : false,
             'has_mysql_system' => false,
             'entry_count' => 0,
-        ];
+        ]);
     }
     $entries = @scandir($dataDir);
     $names = is_array($entries) ? array_values(array_diff($entries, ['.', '..'])) : [];
@@ -645,59 +765,105 @@ function orange_restore_private_engine_classify_datadir(string $engineRoot, stri
     $ownedMeta = is_array($state) && array_key_exists('datadir_job_owned', $state)
         ? !empty($state['datadir_job_owned'])
         : null;
-    // Under job private_shadow_engine root ⇒ owned by construction when jobId valid.
     $ownedByPath = $jobId !== '' && str_contains(
         strtolower(str_replace('\\', '/', $engineRoot)),
         '/' . strtolower($jobId) . '/' . strtolower(ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME)
     );
     $owned = $ownedMeta === true || ($ownedMeta === null && $ownedByPath);
+    $ownershipProven = $ownedMeta === true || ($ownedMeta === null && $ownedByPath);
     $writable = @is_writable($dataDir);
+    $ctx = is_array($attemptContext) ? $attemptContext : [];
+    $activeAttempt = !empty($ctx['active_attempt']);
+    $terminalAttempt = !empty($ctx['latest_attempt_terminal']);
+    $phpLive = (string) ($ctx['php_worker_liveness'] ?? 'unknown');
+    $dbLive = (string) ($ctx['private_db_liveness'] ?? 'unknown');
+    $step8Depends = !empty($ctx['step8_depends_on_datadir']);
+    $procUnknown = $phpLive === 'unknown' || $dbLive === 'unknown';
+    $anyAlive = $phpLive === 'alive' || $dbLive === 'alive';
 
     if ($names === []) {
-        return [
+        return array_merge($base, [
             'state' => $owned ? 'EMPTY_OWNED' : 'ABSENT',
             'owned' => $owned,
             'writable' => $writable,
             'has_mysql_system' => false,
             'entry_count' => 0,
-        ];
+            'ownership_proven' => $ownershipProven,
+        ]);
     }
     if ($ownedMeta === false) {
-        return [
+        return array_merge($base, [
             'state' => 'UNOWNED',
             'owned' => false,
             'writable' => $writable,
             'has_mysql_system' => $hasMysql,
             'entry_count' => count($names),
-        ];
+            'ownership_proven' => true,
+        ]);
     }
     if (!$owned && !$ownedByPath) {
-        return [
-            'state' => 'UNKNOWN',
+        return array_merge($base, [
+            'state' => 'MALFORMED_OR_UNKNOWN',
             'owned' => false,
             'writable' => $writable,
             'has_mysql_system' => $hasMysql,
             'entry_count' => count($names),
-        ];
+            'ownership_proven' => false,
+        ]);
     }
     if (!$hasMysql) {
-        return [
-            'state' => 'PARTIAL_OWNED_CURRENT_ATTEMPT',
+        // Never label terminal/historical partial as generic CURRENT without terminality.
+        $stateName = 'PARTIAL_OWNED_TERMINAL_ATTEMPT';
+        if ($activeAttempt || $anyAlive) {
+            $stateName = 'PARTIAL_OWNED_ACTIVE_ATTEMPT';
+        } elseif ($terminalAttempt || $ctx === []) {
+            // Empty context: owned incomplete datadir is treated as terminal-candidate
+            // (live historical shape). Recovery safety still requires process proofs.
+            $stateName = 'PARTIAL_OWNED_TERMINAL_ATTEMPT';
+        }
+        $recoveryRequired = $stateName === 'PARTIAL_OWNED_TERMINAL_ATTEMPT';
+        $recoverySafe = $recoveryRequired
+            && $ownershipProven
+            && $writable
+            && !$activeAttempt
+            && !$anyAlive
+            && !$procUnknown
+            && !$step8Depends
+            && ($terminalAttempt || $ctx === []);
+
+        return array_merge($base, [
+            'state' => $stateName,
             'owned' => true,
             'writable' => $writable,
             'has_mysql_system' => false,
             'entry_count' => count($names),
-        ];
+            'ownership_proven' => $ownershipProven,
+            'recovery_required' => $recoveryRequired,
+            'recovery_safe' => $recoverySafe,
+        ]);
     }
     $ready = is_array($state) && !empty($state['ready']);
+    if ($ready && $anyAlive) {
+        return array_merge($base, [
+            'state' => 'ACTIVE_OWNED',
+            'owned' => true,
+            'writable' => $writable,
+            'has_mysql_system' => true,
+            'entry_count' => count($names),
+            'ownership_proven' => $ownershipProven,
+        ]);
+    }
 
-    return [
-        'state' => $ready ? 'READY_OWNED' : 'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+    return array_merge($base, [
+        'state' => $ready ? 'READY_OWNED' : 'PARTIAL_OWNED_TERMINAL_ATTEMPT',
         'owned' => true,
         'writable' => $writable,
         'has_mysql_system' => true,
         'entry_count' => count($names),
-    ];
+        'ownership_proven' => $ownershipProven,
+        'recovery_required' => !$ready,
+        'recovery_safe' => !$ready && $ownershipProven && $writable && !$activeAttempt && !$anyAlive && !$procUnknown && !$step8Depends,
+    ]);
 }
 
 /**
@@ -711,11 +877,20 @@ function orange_restore_private_engine_quarantine_partial_datadir(
     array $classification
 ): array {
     $state = (string) ($classification['state'] ?? 'UNKNOWN');
-    if (!in_array($state, [
-        'PARTIAL_OWNED_CURRENT_ATTEMPT',
+    if ($state === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE,
+            'quarantined' => false,
+        ];
+    }
+    $terminalStates = [
+        'PARTIAL_OWNED_TERMINAL_ATTEMPT',
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
-    ], true)) {
-        if ($state === 'UNOWNED' || $state === 'UNKNOWN') {
+        'PARTIAL_OWNED_CURRENT_ATTEMPT', // legacy alias only when recovery_safe
+    ];
+    if (!in_array($state, $terminalStates, true)) {
+        if (in_array($state, ['UNOWNED', 'UNKNOWN', 'MALFORMED_OR_UNKNOWN'], true)) {
             return [
                 'ok' => false,
                 'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
@@ -725,10 +900,31 @@ function orange_restore_private_engine_quarantine_partial_datadir(
 
         return ['ok' => true, 'code' => 'ok', 'quarantined' => false];
     }
+    if ($state === 'PARTIAL_OWNED_CURRENT_ATTEMPT' && empty($classification['recovery_safe'])) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE,
+            'quarantined' => false,
+        ];
+    }
     if (empty($classification['owned']) || empty($classification['writable'])) {
         return [
             'ok' => false,
             'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
+            'quarantined' => false,
+        ];
+    }
+    if (array_key_exists('ownership_proven', $classification) && empty($classification['ownership_proven'])) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN,
+            'quarantined' => false,
+        ];
+    }
+    if (array_key_exists('recovery_safe', $classification) && empty($classification['recovery_safe'])) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE,
             'quarantined' => false,
         ];
     }
@@ -753,10 +949,20 @@ function orange_restore_private_engine_quarantine_partial_datadir(
     if (!@rename($dataDir, $dest)) {
         return [
             'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED,
             'quarantined' => false,
         ];
     }
+    @file_put_contents(
+        $dest . DIRECTORY_SEPARATOR . 'orange_quarantine_marker.json',
+        json_encode([
+            'record_version' => 'step7-terminal-partial-quarantine-v1',
+            'job_id' => $jobId,
+            'terminal_classification' => $state,
+            'quarantined_at_utc' => gmdate('c'),
+            'mode' => 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT',
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+    );
     if (!@mkdir($dataDir, 0775, true) && !is_dir($dataDir)) {
         return [
             'ok' => false,
@@ -1576,7 +1782,8 @@ function orange_restore_private_engine_preflight(
     // Authoritative readiness: never false-green on UNOWNED/UNKNOWN or non-persistable source.
     // Owned partial datadir may be green only when quarantine preconditions are proven (recovery path).
     $engineRoot = orange_restore_private_engine_root_path($workRoot, $jobId);
-    $datadirClass = orange_restore_private_engine_classify_datadir($engineRoot, $jobId, $state);
+    $attemptCtx = orange_restore_private_engine_attempt_context($workRoot, $jobId);
+    $datadirClass = orange_restore_private_engine_classify_datadir($engineRoot, $jobId, $state, $attemptCtx);
     $datadirState = (string) ($datadirClass['state'] ?? 'ABSENT');
     $unresolvedInit = is_array($ledger)
         && !empty($ledger['terminal_failure'])
@@ -1588,24 +1795,43 @@ function orange_restore_private_engine_preflight(
         || ($runtimeSource === 'materializable_portable' && $materializable && $toolsReady);
 
     $ownedPartial = in_array($datadirState, [
+        'PARTIAL_OWNED_TERMINAL_ATTEMPT',
+        'PARTIAL_OWNED_ACTIVE_ATTEMPT',
         'PARTIAL_OWNED_CURRENT_ATTEMPT',
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
     ], true);
-    $quarantineReady = $ownedPartial
-        && !empty($datadirClass['owned'])
-        && !empty($datadirClass['writable'])
+    $recoverySafe = !empty($datadirClass['recovery_safe']);
+    $quarantineReady = $datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT'
+        && $recoverySafe
         && !orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
-    $hardBlock = in_array($datadirState, ['UNOWNED', 'UNKNOWN'], true)
+    $hardBlock = in_array($datadirState, ['UNOWNED', 'UNKNOWN', 'MALFORMED_OR_UNKNOWN', 'PARTIAL_OWNED_ACTIVE_ATTEMPT'], true)
         || !$sourceOkForGreen
+        || ($ownedPartial && $datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT' && !$quarantineReady)
         || ($unresolvedInit && $ownedPartial && !$quarantineReady)
         || ($unresolvedInit && !$ownedPartial && !in_array($datadirState, ['ABSENT', 'EMPTY_OWNED'], true));
 
+    // Capture capability of CURRENT deployed code (not historical artifact presence).
+    $engineStateCaptureReady = function_exists('orange_restore_private_engine_init_ledger_write')
+        && function_exists('orange_restore_private_engine_write_state');
+    $initErrorCaptureReady = function_exists('orange_restore_private_engine_init_with_log')
+        && function_exists('orange_restore_private_engine_init_log_contract');
+
+    if (!$engineStateCaptureReady || !$initErrorCaptureReady) {
+        $hardBlock = true;
+    }
+
     if ($hardBlock) {
         $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY;
-        if ($datadirState === 'UNOWNED' || $datadirState === 'UNKNOWN') {
-            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED;
+        if ($datadirState === 'UNOWNED' || $datadirState === 'UNKNOWN' || $datadirState === 'MALFORMED_OR_UNKNOWN') {
+            $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
+        } elseif ($datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+            $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
         } elseif ($ownedPartial && !$quarantineReady) {
-            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL;
+            $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
+        } elseif (!$engineStateCaptureReady) {
+            $code = ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY;
+        } elseif (!$initErrorCaptureReady) {
+            $code = ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY;
         } elseif ($unresolvedInit) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE;
         } elseif (!$sourceOkForGreen) {
@@ -1626,13 +1852,15 @@ function orange_restore_private_engine_preflight(
             'process_execution_available' => true,
             'private_capability' => $materializable && !$binaryOk ? 'materializable' : 'runtime_present',
             'datadir_state' => $datadirState,
-            'datadir_recovery_required' => $ownedPartial ? true : false,
+            'datadir_recovery_required' => !empty($datadirClass['recovery_required']),
+            'datadir_recovery_safe' => $quarantineReady,
+            'ownership_proven' => !empty($datadirClass['ownership_proven']),
+            'engine_state_capture_ready' => $engineStateCaptureReady,
+            'init_error_capture_ready' => $initErrorCaptureReady,
             'init_ledger_phase' => is_array($ledger) ? (string) ($ledger['phase'] ?? '') : '',
         ]);
     }
 
-    // Pre-existing false READY: unresolved init + partial WITHOUT quarantine path → blocked above.
-    // Owned recoverable partial ⇒ green with recovery_required (provision will quarantine first).
     return [
         'ok' => true,
         'code' => 'ok',
@@ -1654,6 +1882,10 @@ function orange_restore_private_engine_preflight(
         'manifest' => $manifest,
         'datadir_state' => $datadirState,
         'datadir_recovery_required' => $quarantineReady,
+        'datadir_recovery_safe' => $quarantineReady,
+        'ownership_proven' => !empty($datadirClass['ownership_proven']) || in_array($datadirState, ['ABSENT', 'EMPTY_OWNED'], true),
+        'engine_state_capture_ready' => true,
+        'init_error_capture_ready' => true,
         'init_ledger_phase' => is_array($ledger) ? (string) ($ledger['phase'] ?? 'PREFLIGHT') : 'PREFLIGHT',
     ];
 }
@@ -1929,7 +2161,7 @@ function orange_restore_private_engine_provision(
     $ledgerBase['datadir_state'] = (string) ($datadirClass['state'] ?? 'UNKNOWN');
     orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
 
-    if (in_array((string) $datadirClass['state'], ['UNOWNED', 'UNKNOWN'], true)) {
+    if (in_array((string) $datadirClass['state'], ['UNOWNED', 'UNKNOWN', 'MALFORMED_OR_UNKNOWN'], true)) {
         return $failProvision(
             $workRoot,
             $jobId,
@@ -1939,16 +2171,35 @@ function orange_restore_private_engine_provision(
             ['datadir_state' => (string) $datadirClass['state']]
         );
     }
+    if ((string) $datadirClass['state'] === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+        return $failProvision(
+            $workRoot,
+            $jobId,
+            $ledgerBase,
+            'FAILED',
+            ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE,
+            ['datadir_state' => (string) $datadirClass['state']]
+        );
+    }
 
     $mysqlSystem = $dataDir . DIRECTORY_SEPARATOR . 'mysql';
     if (!is_dir($mysqlSystem)
         && in_array((string) $datadirClass['state'], [
-            'PARTIAL_OWNED_CURRENT_ATTEMPT',
+            'PARTIAL_OWNED_TERMINAL_ATTEMPT',
             'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+            'PARTIAL_OWNED_CURRENT_ATTEMPT',
         ], true)
     ) {
         $ledgerBase['phase'] = 'QUARANTINE';
         orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+        // Re-classify with terminal context for historical pre-ledger partials.
+        $datadirClass = orange_restore_private_engine_classify_datadir($root, $jobId, $stateProbe, [
+            'active_attempt' => false,
+            'latest_attempt_terminal' => true,
+            'php_worker_liveness' => 'dead',
+            'private_db_liveness' => orange_restore_private_engine_runtime_healthy($workRoot, $jobId) ? 'alive' : 'dead',
+            'step8_depends_on_datadir' => false,
+        ]);
         $q = orange_restore_private_engine_quarantine_partial_datadir($workRoot, $jobId, $datadirClass);
         if (empty($q['ok'])) {
             return $failProvision(
@@ -1956,7 +2207,7 @@ function orange_restore_private_engine_provision(
                 $jobId,
                 $ledgerBase,
                 'FAILED',
-                (string) ($q['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL),
+                (string) ($q['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED),
                 ['datadir_state' => (string) $datadirClass['state']]
             );
         }
@@ -1994,7 +2245,7 @@ function orange_restore_private_engine_provision(
                     'init_log_result' => (string) ($init['init_log_result'] ?? 'D'),
                     'init_log_category' => (string) ($init['init_log_category'] ?? 'error_log_absent'),
                     'init_method' => (string) ($init['method'] ?? ''),
-                    'datadir_state' => 'PARTIAL_OWNED_CURRENT_ATTEMPT',
+                    'datadir_state' => 'PARTIAL_OWNED_TERMINAL_ATTEMPT',
                 ]
             );
         }

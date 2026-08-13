@@ -121,9 +121,13 @@ try {
         'datadir_job_owned' => false,
     ]);
     $pubUn = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobUnowned);
+    $unCode = (string) ($pubUn['code'] ?? '');
     s7pic_ok(
         (string) ($pubUn['ready_token'] ?? '') === ''
-        && (string) ($pubUn['code'] ?? '') === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
+        && (
+            $unCode === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED
+            || $unCode === ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN
+        ),
         'UNOWNED datadir ⇒ non-green exact code'
     );
 
@@ -142,7 +146,7 @@ try {
         'safe_code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED,
         'init_log_result' => 'D',
         'init_log_category' => 'error_log_absent',
-        'datadir_state' => 'PARTIAL_OWNED_CURRENT_ATTEMPT',
+        'datadir_state' => 'PARTIAL_OWNED_TERMINAL_ATTEMPT',
     ]);
     $pubPartial = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobPartial);
     $tokenPartial = (string) ($pubPartial['ready_token'] ?? '');

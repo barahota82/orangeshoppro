@@ -261,9 +261,24 @@ function orange_restore_private_engine_trace_datadir_state(string $engineRoot, ?
     }
 
     if (!$hasMysqlSystem) {
+        $terminal = true;
+        if (function_exists('orange_restore_private_engine_attempt_context')
+            && isset($GLOBALS['orange_restore_private_engine_trace_work_root'])
+            && is_string($GLOBALS['orange_restore_private_engine_trace_work_root'])) {
+            $ctx = orange_restore_private_engine_attempt_context(
+                (string) $GLOBALS['orange_restore_private_engine_trace_work_root'],
+                $jobId
+            );
+            if (!empty($ctx['active_attempt'])
+                || ($ctx['php_worker_liveness'] ?? '') === 'alive'
+                || ($ctx['private_db_liveness'] ?? '') === 'alive') {
+                $terminal = false;
+            }
+        }
+
         return [
             'state' => $owned || $jobId !== ''
-                ? 'PARTIAL_OWNED_CURRENT_ATTEMPT'
+                ? ($terminal ? 'PARTIAL_OWNED_TERMINAL_ATTEMPT' : 'PARTIAL_OWNED_ACTIVE_ATTEMPT')
                 : 'MALFORMED_OR_UNKNOWN',
             'status' => 'PARTIAL',
             'writable' => $writable,
@@ -284,7 +299,7 @@ function orange_restore_private_engine_trace_datadir_state(string $engineRoot, ?
         return ['state' => 'READY_OWNED', 'status' => $owned || $hasMysqlSystem ? 'PROVEN' : 'PARTIAL', 'writable' => $writable];
     }
 
-    return ['state' => 'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT', 'status' => 'PARTIAL', 'writable' => $writable];
+    return ['state' => 'PARTIAL_OWNED_TERMINAL_ATTEMPT', 'status' => 'PARTIAL', 'writable' => $writable];
 }
 
 /**
@@ -589,6 +604,7 @@ function orange_restore_private_engine_trace_snapshot(
     string $workRoot,
     string $jobId
 ): array {
+    $GLOBALS['orange_restore_private_engine_trace_work_root'] = $workRoot;
     $mutationCounters = [
         'JOB_STATE_WRITE_COUNT' => 0,
         'ATTEMPT_CREATE_COUNT' => 0,
@@ -905,9 +921,34 @@ function orange_restore_private_engine_trace_snapshot(
 
     $partialRuntime = (($runtimeInternal['install_state'] ?? '') === 'partial');
     $partialDatadir = in_array((string) ($datadirInfo['state'] ?? ''), [
+        'PARTIAL_OWNED_TERMINAL_ATTEMPT',
+        'PARTIAL_OWNED_ACTIVE_ATTEMPT',
         'PARTIAL_OWNED_CURRENT_ATTEMPT',
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
     ], true);
+    $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
+        ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
+        : [];
+    $recoverySafe = ((string) ($datadirInfo['state'] ?? '') === 'PARTIAL_OWNED_TERMINAL_ATTEMPT')
+        && empty($attemptCtx['active_attempt'])
+        && ($attemptCtx['php_worker_liveness'] ?? '') !== 'alive'
+        && ($attemptCtx['private_db_liveness'] ?? '') !== 'alive'
+        && ($attemptCtx['php_worker_liveness'] ?? 'unknown') !== 'unknown'
+        && ($attemptCtx['private_db_liveness'] ?? 'unknown') !== 'unknown';
+    $legacyRuntimeAbsent = !is_array($state) || empty($state['runtime_source']);
+    $legacyEngineStateAbsent = !is_array($state);
+    $legacyErrorLogAbsent = ($errClass['status'] ?? '') === 'ABSENT';
+    $currentRuntime = function_exists('orange_restore_private_engine_public_readiness')
+        ? orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId)
+        : [];
+    $currentCaps = [
+        'current_runtime_source' => (string) ($currentRuntime['runtime_source'] ?? ($runtimeInternal['source_category'] ?? 'unavailable')),
+        'runtime_verified' => !empty($currentRuntime['binary_available']) || !empty($runtimeInternal['verified']),
+        'runtime_compatible' => !empty($currentRuntime['runtime_compatible']) || !empty($runtimeInternal['verified']),
+        'runtime_identity_persistence' => function_exists('orange_restore_private_engine_persistable_runtime_source') ? 'ready' : 'not_ready',
+        'engine_state_capture' => function_exists('orange_restore_private_engine_write_state') ? 'ready' : 'not_ready',
+        'initialization_error_capture' => function_exists('orange_restore_private_engine_init_with_log') ? 'ready' : 'not_ready',
+    ];
     $staleAttempt = ($claimActive === 'stale_candidate')
         || ($latestActiveClass === 'terminal' && $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED);
     $staleClaim = $claimActive === 'stale_candidate';
@@ -1332,6 +1373,59 @@ function orange_restore_private_engine_trace_snapshot(
         'diagnostic_performs_no_cleanup' => orange_restore_private_engine_trace_field(true, 'PROVEN'),
     ];
 
+    $historicalArtifacts = [
+        'historical_runtime_identity' => orange_restore_private_engine_trace_field(
+            $legacyRuntimeAbsent ? 'LEGACY_ATTEMPT_RUNTIME_IDENTITY_ABSENT' : 'present',
+            $legacyRuntimeAbsent ? 'HISTORICAL' : 'PROVEN'
+        ),
+        'historical_engine_state' => orange_restore_private_engine_trace_field(
+            $legacyEngineStateAbsent ? 'LEGACY_ATTEMPT_ENGINE_STATE_ABSENT' : 'present',
+            $legacyEngineStateAbsent ? 'HISTORICAL' : 'PROVEN'
+        ),
+        'historical_error_log' => orange_restore_private_engine_trace_field(
+            $legacyErrorLogAbsent ? 'LEGACY_ATTEMPT_ERROR_LOG_ABSENT' : 'present',
+            $legacyErrorLogAbsent ? 'HISTORICAL' : 'PROVEN'
+        ),
+    ];
+    $currentCapabilities = [
+        'current_runtime_source' => orange_restore_private_engine_trace_field(
+            $currentCaps['current_runtime_source'],
+            $currentCaps['runtime_verified'] ? 'PROVEN' : 'ABSENT'
+        ),
+        'runtime_verified' => orange_restore_private_engine_trace_field(
+            !empty($currentCaps['runtime_verified']) ? 'yes' : 'no',
+            'PROVEN'
+        ),
+        'runtime_compatible' => orange_restore_private_engine_trace_field(
+            !empty($currentCaps['runtime_compatible']) ? 'yes' : 'no',
+            'PROVEN'
+        ),
+        'runtime_identity_persistence' => orange_restore_private_engine_trace_field(
+            $currentCaps['runtime_identity_persistence'],
+            'PROVEN'
+        ),
+        'engine_state_capture' => orange_restore_private_engine_trace_field(
+            $currentCaps['engine_state_capture'],
+            'PROVEN'
+        ),
+        'initialization_error_capture' => orange_restore_private_engine_trace_field(
+            $currentCaps['initialization_error_capture'],
+            'PROVEN'
+        ),
+    ];
+    $sectionG['partial_recovery_required'] = orange_restore_private_engine_trace_field(
+        $partialDatadir && (string) ($datadirInfo['state'] ?? '') === 'PARTIAL_OWNED_TERMINAL_ATTEMPT',
+        'PROVEN'
+    );
+    $sectionG['partial_recovery_safe'] = orange_restore_private_engine_trace_field(
+        $recoverySafe ? 'yes' : 'no',
+        $recoverySafe ? 'PROVEN' : 'PROVEN'
+    );
+    $sectionG['recovery_mode'] = orange_restore_private_engine_trace_field(
+        $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
+        'PROVEN'
+    );
+
     $arabicReport = orange_restore_private_engine_trace_arabic_report([
         'job_id' => $jobId,
         'package_id' => $packageId,
@@ -1342,22 +1436,41 @@ function orange_restore_private_engine_trace_snapshot(
         'php_alive' => $phpAlive,
         'engine_alive' => $engineAlive,
         'datadir_state' => (string) ($datadirInfo['state'] ?? 'ABSENT'),
-        'init_category' => $errClass['category'],
+        'init_category' => $legacyErrorLogAbsent
+            ? 'LEGACY_ATTEMPT_ERROR_LOG_ABSENT'
+            : $errClass['category'],
         'import_started' => $importStarted,
         'import_terminal' => $importTerminal,
         'step8_locked' => $step8Locked,
-        'runtime_source' => (string) ($runtimeInternal['source_category'] ?? 'unavailable'),
+        'runtime_source' => (string) $currentCaps['current_runtime_source'],
+        'historical_runtime' => $legacyRuntimeAbsent ? 'LEGACY_ATTEMPT_RUNTIME_IDENTITY_ABSENT' : 'present',
+        'recovery_safe' => $recoverySafe ? 'yes' : 'no',
+        'recovery_mode' => $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
+        'engine_state_capture' => $currentCaps['engine_state_capture'],
+        'init_error_capture' => $currentCaps['initialization_error_capture'],
         'missing_categories' => $missingCategories,
         'next_evidence' => $nextEvidence,
         'install_mutex_separate' => true,
     ]);
+
+    // Historical absences are not "current capability missing".
+    $missingForOwner = [];
+    foreach (array_values(array_unique($missingCategories)) as $mc) {
+        if ($mc === 'engine_state') {
+            $missingForOwner[] = 'LEGACY_ATTEMPT_ENGINE_STATE_ABSENT';
+        } elseif ($mc === 'mysqld_private_error_log') {
+            $missingForOwner[] = 'LEGACY_ATTEMPT_ERROR_LOG_ABSENT';
+        } else {
+            $missingForOwner[] = $mc;
+        }
+    }
 
     return [
         'trace_version' => ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION,
         'read_only' => true,
         'immutable_snapshot' => true,
         'classification' => $classification,
-        'missing_artifact_categories' => array_values(array_unique($missingCategories)),
+        'missing_artifact_categories' => $missingForOwner,
         'mutation_counters' => $mutationCounters,
         'redaction' => [
             'SECRET_OWNER_OUTPUT_COUNT' => 0,
@@ -1370,6 +1483,8 @@ function orange_restore_private_engine_trace_snapshot(
         'sections' => [
             'A_job_and_stage' => $sectionA,
             'B_latest_step7_attempt' => $sectionB,
+            'B2_historical_attempt_artifacts' => $historicalArtifacts,
+            'B3_current_implementation_capabilities' => $currentCapabilities,
             'C_control_plane_ownership' => $sectionC,
             'D_private_runtime_supply' => $runtime,
             'E_private_job_environment' => $sectionE,
@@ -1379,6 +1494,7 @@ function orange_restore_private_engine_trace_snapshot(
         'arabic_report' => $arabicReport,
         'notes_ar' => [
             'لقطة قراءة فقط لآثار محرك قاعدة الظل الخاص — لا تُنشئ محاولة ولا تغيّر حالة.',
+            'غياب آثار المحاولة التاريخية لا يعني أن قدرة النشر الحالي غير متاحة.',
             'لا تُعرض مسارات أو أرقام PID أو أسرار أو سجلات خام.',
             'Mutex تثبيت المحرك منفصل عن محاولة Step 7.',
         ],
@@ -1401,11 +1517,16 @@ function orange_restore_private_engine_trace_arabic_report(array $ctx): string
     $lines[] = 'عامل PHP: ' . (string) ($ctx['php_alive'] ?? 'unknown');
     $lines[] = 'محرك قاعدة الظل الخاص: ' . (string) ($ctx['engine_alive'] ?? 'unknown');
     $lines[] = 'حالة مجلد البيانات: ' . (string) ($ctx['datadir_state'] ?? 'ABSENT');
-    $lines[] = 'فئة التهيئة: ' . (string) ($ctx['init_category'] ?? '—');
+    $lines[] = 'استرداد آمن: ' . (string) ($ctx['recovery_safe'] ?? 'no');
+    $lines[] = 'وضع الاسترداد: ' . (string) ($ctx['recovery_mode'] ?? 'none');
+    $lines[] = 'فئة التهيئة التاريخية: ' . (string) ($ctx['init_category'] ?? '—');
+    $lines[] = 'هوية محرك المحاولة التاريخية: ' . (string) ($ctx['historical_runtime'] ?? '—');
     $lines[] = 'بدأ الاستيراد: ' . (!empty($ctx['import_started']) ? 'نعم' : 'لا');
     $lines[] = 'نتيجة الاستيراد: ' . (string) ($ctx['import_terminal'] ?? 'none');
     $lines[] = 'قفل الخطوة 8: ' . (!empty($ctx['step8_locked']) ? 'مقفل' : 'مفتوح');
-    $lines[] = 'مصدر المحرك: ' . (string) ($ctx['runtime_source'] ?? 'unavailable');
+    $lines[] = 'مصدر المحرك الحالي: ' . (string) ($ctx['runtime_source'] ?? 'unavailable');
+    $lines[] = 'قدرة تسجيل حالة المحرك: ' . (string) ($ctx['engine_state_capture'] ?? '—');
+    $lines[] = 'قدرة التقاط خطأ التهيئة: ' . (string) ($ctx['init_error_capture'] ?? '—');
     $lines[] = 'Mutex التثبيت منفصل عن محاولة Step7: نعم';
     $missing = is_array($ctx['missing_categories'] ?? null) ? $ctx['missing_categories'] : [];
     $lines[] = 'فئات الآثار الناقصة: ' . ($missing === [] ? 'لا يوجد' : implode('، ', $missing));
