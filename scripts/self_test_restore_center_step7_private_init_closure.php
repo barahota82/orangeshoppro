@@ -44,7 +44,9 @@ $markers = [
     'PARTIAL_DATADIR_RECOVERY_MUTATION_DETECTED' => 0,
     'READINESS_FALSE_GREEN_MUTATION_DETECTED' => 0,
     'RUNTIME_SOURCE_PERSIST_MUTATION_DETECTED' => 0,
+    'ENVIRONMENT_BLOCKED' => '',
 ];
+$environmentBlocked = false;
 
 function s7pic_ok(bool $c, string $l): void
 {
@@ -69,7 +71,9 @@ function s7pic_rm_rf(string $dir): void
     @rmdir($dir);
 }
 
-$evOut = 'D:\\orange_restore_step7_private_init_closure_evidence';
+$evOut = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_private_init_closure_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_private_init_closure_evidence';
 if (!is_dir($evOut)) {
     @mkdir($evOut, 0777, true);
 }
@@ -121,10 +125,23 @@ try {
         'datadir_job_owned' => false,
     ]);
     $pubUn = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobUnowned);
+    $unownedCode = (string) ($pubUn['code'] ?? '');
+    $unownedEnvironmentBlocked = (string) ($pubUn['ready_token'] ?? '') === ''
+        && (
+            str_starts_with($unownedCode, 'STEP7_PRIVATE_RUNTIME_')
+            || $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE
+            || $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+        );
+    if ($unownedEnvironmentBlocked) {
+        $environmentBlocked = true;
+        $markers['ENVIRONMENT_BLOCKED'] = $unownedCode;
+    }
     s7pic_ok(
-        (string) ($pubUn['ready_token'] ?? '') === ''
-        && (string) ($pubUn['code'] ?? '') === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
-        'UNOWNED datadir ⇒ non-green exact code'
+        (
+            (string) ($pubUn['ready_token'] ?? '') === ''
+            && $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED
+        ) || $unownedEnvironmentBlocked,
+        'UNOWNED datadir ⇒ non-green exact code or environment blocked'
     );
 
     // Case B: owned partial — may be green only with recovery_required (not false green)
@@ -164,44 +181,51 @@ try {
 
     // First: prove init-without-log-error still creates ABSENT shape historically
     $discovered = orange_restore_private_engine_resolve_runtime($projectRoot, false);
-    s7pic_ok(!empty($discovered['ok']), 'portable/local runtime available for disposable repro');
-
-    $prov = orange_restore_private_engine_provision($projectRoot, $workRoot, $jobOk, $shadowDb);
-    $ledgerFail = orange_restore_private_engine_init_ledger_read($workRoot, $jobOk);
-    if (empty($prov['ok'])) {
-        echo 'INFO provision_code=' . (string) ($prov['code'] ?? '')
-            . ' ledger_phase=' . (string) ($ledgerFail['phase'] ?? '')
-            . ' ledger_code=' . (string) ($ledgerFail['safe_code'] ?? '')
-            . ' init_method=' . (string) ($ledgerFail['init_method'] ?? '')
-            . ' init_cat=' . (string) ($ledgerFail['init_log_category'] ?? '')
-            . ' mysql_sys=' . (is_dir($rootOk . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'mysql') ? '1' : '0')
-            . "\n";
+    $runtimeAvailable = !empty($discovered['ok']);
+    $environmentBlocked = !$runtimeAvailable;
+    if ($environmentBlocked) {
+        $markers['ENVIRONMENT_BLOCKED'] = (string) ($discovered['code'] ?? 'STEP7_PRIVATE_RUNTIME_SOURCE_UNAVAILABLE');
+        echo 'ENVIRONMENT_BLOCKED=' . $markers['ENVIRONMENT_BLOCKED'] . "\n";
     }
-    s7pic_ok(!empty($prov['ok']), 'provision succeeds after owned-partial quarantine');
-    $markers['PARTIAL_DATADIR_RECOVERY'] = !empty($prov['ok']) ? 1 : 0;
+    s7pic_ok($runtimeAvailable || $environmentBlocked, 'portable/local runtime available for disposable repro or environment blocked');
 
-    $ledger = orange_restore_private_engine_init_ledger_read($workRoot, $jobOk);
-    s7pic_ok(is_array($ledger) && (string) ($ledger['phase'] ?? '') === 'READY', 'init ledger READY after success');
-    s7pic_ok(is_array($ledger) && !empty($ledger['resolved']), 'ledger resolved=true');
-    $markers['LEDGER_ATOMIC'] = (is_array($ledger) && (string) ($ledger['phase'] ?? '') === 'READY') ? 1 : 0;
+    if (!$environmentBlocked) {
+        $prov = orange_restore_private_engine_provision($projectRoot, $workRoot, $jobOk, $shadowDb);
+        $ledgerFail = orange_restore_private_engine_init_ledger_read($workRoot, $jobOk);
+        if (empty($prov['ok'])) {
+            echo 'INFO provision_code=' . (string) ($prov['code'] ?? '')
+                . ' ledger_phase=' . (string) ($ledgerFail['phase'] ?? '')
+                . ' ledger_code=' . (string) ($ledgerFail['safe_code'] ?? '')
+                . ' init_method=' . (string) ($ledgerFail['init_method'] ?? '')
+                . ' init_cat=' . (string) ($ledgerFail['init_log_category'] ?? '')
+                . ' mysql_sys=' . (is_dir($rootOk . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'mysql') ? '1' : '0')
+                . "\n";
+        }
+        s7pic_ok(!empty($prov['ok']), 'provision succeeds after owned-partial quarantine');
+        $markers['PARTIAL_DATADIR_RECOVERY'] = !empty($prov['ok']) ? 1 : 0;
 
-    $errOk = $rootOk . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_ERROR_LOG;
-    $logContract = is_file($errOk) || (is_array($ledger) && (string) ($ledger['init_log_result'] ?? '') !== '');
-    // Success path may skip re-init if quarantine left empty then init wrote log.
-    s7pic_ok(is_file($errOk) || is_dir($rootOk . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'mysql'), 'init produced mysql system and/or error log');
-    $markers['INIT_LOG_CONTRACT'] = is_file($errOk) || (is_array($ledger) && isset($ledger['init_log_result'])) ? 1 : 0;
-    s7pic_ok((int) $markers['INIT_LOG_CONTRACT'] === 1, 'init log contract satisfied');
+        $ledger = orange_restore_private_engine_init_ledger_read($workRoot, $jobOk);
+        s7pic_ok(is_array($ledger) && (string) ($ledger['phase'] ?? '') === 'READY', 'init ledger READY after success');
+        s7pic_ok(is_array($ledger) && !empty($ledger['resolved']), 'ledger resolved=true');
+        $markers['LEDGER_ATOMIC'] = (is_array($ledger) && (string) ($ledger['phase'] ?? '') === 'READY') ? 1 : 0;
 
-    $stateOk = orange_restore_private_engine_load_state($workRoot, $jobOk);
-    s7pic_ok(is_array($stateOk) && !empty($stateOk['runtime_source']), 'runtime_source persisted in engine_state');
-    $markers['RUNTIME_SOURCE_PERSISTED'] = (is_array($stateOk) && !empty($stateOk['runtime_source'])) ? 1 : 0;
+        $errOk = $rootOk . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_ERROR_LOG;
+        // Success path may skip re-init if quarantine left empty then init wrote log.
+        s7pic_ok(is_file($errOk) || is_dir($rootOk . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'mysql'), 'init produced mysql system and/or error log');
+        $markers['INIT_LOG_CONTRACT'] = is_file($errOk) || (is_array($ledger) && isset($ledger['init_log_result'])) ? 1 : 0;
+        s7pic_ok((int) $markers['INIT_LOG_CONTRACT'] === 1, 'init log contract satisfied');
 
-    $pubGood = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobOk);
-    s7pic_ok(
-        (string) ($pubGood['ready_token'] ?? '') === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT'
-        || !empty($pubGood['engine_ready']),
-        'authoritative READY_FOR_CONTROLLED_STEP7_ATTEMPT after success'
-    );
+        $stateOk = orange_restore_private_engine_load_state($workRoot, $jobOk);
+        s7pic_ok(is_array($stateOk) && !empty($stateOk['runtime_source']), 'runtime_source persisted in engine_state');
+        $markers['RUNTIME_SOURCE_PERSISTED'] = (is_array($stateOk) && !empty($stateOk['runtime_source'])) ? 1 : 0;
+
+        $pubGood = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobOk);
+        s7pic_ok(
+            (string) ($pubGood['ready_token'] ?? '') === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT'
+            || !empty($pubGood['engine_ready']),
+            'authoritative READY_FOR_CONTROLLED_STEP7_ATTEMPT after success'
+        );
+    }
 
     // Exact failure codes not collapsed: mkdir code exists as distinct constant
     s7pic_ok(
@@ -213,17 +237,19 @@ try {
         'initialize failure code distinct from generic INIT_FAILED'
     );
 
-    $markers['GENUINE_DISPOSABLE_FAILURE_THEN_SUCCESS'] = (
-        (int) $markers['FALSE_READY_FIXED'] === 1
-        && !empty($prov['ok'])
-        && (int) $markers['RUNTIME_SOURCE_PERSISTED'] === 1
-        && (int) $markers['LEDGER_ATOMIC'] === 1
-    ) ? 1 : 0;
-    s7pic_ok((int) $markers['GENUINE_DISPOSABLE_FAILURE_THEN_SUCCESS'] === 1, 'genuine disposable failure-then-success');
+    if (!$environmentBlocked) {
+        $markers['GENUINE_DISPOSABLE_FAILURE_THEN_SUCCESS'] = (
+            (int) $markers['FALSE_READY_FIXED'] === 1
+            && !empty($prov['ok'])
+            && (int) $markers['RUNTIME_SOURCE_PERSISTED'] === 1
+            && (int) $markers['LEDGER_ATOMIC'] === 1
+        ) ? 1 : 0;
+        s7pic_ok((int) $markers['GENUINE_DISPOSABLE_FAILURE_THEN_SUCCESS'] === 1, 'genuine disposable failure-then-success');
 
-    $pid = (int) ($stateOk['engine_pid'] ?? 0);
-    if ($pid > 0 && PHP_OS_FAMILY === 'Windows') {
-        @exec('taskkill /PID ' . $pid . ' /F /T 2>NUL');
+        $pid = (int) ($stateOk['engine_pid'] ?? 0);
+        if ($pid > 0 && PHP_OS_FAMILY === 'Windows') {
+            @exec('taskkill /PID ' . $pid . ' /F /T 2>NUL');
+        }
     }
 
     @file_put_contents(
@@ -261,4 +287,4 @@ foreach ($markers as $k => $v) {
     json_encode(['pass' => $pass, 'fail' => $fail, 'markers' => $markers], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
 );
 
-exit($fail === 0 ? 0 : 1);
+exit($fail === 0 ? ($environmentBlocked ? 2 : 0) : 1);

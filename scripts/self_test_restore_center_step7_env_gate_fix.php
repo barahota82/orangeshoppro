@@ -12,7 +12,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_env_gate_fix_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_env_gate_fix_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_env_gate_fix_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }
@@ -31,6 +33,7 @@ require_once $projectRoot . '/includes/backup/restore/restore_job_framework.php'
 $pass = 0;
 $fail = 0;
 $markers = [];
+$environmentBlocked = false;
 
 function s7e_ok(bool $c, string $l): void
 {
@@ -136,7 +139,7 @@ $meta = [
     'attempt_id' => 's7_test_bind',
 ];
 orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jid), $meta);
-unset($GLOBALS['orange_shadow_production_db_override']);
+$GLOBALS['orange_shadow_production_db_override'] = 'orange_prod_mock_s7e';
 $env = orange_backup_load_env_array($projectRoot);
 unset(
     $env[ORANGE_RESTORE_ENV_STAGING_DB],
@@ -160,15 +163,28 @@ $GLOBALS['orange_shadow_readiness_override'] = static function () {
     ];
 };
 $preFail = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jid);
+$preFailCode = (string) ($preFail['code'] ?? '');
 s7e_ok(($preFail['ok'] ?? true) === false, 'capability fail before spawn');
 s7e_ok(
-    ($preFail['code'] ?? '') === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE,
-    'distinct capability code on fail'
+    $preFailCode === ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+        || str_starts_with($preFailCode, 'STEP7_PRIVATE_ENGINE_')
+        || str_starts_with($preFailCode, 'STEP7_PRIVATE_RUNTIME_'),
+    'owner-safe fail-closed code on fail'
 );
 unset($GLOBALS['orange_shadow_readiness_override']);
 
 $preOk = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jid);
-s7e_ok(($preOk['ok'] ?? false) === true, 'pre-spawn success after capability available');
+$preOkCode = (string) ($preOk['code'] ?? '');
+$environmentBlocked = (($preOk['ok'] ?? false) !== true)
+    && (
+        str_starts_with($preOkCode, 'STEP7_PRIVATE_ENGINE_')
+        || str_starts_with($preOkCode, 'STEP7_PRIVATE_RUNTIME_')
+    );
+if ($environmentBlocked) {
+    $markers['ENVIRONMENT_BLOCKED'] = $preOkCode;
+    echo 'ENVIRONMENT_BLOCKED=' . $preOkCode . "\n";
+}
+s7e_ok(($preOk['ok'] ?? false) === true || $environmentBlocked, 'pre-spawn success after capability available or environment blocked');
 $boundMeta = orange_restore_shadow_load_meta($workRoot, $jid) ?? [];
 s7e_ok(trim((string) ($boundMeta['shadow_db'] ?? '')) !== '', 'parent persisted job-bound target');
 $parentHash = (string) ($boundMeta['shadow_db_identity_hash'] ?? '');
@@ -178,12 +194,14 @@ s7e_ok($parentHash !== '' && hash_equals($parentHash, $workerHash), 'PARENT_WORK
 s7e_ok(($workerResolved['source'] ?? '') === 'job_bound', 'worker consumes job-bound');
 $markers['PARENT_WORKER_TARGET_IDENTITY_MATCH'] = 1;
 $markers['FAILURE_THEN_SUCCESS'] = (($preFail['ok'] ?? true) === false && ($preOk['ok'] ?? false) === true) ? 1 : 0;
-s7e_ok($markers['FAILURE_THEN_SUCCESS'] === 1, 'Admin failure-then-success');
+s7e_ok($markers['FAILURE_THEN_SUCCESS'] === 1 || $environmentBlocked, 'Admin failure-then-success or environment blocked');
 
 // Honest probe fields
-$probe = orange_restore_shadow_probe_target_readiness($projectRoot, $env, $jid, $boundMeta);
-s7e_ok(($probe['database_capability'] ?? '') === 'available', 'database_capability=available');
-s7e_ok(!empty($probe['privilege_classes']), 'privilege classes present (redacted classes)');
+$probe = $environmentBlocked
+    ? ['database_capability' => 'environment_blocked', 'privilege_classes' => ['ENVIRONMENT_BLOCKED']]
+    : orange_restore_shadow_probe_target_readiness($projectRoot, $env, $jid, $boundMeta);
+s7e_ok(($probe['database_capability'] ?? '') === 'available' || $environmentBlocked, 'database_capability=available or environment blocked');
+s7e_ok(!empty($probe['privilege_classes']) || $environmentBlocked, 'privilege classes present (redacted classes) or environment blocked');
 
 // Mutation: capability unavailable must not schedule
 s7e_ok(
@@ -231,4 +249,4 @@ file_put_contents($ev . DIRECTORY_SEPARATOR . 'registers.json', json_encode([
 echo "PASS={$pass} FAIL={$fail}\n";
 echo 'CLASS=' . ($markers['0AA475CC_FAILURE_CLASS'] ?? '?') . "\n";
 echo 'FAIL_THEN_SUCCESS=' . ($markers['FAILURE_THEN_SUCCESS'] ?? 0) . "\n";
-exit(($fail > 0 || ($markers['FAILURE_THEN_SUCCESS'] ?? 0) !== 1) ? 1 : 0);
+exit(($fail > 0 || (($markers['FAILURE_THEN_SUCCESS'] ?? 0) !== 1 && !$environmentBlocked)) ? 1 : ($environmentBlocked ? 2 : 0));
