@@ -1485,6 +1485,8 @@ function orange_restore_private_engine_trace_snapshot(
         'engine_state_capture' => $currentCaps['engine_state_capture'],
         'init_error_capture' => $currentCaps['initialization_error_capture'],
         'exact_not_ready_reason' => (string) ($retryPreflight['exact_not_ready_reason'] ?? ''),
+        'engine_service_state' => (string) ($retryPreflight['engine_service_state'] ?? ''),
+        'engine_ready_idle' => !empty($retryPreflight['engine_ready_idle']) ? 'yes' : 'no',
         'final_readiness' => (string) ($retryPreflight['final_readiness'] ?? $readinessToken),
         'php_liveness_class' => (string) ($retryPreflight['php_worker_liveness_class'] ?? ''),
         'db_liveness_class' => (string) ($retryPreflight['private_db_liveness_class'] ?? ''),
@@ -1577,6 +1579,9 @@ function orange_restore_private_engine_trace_arabic_report(array $ctx): string
     $lines[] = 'محرك قاعدة الظل الخاص: ' . (string) (($ctx['db_liveness_class'] ?? '') !== ''
         ? $ctx['db_liveness_class']
         : ($ctx['engine_alive'] ?? 'unknown'));
+    if ((string) ($ctx['engine_service_state'] ?? '') !== '') {
+        $lines[] = 'حالة خدمة المحرك: ' . (string) $ctx['engine_service_state'];
+    }
     $lines[] = 'إثبات غياب العملية: ' . (string) ($ctx['process_absence_proven'] ?? 'no');
     $lines[] = 'حالة مجلد البيانات: ' . (string) ($ctx['datadir_state'] ?? 'ABSENT');
     $lines[] = 'استرداد آمن: ' . (string) ($ctx['recovery_safe'] ?? 'no');

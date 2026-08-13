@@ -27,6 +27,7 @@ require_once __DIR__ . '/restore_worker_php_cli.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 require_once __DIR__ . '/restore_private_shadow_engine.php';
+require_once __DIR__ . '/restore_private_sql_import_policy.php';
 require_once __DIR__ . '/restore_private_engine_trace.php';
 
 const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v10-attempt-contract';
@@ -932,12 +933,26 @@ function orange_restore_center_classify_worker_log_bootstrap(string $logPath): s
         || preg_match('/access denied/i', $raw) === 1) {
         return ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE;
     }
-    if (preg_match('/SHADOW_RESTORE_RESULT:\s*FAIL/i', $raw) === 1
-        || preg_match('/CODE:\s*STEP7_SHADOW_DB_TARGET_UNAVAILABLE/i', $raw) === 1
+    // Prefer exact CODE: when present — never collapse every FAIL to target-unavailable.
+    if (preg_match('/CODE:\s*(STEP7_[A-Z0-9_]+)/i', $raw, $mCode) === 1) {
+        return strtoupper((string) $mCode[1]);
+    }
+    if (preg_match('/forbidden pattern\(s\) for Phase 2B\.1 staging\s*import:\s*USE database switch/i', $raw) === 1
+        || preg_match('/USE database switch/i', $raw) === 1) {
+        if (!function_exists('orange_restore_private_sql_map_import_error')) {
+            require_once __DIR__ . '/restore_private_sql_import_policy.php';
+        }
+
+        return ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED;
+    }
+    if (preg_match('/CODE:\s*STEP7_SHADOW_DB_TARGET_UNAVAILABLE/i', $raw) === 1
         || preg_match('/ORANGE_RESTORE_STAGING_DB/i', $raw) === 1
         || preg_match('/ORANGE_RESTORE_SHADOW_DB/i', $raw) === 1
         || preg_match('/is not configured/i', $raw) === 1) {
         return ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
+    }
+    if (preg_match('/SHADOW_RESTORE_RESULT:\s*FAIL/i', $raw) === 1) {
+        return ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_READY_IMPORT_NOT_STARTED;
     }
 
     return '';
@@ -1180,6 +1195,11 @@ function orange_restore_center_step7_classify_start_failure(string $code): strin
             || str_contains($code, 'ORANGE_RESTORE_SHADOW_DB')
             || str_contains($code, 'is not configured') => ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE,
         str_starts_with($code, 'STEP7_PRIVATE_ENGINE_') => $code,
+        str_starts_with($code, 'STEP7_SQL_') => $code,
+        str_starts_with($code, 'STEP7_PRIVATE_IMPORT_') => $code,
+        str_starts_with($code, 'STEP7_PRIVATE_TARGET_') => $code,
+        str_contains($code, 'USE database switch')
+            || str_contains($code, 'forbidden pattern') => 'STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED',
         str_starts_with($code, 'STEP7_') => $code,
         default => ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE,
     };
@@ -1231,6 +1251,36 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH),
         ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY),
         ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT),
+        ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED)
+            : 'تعذر قبول مقدمة ملف SQL للحزمة على مسار الاستيراد الخاص. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES)
+            : 'ملف SQL يحتوي أكثر من تبديل قاعدة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH)
+            : 'هوية قاعدة البيانات في مقدمة SQL غير متطابقة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE)
+            : 'ملف SQL يحتوي مراجع عبر قواعد بيانات غير مسموحة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_LEVEL_DDL_FORBIDDEN => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_LEVEL_DDL_FORBIDDEN)
+            : 'ملف SQL يحتوي أوامر مستوى قاعدة غير مسموحة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED)
+            : 'تعذر تجهيز تيار الاستيراد المطبّع. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED)
+            : 'تعذر تجهيز هدف قاعدة الظل داخل المحرك الخاص. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_READY_IMPORT_NOT_STARTED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_READY_IMPORT_NOT_STARTED)
+            : 'محرك قاعدة الظل الخاص جاهز لكن الاستيراد لم يبدأ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_START_FAILED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_START_FAILED)
+            : 'تعذر بدء استيراد SQL إلى قاعدة الظل الخاصة.',
+        ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_FAILED => function_exists('orange_restore_private_sql_operator_reason_ar')
+            ? orange_restore_private_sql_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_FAILED)
+            : 'فشل استيراد SQL إلى قاعدة الظل الخاصة.',
         ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY),
         ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY),
         ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN),
@@ -1489,12 +1539,22 @@ function orange_restore_step7_retry_preflight(
     $parentRuntimeMatch = $match && $runtimeVerified;
     $claimStatus = !empty($active['active']) ? 'active' : 'ABSENT_TERMINAL_OR_RELEASED';
 
+    $engineServiceState = (string) ($attemptCtx['engine_service_state'] ?? '');
+    if ($engineServiceState === '' && function_exists('orange_restore_private_engine_attempt_context')) {
+        $engineServiceState = (string) ($attemptCtx['engine_service_state'] ?? ORANGE_RESTORE_ENGINE_ABSENT);
+    }
+    $engineReadyIdle = $engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE
+        || !empty($attemptCtx['engine_ready_idle']);
+    $phpAbsenceOk = !empty($attemptCtx['php_worker_absence_proven'])
+        || ($processAbsenceProven && $phpClass !== ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE);
+
     $code = 'ok';
     $green = false;
     if (!empty($active['active']) || $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
         $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
-    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
-        || $datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+    } elseif ($datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT' && !$engineReadyIdle) {
+        $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE && !$engineReadyIdle) {
         $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
     } elseif ($stageMutex === 'held' || $stageMutex === 'unresolved') {
         $code = ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED;
@@ -1532,8 +1592,18 @@ function orange_restore_step7_retry_preflight(
         $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
     } elseif (in_array($datadirState, ['UNOWNED', 'MALFORMED_OR_UNKNOWN', 'UNKNOWN'], true)) {
         $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
+    } elseif ($engineReadyIdle
+        && $requestable && !$inflight && $phpAbsenceOk && empty($active['active'])
+        && $latestTerminal && $step8Locked && $parentTargetMatch && $parentRuntimeMatch
+        && $runtimeVerified && $runtimeCompatible && $runtimePersistable
+        && $sourceReady && $engineStateCap && $initCap
+        && in_array($datadirState, ['ACTIVE_OWNED', 'READY_OWNED', 'EMPTY_OWNED'], true)) {
+        // Owned healthy private engine service → controlled retry (not provisioning).
+        $green = true;
+        $code = 'ok';
+        $token = ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
     } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT
-        && $requestable && !$inflight && $processAbsenceProven && empty($active['active'])) {
+        && $requestable && !$inflight && ($processAbsenceProven || $phpAbsenceOk) && empty($active['active'])) {
         $green = true;
         $code = 'ok';
     } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
@@ -1587,8 +1657,13 @@ function orange_restore_step7_retry_preflight(
         'private_DB_process_liveness' => $dbLive,
         'private_db_liveness' => $dbLive,
         'private_db_liveness_class' => $dbClass,
-        'process_absence_proven' => $processAbsenceProven,
+        'process_absence_proven' => $processAbsenceProven || ($engineReadyIdle && $phpAbsenceOk),
         'process_absence_conclusion' => $absenceConclusion,
+        'engine_service_state' => $engineServiceState !== ''
+            ? $engineServiceState
+            : ($engineReadyIdle ? ORANGE_RESTORE_ENGINE_READY_IDLE : ORANGE_RESTORE_ENGINE_ABSENT),
+        'engine_ready_idle' => $engineReadyIdle,
+        'php_worker_absence_proven' => $phpAbsenceOk,
         'current_runtime_source' => (string) ($engine['runtime_source'] ?? 'unavailable'),
         'current_runtime_verified' => $runtimeVerified,
         'current_runtime_compatible' => $runtimeCompatible,

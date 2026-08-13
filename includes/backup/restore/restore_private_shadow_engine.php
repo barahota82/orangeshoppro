@@ -87,6 +87,15 @@ const ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN = 'STEP7_RETRY_PREFLIGHT_UNKN
 const ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT = 'STEP7_ACTIVE_ATTEMPT';
 const ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT = 'STEP7_GENUINE_ACTIVE_ATTEMPT';
 
+/** Private DB engine service lifecycle (distinct from Step-7 attempt/worker). */
+const ORANGE_RESTORE_ENGINE_ABSENT = 'ENGINE_ABSENT';
+const ORANGE_RESTORE_ENGINE_STARTING = 'ENGINE_STARTING';
+const ORANGE_RESTORE_ENGINE_READY_IDLE = 'ENGINE_READY_IDLE';
+const ORANGE_RESTORE_ENGINE_IN_USE_BY_ACTIVE_ATTEMPT = 'ENGINE_IN_USE_BY_ACTIVE_ATTEMPT';
+const ORANGE_RESTORE_ENGINE_STOPPED_OWNED = 'ENGINE_STOPPED_OWNED';
+const ORANGE_RESTORE_ENGINE_FAILED = 'ENGINE_FAILED';
+const ORANGE_RESTORE_ENGINE_OWNERSHIP_UNKNOWN = 'ENGINE_OWNERSHIP_UNKNOWN';
+
 /** Process liveness classifications (never coerce METADATA_ABSENT → dead). */
 const ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE = 'MATCHED_ACTIVE';
 const ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD = 'MATCHED_TERMINAL_OR_DEAD';
@@ -887,15 +896,44 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
     ];
     $phpActive = $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
     $dbActive = $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
-    $activeAttempt = $claimBlocks || ($inflight && $phpActive);
+    // Genuine Step-7 attempt = claim/worker only — never the idle private DB engine service.
+    $activeAttempt = $claimBlocks || ($inflight && $phpActive) || $phpActive;
 
-    $processAbsenceProven = !$phpActive && !$dbActive && !$activeAttempt
+    $phpAbsenceProven = !$phpActive && !$activeAttempt
         && in_array($phpClass, $nonActiveProven, true)
-        && in_array($dbClass, $nonActiveProven, true)
-        && ($terminalFailed || $terminalReady || !$claimPresent);
+        && ($terminalFailed || $terminalReady || !$claimPresent || !$claimBlocks);
+    $processAbsenceProven = $phpAbsenceProven
+        && !$dbActive
+        && in_array($dbClass, $nonActiveProven, true);
 
-    if ($phpActive || $dbActive || $activeAttempt) {
+    $engineHealthyOwned = $dbActive
+        && ($terminalFailed || $terminalReady || !$inflight)
+        && !$phpActive
+        && !$claimBlocks
+        && (is_array($state) && (!empty($state['ready']) || !empty($state['datadir_job_owned'])));
+    $engineServiceState = ORANGE_RESTORE_ENGINE_ABSENT;
+    if ($activeAttempt && $dbActive) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_IN_USE_BY_ACTIVE_ATTEMPT;
+    } elseif ($engineHealthyOwned) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_READY_IDLE;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD
+        && is_array($state) && !empty($state['datadir_job_owned'])) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_STOPPED_OWNED;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_OWNERSHIP_UNKNOWN;
+    } elseif ($dbActive && $inflight) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_STARTING;
+    } elseif (is_array($state) && !empty($state['terminal_failure'])) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_FAILED;
+    }
+
+    if ($phpActive || $activeAttempt) {
         $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_ACTIVE;
+    } elseif ($engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE && $phpAbsenceProven) {
+        // Idle owned engine is a service lifecycle, not an active attempt blocker.
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_PROVEN;
     } elseif ($processAbsenceProven) {
         $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_PROVEN;
     } else {
@@ -925,8 +963,12 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
         'private_db_liveness' => $dbCompat,
         'php_worker_liveness_class' => $phpClass,
         'private_db_liveness_class' => $dbClass,
-        'process_absence_proven' => $processAbsenceProven,
+        'php_worker_absence_proven' => $phpAbsenceProven,
+        'process_absence_proven' => $processAbsenceProven
+            || ($engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE && $phpAbsenceProven),
         'process_absence_conclusion' => $absenceConclusion,
+        'engine_service_state' => $engineServiceState,
+        'engine_ready_idle' => $engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE,
         'process_inspection_available' => !empty($probe['inspection_available'])
             || ($phpClass !== ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
                 && $dbClass !== ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE),
@@ -1008,9 +1050,14 @@ function orange_restore_private_engine_classify_datadir(
         && in_array($dbLive, ['dead', 'inactive'], true)) {
         $procUnknown = false;
     }
-    $anyAlive = $phpLive === 'alive' || $dbLive === 'alive'
+    $engineReadyIdleCtx = !empty($ctx['engine_ready_idle'])
+        || (string) ($ctx['engine_service_state'] ?? '') === ORANGE_RESTORE_ENGINE_READY_IDLE;
+    // Idle owned private DB engine is a service — not an "active attempt" alive signal.
+    $anyAlive = $phpLive === 'alive'
         || $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
-        || $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+        || ((!$engineReadyIdleCtx) && (
+            $dbLive === 'alive' || $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+        ));
     $absenceOk = array_key_exists('process_absence_proven', $ctx)
         ? !empty($ctx['process_absence_proven'])
         : (!$procUnknown && !$anyAlive && !$activeAttempt);
@@ -2039,7 +2086,10 @@ function orange_restore_private_engine_preflight(
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
     ], true);
     $recoverySafe = !empty($datadirClass['recovery_safe']);
+    $engineReadyIdleNow = !empty($attemptCtx['engine_ready_idle'])
+        || (string) ($attemptCtx['engine_service_state'] ?? '') === ORANGE_RESTORE_ENGINE_READY_IDLE;
     $processAbsenceOk = !empty($attemptCtx['process_absence_proven'])
+        || ($engineReadyIdleNow && !empty($attemptCtx['php_worker_absence_proven']))
         || (!array_key_exists('process_absence_proven', $attemptCtx) && $recoverySafe);
     $quarantineReady = $datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT'
         && $recoverySafe
@@ -2074,8 +2124,10 @@ function orange_restore_private_engine_preflight(
             if ($phpCls === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
                 || $dbCls === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE) {
                 $code = ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE;
-            } elseif ($phpCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
-                || $dbCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+            } elseif ($phpCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+                $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+            } elseif ($dbCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+                && (string) ($attemptCtx['engine_service_state'] ?? '') !== ORANGE_RESTORE_ENGINE_READY_IDLE) {
                 $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
             } elseif (($attemptCtx['php_worker_liveness'] ?? '') === 'unknown') {
                 $code = ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN;

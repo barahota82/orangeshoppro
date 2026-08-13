@@ -20,6 +20,7 @@ require_once __DIR__ . '/restore_pre_restore_backup.php';
 require_once __DIR__ . '/restore_staging_target.php';
 require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_package_compat.php';
+require_once __DIR__ . '/restore_private_sql_import_policy.php';
 require_once __DIR__ . '/restore_private_shadow_engine.php';
 require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../backup_manifest.php';
@@ -83,6 +84,16 @@ function orange_restore_shadow_operator_message_ar(string $code): string
         'shadow_db_ownership_mismatch' => 'تعذر إنشاء بيئة قاعدة الظل. الهدف لا يخص هذه المهمة.',
         'shadow_db_target_unavailable' => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE => 'تعذر تجهيز هدف قاعدة الظل لهذه المهمة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED => 'تعذر قبول مقدمة ملف SQL للحزمة على مسار الاستيراد الخاص. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES => 'ملف SQL يحتوي أكثر من تبديل قاعدة أو تبديلاً متأخراً. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH => 'هوية قاعدة البيانات في مقدمة SQL لا تطابق مصدر الحزمة الموثوق. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE => 'ملف SQL يحتوي مراجع عبر قواعد بيانات غير مسموحة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_LEVEL_DDL_FORBIDDEN => 'ملف SQL يحتوي أوامر مستوى قاعدة غير مسموحة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED => 'تعذر تجهيز تيار الاستيراد المطبّع لملف SQL. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED => 'تعذر تجهيز هدف قاعدة الظل داخل المحرك الخاص. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_READY_IMPORT_NOT_STARTED => 'محرك قاعدة الظل الخاص جاهز لكن الاستيراد لم يبدأ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_START_FAILED => 'تعذر بدء استيراد SQL إلى قاعدة الظل الخاصة.',
+        ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_FAILED => 'فشل استيراد SQL إلى قاعدة الظل الخاصة. لم تُمس قاعدة الإنتاج.',
         'shadow_db_capability_unavailable' => 'هدف قاعدة الظل معروف، لكن صلاحية إنشاء/استخدام قاعدة الظل غير متاحة لحساب التطبيق. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE => 'هدف قاعدة الظل معروف، لكن صلاحية إنشاء/استخدام قاعدة الظل غير متاحة لحساب التطبيق. لم يبدأ التنفيذ.',
         'cli_only' => 'تعذر تنفيذ العملية.',
@@ -112,6 +123,22 @@ function orange_restore_shadow_normalize_failure_code(string $code): string
     $code = trim($code);
     if ($code === '') {
         return 'shadow_restore_failed';
+    }
+    if (!function_exists('orange_restore_private_sql_map_import_error')) {
+        require_once __DIR__ . '/restore_private_sql_import_policy.php';
+    }
+    if (str_starts_with($code, 'STEP7_SQL_')
+        || str_starts_with($code, 'STEP7_PRIVATE_IMPORT_')
+        || str_starts_with($code, 'STEP7_PRIVATE_TARGET_')
+        || $code === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_READY_IMPORT_NOT_STARTED) {
+        return $code;
+    }
+    if (str_contains($code, 'forbidden pattern')
+        || str_contains($code, 'USE database switch')
+        || str_contains($code, 'rejected USE database switch')
+        || str_contains($code, 'CREATE DATABASE')
+        || str_contains($code, 'cross-database')) {
+        return orange_restore_private_sql_map_import_error($code);
     }
     if (str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
         return $code;
@@ -1970,6 +1997,31 @@ function orange_restore_shadow_run_cli(
             'job_id' => $jobId,
         ];
 
+        // Persist attempt runtime / engine-service identity before target preparation.
+        $engineState = function_exists('orange_restore_private_engine_load_state')
+            ? orange_restore_private_engine_load_state($workRoot, $jobId)
+            : null;
+        $attemptCtxEarly = function_exists('orange_restore_private_engine_attempt_context')
+            ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
+            : [];
+        $meta['attempt_runtime'] = [
+            'runtime_source' => is_array($engineState)
+                ? (string) ($engineState['runtime_source'] ?? 'unavailable')
+                : 'unavailable',
+            'runtime_version' => is_array($engineState)
+                ? (string) ($engineState['runtime_version'] ?? ($engineState['family'] ?? ''))
+                : '',
+            'engine_service_state' => (string) ($attemptCtxEarly['engine_service_state'] ?? ORANGE_RESTORE_ENGINE_ABSENT),
+            'import_policy_version' => ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION,
+            'source_package_id' => (string) ($job['source_package_id'] ?? $job['package_id'] ?? ''),
+            'attempt_id' => $attemptId,
+            'engine_boundary' => (string) ($attemptCtxEarly['engine_service_state'] ?? '') === ORANGE_RESTORE_ENGINE_READY_IDLE
+                ? 'ENGINE_READY_IDLE'
+                : 'TARGET_PREPARE_STARTED',
+        ];
+        $meta['execution_started'] = false;
+        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+
         // Authoritative resolver only — never orange_restore_staging_db_name / mandatory env.
         // Prefer job-bound meta persisted by parent pre-spawn; else auto/override resolve.
         $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
@@ -2042,9 +2094,54 @@ function orange_restore_shadow_run_cli(
             throw new RuntimeException('dump_file_missing');
         }
 
-        $compat = orange_restore_package_staging_import_compat($packagePath, $manifest, $shadowDb, $productionDb);
+        if (!function_exists('orange_restore_package_private_engine_import_compat')) {
+            require_once __DIR__ . '/restore_private_sql_import_policy.php';
+        }
+        // Private-engine adapter: structural prelude contract (do not use Phase-2B.1 USE ban).
+        $compat = orange_restore_package_private_engine_import_compat(
+            $packagePath,
+            $manifest,
+            $shadowDb,
+            $productionDb,
+            $productionDb
+        );
         if (!($compat['ok'] ?? false)) {
-            throw new RuntimeException((string) ($compat['error'] ?? 'package_incompatible'));
+            throw new RuntimeException((string) ($compat['error'] ?? ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED));
+        }
+        $classification = (string) ($compat['classification'] ?? ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE);
+        $meta['import_policy_version'] = ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION;
+        $meta['sql_structure_classification'] = $classification;
+        $meta['source_dump_sha256'] = (string) ($compat['source_dump_sha256'] ?? '');
+        $meta['engine_boundary'] = 'IMPORT_STREAM_VALIDATE_STARTED';
+        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+
+        $importGzipPath = $dumpPath;
+        $normalizedMeta = null;
+        if (in_array($classification, [
+            ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE,
+            ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE,
+        ], true)) {
+            $prepared = orange_restore_private_sql_prepare_normalized_import(
+                $workRoot,
+                $jobId,
+                $dumpPath,
+                $productionDb,
+                $classification
+            );
+            if (!($prepared['ok'] ?? false)) {
+                throw new RuntimeException((string) ($prepared['code'] ?? ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED));
+            }
+            $importGzipPath = (string) $prepared['normalized_path'];
+            $normalizedMeta = $prepared;
+            $meta['normalized_stream_sha256'] = (string) ($prepared['normalized_stream_sha256'] ?? '');
+            $meta['canonical_use_removed_count'] = (int) ($prepared['removed_count'] ?? 0);
+            $meta['engine_boundary'] = 'IMPORT_STREAM_NORMALIZED';
+            orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+        } else {
+            $meta['canonical_use_removed_count'] = 0;
+            $meta['normalized_stream_sha256'] = '';
+            $meta['engine_boundary'] = 'IMPORT_STREAM_NORMALIZED';
+            orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
         }
 
         $ensured = orange_restore_shadow_ensure_database($projectRoot, $env, $shadowDb);
@@ -2056,33 +2153,58 @@ function orange_restore_shadow_run_cli(
                 || $ensureCode === 'shadow_db_create_failed') {
                 throw new RuntimeException(
                     $ensureCode === ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE
-                        ? ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
-                        : ($ensureCode !== '' ? $ensureCode : 'shadow_db_create_failed')
+                        ? ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED
+                        : ($ensureCode !== '' ? $ensureCode : ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED)
                 );
             }
             throw new RuntimeException(
-                $ensureCode !== '' ? $ensureCode : ORANGE_RESTORE_STEP7_SHADOW_DB_CAPABILITY_UNAVAILABLE
+                $ensureCode !== '' ? $ensureCode : ORANGE_RESTORE_STEP7_PRIVATE_TARGET_PREPARE_FAILED
             );
         }
+        $meta['engine_boundary'] = 'TARGET_READY';
+        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
 
         $pdo = orange_restore_shadow_connect_pdo($projectRoot, $env, $shadowDb);
         orange_restore_shadow_wipe($pdo, $shadowDb);
 
+        $meta['engine_boundary'] = 'IMPORT_START_REQUESTED';
+        $meta['execution_started'] = false;
+        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+
         if (isset($GLOBALS['orange_shadow_import_override']) && is_callable($GLOBALS['orange_shadow_import_override'])) {
             /** @var callable $fn */
             $fn = $GLOBALS['orange_shadow_import_override'];
-            $sqlResult = $fn($pdo, $dumpPath, $shadowDb, $productionDb);
+            $sqlResult = $fn($pdo, $importGzipPath, $shadowDb, $productionDb);
             if (!is_array($sqlResult)) {
-                throw new RuntimeException('import_override_invalid');
+                throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_START_FAILED);
             }
         } else {
-            $sqlResult = orange_restore_sql_runner_import_gzip($pdo, $dumpPath, $shadowDb, $productionDb);
+            // execution_started flips true only when the runner begins submitting statements.
+            $meta['engine_boundary'] = 'IMPORT_STARTED';
+            $meta['execution_started'] = true;
+            $job['execution_started'] = true;
+            orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
+            orange_restore_fw_write($workRoot, $job);
+
+            $sqlResult = orange_restore_private_sql_import_gzip($pdo, $importGzipPath, $shadowDb, $productionDb);
             // Safety: session must still be shadow (skip when import is mocked for self-tests).
             orange_restore_staging_assert_safe_target($pdo, $shadowDb);
         }
         if (!($sqlResult['ok'] ?? false)) {
-            throw new RuntimeException('sql_import_failed');
+            $importCode = (string) ($sqlResult['code'] ?? $sqlResult['error'] ?? ORANGE_RESTORE_STEP7_PRIVATE_IMPORT_FAILED);
+            throw new RuntimeException(orange_restore_shadow_normalize_failure_code($importCode));
         }
+        $meta['engine_boundary'] = 'IMPORT_FINISHED';
+        if (is_array($normalizedMeta)) {
+            $meta['normalization_provenance'] = [
+                'policy_version' => ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION,
+                'classification' => $classification,
+                'removed_count' => (int) ($normalizedMeta['removed_count'] ?? 0),
+                'source_dump_sha256' => (string) ($normalizedMeta['source_dump_sha256'] ?? ''),
+                'normalized_stream_sha256' => (string) ($normalizedMeta['normalized_stream_sha256'] ?? ''),
+            ];
+        }
+        orange_restore_private_sql_cleanup_normalized_import($workRoot, $jobId);
 
         $meta['statements_executed'] = (int) ($sqlResult['statements_executed'] ?? 0);
         $meta['backend'] = (string) ($manifest['export_backend'] ?? 'php_pdo');

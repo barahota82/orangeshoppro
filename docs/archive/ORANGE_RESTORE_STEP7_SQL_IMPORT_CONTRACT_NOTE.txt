@@ -1,0 +1,28 @@
+Orange — Restore Center Step 7 SQL dump / private-import contract
+=================================================================
+Last update: 2026-08-13
+
+Scope
+-----
+Restore-only private-engine SQL import-stream contract:
+- structural DB-directive scanner (not naive Phase-2B.1 USE ban);
+- canonical prelude normalization (A/B only) on a job-owned transient stream;
+- source package / dump bytes immutable;
+- private-engine service lifecycle (ENGINE_READY_IDLE) distinct from
+  STEP7_GENUINE_ACTIVE_ATTEMPT;
+- exact SQL/import failure codes (no collapse to TARGET_UNAVAILABLE).
+
+Phase-2B.1 staging policy in restore_sql_safety.php remains unchanged.
+
+Backup dump generation (read-only)
+----------------------------------
+Authoritative Full php_pdo exporter (backup_pdo_export.php) writes SET
+preamble without USE/CREATE DATABASE. Packages that still contain a single
+canonical top-level USE are handled by the private adapter (classification A).
+Naive Phase-2B.1 gzip USE scan may false-positive on comment/string text (G).
+
+Owner next action after deploy
+------------------------------
+Open job 2026-08-10_035058_0bd13c6d → Refresh once → diagnostic / private
+engine trace → confirm ENGINE_READY_IDLE + READY_FOR_CONTROLLED_STEP7_ATTEMPT.
+Do not press Step 7 in this task. Do not stop the live private engine.
