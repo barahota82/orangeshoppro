@@ -402,13 +402,10 @@ function orange_restore_sql_compat_scan_package(
         while (!gzeof($h)) {
             $chunk = gzread($h, 65536);
             if ($chunk === false) {
-                gzclose($h);
-
                 return $base;
             }
             $sql .= $chunk;
             if (strlen($sql) > 268435456) {
-                gzclose($h);
                 $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
                 $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
 
