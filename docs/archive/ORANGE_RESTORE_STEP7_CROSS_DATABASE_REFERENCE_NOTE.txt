@@ -1,0 +1,37 @@
+ORANGE — Restore Center Step 7
+Cross-database qualified reference scanner (private import policy)
+================================================================
+Date: 2026-08-13
+Policy version: ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION 1.0.1
+
+Decision (Owner task — Result A)
+--------------------------------
+Classification: FALSE_POSITIVE_SQL_REFERENCE_PARSER
+
+Authoritative Backup `php_pdo` dumps embed `SHOW CREATE TABLE` output containing
+unquoted decimal defaults (e.g. DEFAULT 0.0000) and may include unquoted decimal
+INSERT literals. The SQL tokenizer represents those as ident.dot.ident.
+
+The Restore-only private cross-database scan previously treated every such shape
+as a foreign schema reference, yielding STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE
+before import start (execution_started=false).
+
+Repair (Restore-only; Phase-2B.1 staging policy unchanged)
+---------------------------------------------------------
+`orange_restore_private_sql_scan_cross_database_refs` now:
+1) skips purely numeric ident.dot.ident pairs;
+2) requires the same object-name context gate as Phase-2B.1
+   (`orange_restore_sql_is_schema_qualified_object_context`).
+
+Real external / system schema object references remain rejected.
+
+تنفيذ
+-----
+- includes/backup/restore/restore_private_sql_import_policy.php
+- scripts/self_test_restore_center_step7_cross_database_reference_closure.php
+- Evidence: D:\orange_restore_step7_cross_database_reference_closure_evidence\
+
+Live safety
+-----------
+Does not mutate live job/package/engine. Not a live Step-7 success certificate.
+Owner next: read-only Refresh + diagnostic only (do not press Step 7 in this task).

@@ -13,7 +13,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/restore_sql_safety.php';
 require_once __DIR__ . '/restore_sql_runner.php';
 
-const ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION = '1.0.0';
+const ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION = '1.0.1';
 
 const ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE = 'ONE_CANONICAL_BACKUP_USE_PRELUDE';
 const ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE = 'CANONICAL_CREATE_DATABASE_AND_USE_PRELUDE';
@@ -211,6 +211,10 @@ function orange_restore_private_sql_scan_top_level_directives(string $sql): arra
 /**
  * Detect fully-qualified db.table references outside strings/comments (lexemes).
  *
+ * Aligns with Phase-2B.1 object-name context (INTO/FROM/JOIN/TABLE/…) so that
+ * numeric literals tokenized as ident.dot.ident (e.g. DEFAULT 0.0000, VALUES 12.50)
+ * are not false-positive cross-database hits. Real external schema.object refs still reject.
+ *
  * @return list<string> normalized foreign db names (not equal to allowed)
  */
 function orange_restore_private_sql_scan_cross_database_refs(string $sql, string $allowedDb): array
@@ -241,8 +245,17 @@ function orange_restore_private_sql_scan_cross_database_refs(string $sql, string
             if (($a['type'] ?? '') !== 'ident' || ($b['type'] ?? '') !== 'dot' || ($c['type'] ?? '') !== 'ident') {
                 continue;
             }
-            $db = orange_restore_private_sql_normalize_ident((string) ($a['value'] ?? ''));
-            if ($db === '' || $db === $allowed) {
+            $leftRaw = (string) ($a['value'] ?? '');
+            $rightRaw = (string) ($c['value'] ?? '');
+            // Tokenizer treats digit runs as ident — decimal literals are not schema quals.
+            if (preg_match('/^[0-9]+$/', $leftRaw) === 1 && preg_match('/^[0-9]+$/', $rightRaw) === 1) {
+                continue;
+            }
+            if (!orange_restore_sql_is_schema_qualified_object_context($lexemes, $i)) {
+                continue;
+            }
+            $db = orange_restore_private_sql_normalize_ident($leftRaw);
+            if ($db === '' || ($allowed !== '' && $db === $allowed)) {
                 continue;
             }
             $prevIdent = '';
