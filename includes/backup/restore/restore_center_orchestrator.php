@@ -1345,7 +1345,23 @@ function orange_restore_step7_retry_preflight(
     $active = orange_restore_center_step7_genuine_active_attempt_readonly($workRoot, $jobId, $job);
     $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
     $env = orange_backup_load_env_array($projectRoot);
-    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    if (isset($GLOBALS['orange_shadow_env_override']) && is_array($GLOBALS['orange_shadow_env_override'])) {
+        $env = array_merge($env, $GLOBALS['orange_shadow_env_override']);
+    }
+    $previousPrivateEngineContext = $GLOBALS['orange_restore_private_engine_context'] ?? null;
+    $GLOBALS['orange_restore_private_engine_context'] = [
+        'work_root' => $workRoot,
+        'job_id' => $jobId,
+    ];
+    try {
+        $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    } finally {
+        if (is_array($previousPrivateEngineContext)) {
+            $GLOBALS['orange_restore_private_engine_context'] = $previousPrivateEngineContext;
+        } else {
+            unset($GLOBALS['orange_restore_private_engine_context']);
+        }
+    }
     $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
     $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
         ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
