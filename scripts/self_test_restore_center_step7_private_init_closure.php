@@ -125,10 +125,23 @@ try {
         'datadir_job_owned' => false,
     ]);
     $pubUn = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobUnowned);
+    $unownedCode = (string) ($pubUn['code'] ?? '');
+    $unownedEnvironmentBlocked = (string) ($pubUn['ready_token'] ?? '') === ''
+        && (
+            str_starts_with($unownedCode, 'STEP7_PRIVATE_RUNTIME_')
+            || $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE
+            || $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_TOOLS_ROOT_NOT_READY
+        );
+    if ($unownedEnvironmentBlocked) {
+        $environmentBlocked = true;
+        $markers['ENVIRONMENT_BLOCKED'] = $unownedCode;
+    }
     s7pic_ok(
-        (string) ($pubUn['ready_token'] ?? '') === ''
-        && (string) ($pubUn['code'] ?? '') === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
-        'UNOWNED datadir ⇒ non-green exact code'
+        (
+            (string) ($pubUn['ready_token'] ?? '') === ''
+            && $unownedCode === ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED
+        ) || $unownedEnvironmentBlocked,
+        'UNOWNED datadir ⇒ non-green exact code or environment blocked'
     );
 
     // Case B: owned partial — may be green only with recovery_required (not false green)
