@@ -56,6 +56,15 @@ function s7tpr_rm(string $dir): void
     @rmdir($dir);
 }
 
+function s7tpr_evidence_dir(string $name): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:\\' . $name;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $name;
+}
+
 $engSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_shadow_engine.php');
 $orchSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_center_orchestrator.php');
 $traceSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_private_engine_trace.php');
@@ -190,7 +199,7 @@ try {
     s7tpr_rm($tmp);
 }
 
-$ev = 'D:\\orange_restore_step7_terminal_partial_readiness_closure_evidence';
+$ev = s7tpr_evidence_dir('orange_restore_step7_terminal_partial_readiness_closure_evidence');
 if (!is_dir($ev)) {
     @mkdir($ev, 0777, true);
 }
