@@ -1291,6 +1291,39 @@ function orange_restore_center_step7_genuine_active_attempt(
 }
 
 /**
+ * Read-only variant of Step-7 active attempt detection.
+ *
+ * Do not reconcile or clear stale claim files here; diagnostics/preflight must not
+ * mutate owner-visible job artifacts.
+ *
+ * @param array<string, mixed> $job
+ * @return array{active:bool,class:string,attempt_id:string,claim:array<string,mixed>|null}
+ */
+function orange_restore_center_step7_genuine_active_attempt_readonly(
+    string $workRoot,
+    string $jobId,
+    array $job
+): array {
+    $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
+    $claim = orange_restore_center_read_run_claim($claimPath);
+    if ($claim === null || !orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')) {
+        return [
+            'active' => false,
+            'class' => '',
+            'attempt_id' => '',
+            'claim' => null,
+        ];
+    }
+
+    return [
+        'active' => true,
+        'class' => ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS,
+        'attempt_id' => trim((string) ($claim['attempt_id'] ?? '')),
+        'claim' => $claim,
+    ];
+}
+
+/**
  * Authoritative read-only Step-7 retry preflight (zero filesystem/job writes).
  * Used by diagnostic readiness, button authority, and request mutation gate.
  *
@@ -1309,10 +1342,26 @@ function orange_restore_step7_retry_preflight(
     }
     $job = orange_restore_fw_read($workRoot, $jobId) ?: [];
     $pub = orange_restore_fw_public_row($job);
-    $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
+    $active = orange_restore_center_step7_genuine_active_attempt_readonly($workRoot, $jobId, $job);
     $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
     $env = orange_backup_load_env_array($projectRoot);
-    $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    if (isset($GLOBALS['orange_shadow_env_override']) && is_array($GLOBALS['orange_shadow_env_override'])) {
+        $env = array_merge($env, $GLOBALS['orange_shadow_env_override']);
+    }
+    $previousPrivateEngineContext = $GLOBALS['orange_restore_private_engine_context'] ?? null;
+    $GLOBALS['orange_restore_private_engine_context'] = [
+        'work_root' => $workRoot,
+        'job_id' => $jobId,
+    ];
+    try {
+        $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
+    } finally {
+        if (is_array($previousPrivateEngineContext)) {
+            $GLOBALS['orange_restore_private_engine_context'] = $previousPrivateEngineContext;
+        } else {
+            unset($GLOBALS['orange_restore_private_engine_context']);
+        }
+    }
     $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
     $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
         ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
