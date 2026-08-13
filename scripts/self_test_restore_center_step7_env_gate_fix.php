@@ -138,7 +138,7 @@ $meta = [
     'attempt_id' => 's7_test_bind',
 ];
 orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jid), $meta);
-unset($GLOBALS['orange_shadow_production_db_override']);
+$GLOBALS['orange_shadow_production_db_override'] = 'orange_prod_mock_s7e';
 $env = orange_backup_load_env_array($projectRoot);
 unset(
     $env[ORANGE_RESTORE_ENV_STAGING_DB],
