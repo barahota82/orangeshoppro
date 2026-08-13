@@ -125,6 +125,16 @@ $cases = [
         'expect' => ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH,
         'ok' => true,
     ],
+    'alias_column_and_decimal' => [
+        'sql' => "CREATE TABLE t(id INT, amount DECIMAL(10,2));\nINSERT INTO t VALUES (1, 12.34);\nCREATE VIEW v AS SELECT t.id FROM t;\n",
+        'expect' => ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH,
+        'ok' => true,
+    ],
+    'allowed_db_qualified_object' => [
+        'sql' => "USE `{$trusted}`;\nCREATE TABLE `{$trusted}`.`t`(id INT);\n",
+        'expect' => ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE,
+        'ok' => true,
+    ],
     'cross_db' => [
         'sql' => "USE `{$trusted}`;\nINSERT INTO other_db.t SELECT 1;\n",
         'expect' => ORANGE_RESTORE_SQL_CLASS_CROSS_DB,

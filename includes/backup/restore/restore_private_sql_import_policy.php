@@ -241,6 +241,9 @@ function orange_restore_private_sql_scan_cross_database_refs(string $sql, string
             if (($a['type'] ?? '') !== 'ident' || ($b['type'] ?? '') !== 'dot' || ($c['type'] ?? '') !== 'ident') {
                 continue;
             }
+            if (!orange_restore_sql_is_schema_qualified_object_context($lexemes, $i)) {
+                continue;
+            }
             $db = orange_restore_private_sql_normalize_ident((string) ($a['value'] ?? ''));
             if ($db === '' || $db === $allowed) {
                 continue;
