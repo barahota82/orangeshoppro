@@ -1,0 +1,20 @@
+Orange — Restore Center Step 7 private-engine initialization closure
+====================================================================
+Last update: 2026-08-13
+
+Scope
+-----
+Deterministic private-engine initialization ledger, owned-partial datadir
+quarantine recovery, init error-log contract, runtime_source persistence,
+and non-false-green readiness. Architecture C+E via D unchanged.
+
+Root cause (proven disposable)
+------------------------------
+H — PARTIAL_OWNED_DATADIR_BLOCKS_REINITIALIZE_WITHOUT_LEDGER_OR_LOG
+
+Owner next action after deploy
+------------------------------
+Open job 2026-08-10_035058_0bd13c6d → Refresh → diagnostic/trace →
+press Step 7 once only when green → stop before Step 8.
+
+Do not cancel the live job. Do not broad-kill host mysqld processes.

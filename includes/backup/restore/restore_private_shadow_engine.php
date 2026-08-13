@@ -31,15 +31,22 @@ require_once __DIR__ . '/restore_job_framework.php';
 
 const ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME = 'private_shadow_engine';
 const ORANGE_RESTORE_PRIVATE_ENGINE_STATE_FILE = 'engine_state.json';
+const ORANGE_RESTORE_PRIVATE_ENGINE_INIT_LEDGER_FILE = 'engine_init_ledger.json';
 const ORANGE_RESTORE_PRIVATE_ENGINE_SECRET_FILE = '.engine_runtime.opt';
 const ORANGE_RESTORE_PRIVATE_ENGINE_BOOTSTRAP_OPT = '.engine_bootstrap.opt';
 const ORANGE_RESTORE_PRIVATE_ENGINE_ERROR_LOG = 'mysqld_private.err';
 const ORANGE_RESTORE_PRIVATE_ENGINE_PID_FILE = 'mysqld_private.pid';
 const ORANGE_RESTORE_PRIVATE_ENGINE_RECORD_VERSION = 'step7-private-engine-v1';
+const ORANGE_RESTORE_PRIVATE_ENGINE_INIT_LEDGER_VERSION = 'step7-private-init-ledger-v1';
 
 /** Owner-safe Step-7 private engine codes (no path/port/db/password exposure). */
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE = 'STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED = 'STEP7_PRIVATE_ENGINE_INIT_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_MKDIR_FAILED = 'STEP7_PRIVATE_ENGINE_MKDIR_FAILED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL = 'STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED = 'STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_LOG_UNAVAILABLE = 'STEP7_PRIVATE_ENGINE_INIT_LOG_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED = 'STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED = 'STEP7_PRIVATE_ENGINE_START_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED = 'STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED';
 const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED = 'STEP7_PRIVATE_ENGINE_PROVISION_FAILED';
@@ -59,6 +66,8 @@ const ORANGE_RESTORE_STEP7_PRIVATE_OWNERSHIP_CONFLICT = 'STEP7_PRIVATE_OWNERSHIP
 const ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH = 'STEP7_PARENT_WORKER_IDENTITY_MISMATCH';
 const ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN = 'STEP7_PRIVATE_READINESS_UNKNOWN';
 const ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED = 'STEP7_NOT_READY_MUTATION_REJECTED';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE = 'STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE';
+const ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE = 'STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE';
 
 // Supply-chain helpers (after constants — avoid circular redefinition).
 require_once __DIR__ . '/restore_private_engine_runtime_manifest.php';
@@ -76,6 +85,11 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
     $map = [
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE => 'تعذر اكتشاف محرك قاعدة الظل الخاص على الخادم. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED => 'تعذر تهيئة محرك قاعدة الظل الخاص. لم يبدأ الاستيراد.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_MKDIR_FAILED => 'تعذر إنشاء مجلدات محرك قاعدة الظل الخاص. لم يبدأ الاستيراد.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL => 'مجلد بيانات محرك الظل الخاص جزئي وغير مكتمل. لم يبدأ الاستيراد.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED => 'مجلد بيانات محرك الظل الخاص غير مملوك لهذه المهمة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_LOG_UNAVAILABLE => 'سجل تهيئة محرك الظل الخاص غير متاح للتصنيف. لم يبدأ الاستيراد.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED => 'فشلت تهيئة بيانات محرك قاعدة الظل الخاص. لم يبدأ الاستيراد.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED => 'تعذر تشغيل محرك قاعدة الظل الخاص. لم يبدأ الاستيراد.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_SECRET_BOUNDARY_FAILED => 'تعذر تأمين أسرار محرك قاعدة الظل الخاص. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED => 'تعذر تجهيز محرك قاعدة الظل الخاص لهذه المهمة. لم يبدأ التنفيذ.',
@@ -95,10 +109,25 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
         ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH => 'عدم تطابق هوية الهدف/المحرك بين الأب والعامل. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN => 'جاهزية محرك قاعدة الظل الخاص غير مؤكدة. حدّث الحالة ثم أعد المحاولة.',
         ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED => 'خطوة استعادة قاعدة الظل غير جاهزة للتنفيذ. حدّث الجاهزية ولا تُنشأ محاولة جديدة.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE => 'فشل تهيئة سابق لمحرك الظل الخاص ما زال غير محلول. حدّث الحالة قبل إعادة المحاولة.',
+        ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE => 'مصدر محرك الظل الخاص غير قابل للتثبيت في سجل المحاولة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING => 'الجاهزية: يمكن تجهيز محرك قاعدة الظل الخاص عند الضغط على خطوة استعادة قاعدة الظل.',
     ];
 
     return $map[$safeCode] ?? 'تعذر تجهيز محرك قاعدة الظل الخاص. لم يبدأ التنفيذ.';
+}
+
+/**
+ * Job-private engine root path (no mkdir — safe for Refresh/readiness).
+ */
+function orange_restore_private_engine_root_path(string $workRoot, string $jobId): string
+{
+    $root = orange_restore_fw_job_directory($workRoot, $jobId)
+        . DIRECTORY_SEPARATOR
+        . ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME;
+    orange_restore_assert_inside_work_root($workRoot, $root);
+
+    return $root;
 }
 
 function orange_restore_private_engine_root(string $workRoot, string $jobId): string
@@ -160,12 +189,10 @@ function orange_restore_private_engine_resolve_binaries_under_basedir(string $ba
         : ['mysql', 'mariadb'];
 
     $mysqld = '';
-    $family = '';
     foreach ($daemonNames as $name) {
         $candidate = $bin . DIRECTORY_SEPARATOR . $name;
         if (is_file($candidate)) {
             $mysqld = $candidate;
-            $family = str_starts_with(strtolower($name), 'maria') ? 'mariadb' : 'mysql';
             break;
         }
     }
@@ -184,6 +211,9 @@ function orange_restore_private_engine_resolve_binaries_under_basedir(string $ba
         return $fail;
     }
 
+    // Family must not be inferred from mysqld.exe alone — MariaDB ships mysqld.exe too.
+    $family = orange_restore_private_engine_detect_family($basedir, $bin, $mysqld);
+
     return [
         'ok' => true,
         'code' => 'ok',
@@ -192,6 +222,38 @@ function orange_restore_private_engine_resolve_binaries_under_basedir(string $ba
         'mysql' => $mysql,
         'family' => $family,
     ];
+}
+
+/**
+ * Detect mysql vs mariadb from basedir/bin layout (never guess from mysqld.exe name alone).
+ */
+function orange_restore_private_engine_detect_family(string $basedir, string $bin, string $mysqldPath = ''): string
+{
+    $norm = strtolower(str_replace('\\', '/', $basedir . ' ' . $mysqldPath));
+    if (str_contains($norm, 'mariadb') || str_contains($norm, 'maria')) {
+        return 'mariadb';
+    }
+    $isWin = PHP_OS_FAMILY === 'Windows';
+    $mariaMarkers = $isWin
+        ? ['mariadbd.exe', 'mariadb-install-db.exe', 'mysql_install_db.exe', 'mariadb.exe']
+        : ['mariadbd', 'mariadb-install-db', 'mysql_install_db', 'mariadb'];
+    foreach ($mariaMarkers as $marker) {
+        if (is_file($bin . DIRECTORY_SEPARATOR . $marker)) {
+            // mysql_install_db alone is ambiguous on some MySQL builds — require another maria marker
+            // unless basedir already hinted. Prefer explicit maria binaries.
+            if ($marker === 'mysql_install_db.exe' || $marker === 'mysql_install_db') {
+                continue;
+            }
+
+            return 'mariadb';
+        }
+    }
+    if (is_file($bin . DIRECTORY_SEPARATOR . ($isWin ? 'mysql_install_db.exe' : 'mysql_install_db'))
+        && !is_file($bin . DIRECTORY_SEPARATOR . ($isWin ? 'mysqld.exe' : 'mysqld'))) {
+        return 'mariadb';
+    }
+
+    return 'mysql';
 }
 
 /**
@@ -439,7 +501,7 @@ function orange_restore_private_engine_discover_binaries(string $projectRoot): a
  */
 function orange_restore_private_engine_load_state(string $workRoot, string $jobId): ?array
 {
-    $path = orange_restore_private_engine_root($workRoot, $jobId)
+    $path = orange_restore_private_engine_root_path($workRoot, $jobId)
         . DIRECTORY_SEPARATOR
         . ORANGE_RESTORE_PRIVATE_ENGINE_STATE_FILE;
     if (!is_file($path)) {
@@ -490,6 +552,455 @@ function orange_restore_private_engine_write_state(string $workRoot, string $job
     ) {
         throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
     }
+}
+
+/**
+ * Atomic init-ledger read (safe metadata only; Refresh-safe).
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_restore_private_engine_init_ledger_read(string $workRoot, string $jobId): ?array
+{
+    $path = orange_restore_private_engine_root_path($workRoot, $jobId)
+        . DIRECTORY_SEPARATOR
+        . ORANGE_RESTORE_PRIVATE_ENGINE_INIT_LEDGER_FILE;
+    if (!is_file($path)) {
+        return null;
+    }
+    $decoded = json_decode((string) file_get_contents($path), true);
+
+    return is_array($decoded) ? $decoded : null;
+}
+
+/**
+ * Atomic init-ledger write (temp + rename; never stores secrets/paths/PIDs/raw logs).
+ *
+ * @param array<string, mixed> $ledger
+ */
+function orange_restore_private_engine_init_ledger_write(string $workRoot, string $jobId, array $ledger): void
+{
+    $root = orange_restore_private_engine_root($workRoot, $jobId);
+    if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+    }
+    unset(
+        $ledger['password'],
+        $ledger['admin_password'],
+        $ledger['runtime_password'],
+        $ledger['mysqld'],
+        $ledger['mysql'],
+        $ledger['basedir'],
+        $ledger['datadir'],
+        $ledger['socket'],
+        $ledger['option_file'],
+        $ledger['absolute_paths'],
+        $ledger['raw_log'],
+        $ledger['error_log_raw'],
+        $ledger['pid'],
+        $ledger['engine_pid'],
+        $ledger['port']
+    );
+    $ledger['record_version'] = ORANGE_RESTORE_PRIVATE_ENGINE_INIT_LEDGER_VERSION;
+    $ledger['job_id'] = $jobId;
+    $ledger['updated_at'] = gmdate('c');
+    $json = json_encode($ledger, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+    }
+    $target = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_INIT_LEDGER_FILE;
+    $tmp = $target . '.tmp.' . bin2hex(random_bytes(4));
+    if (file_put_contents($tmp, $json . "\n", LOCK_EX) === false) {
+        @unlink($tmp);
+        throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+    }
+    if (!@rename($tmp, $target)) {
+        @unlink($target);
+        if (!@rename($tmp, $target)) {
+            @unlink($tmp);
+            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED);
+        }
+    }
+}
+
+/**
+ * Classify job-private datadir ownership/completeness (no path exposure).
+ *
+ * @return array{state:string,owned:bool,writable:bool,has_mysql_system:bool,entry_count:int}
+ */
+function orange_restore_private_engine_classify_datadir(string $engineRoot, string $jobId, ?array $state = null): array
+{
+    $dataDir = $engineRoot . DIRECTORY_SEPARATOR . 'data';
+    if (!is_dir($engineRoot) || !is_dir($dataDir)) {
+        return [
+            'state' => 'ABSENT',
+            'owned' => false,
+            'writable' => is_dir($engineRoot) ? @is_writable($engineRoot) : false,
+            'has_mysql_system' => false,
+            'entry_count' => 0,
+        ];
+    }
+    $entries = @scandir($dataDir);
+    $names = is_array($entries) ? array_values(array_diff($entries, ['.', '..'])) : [];
+    $hasMysql = is_dir($dataDir . DIRECTORY_SEPARATOR . 'mysql');
+    $ownedMeta = is_array($state) && array_key_exists('datadir_job_owned', $state)
+        ? !empty($state['datadir_job_owned'])
+        : null;
+    // Under job private_shadow_engine root ⇒ owned by construction when jobId valid.
+    $ownedByPath = $jobId !== '' && str_contains(
+        strtolower(str_replace('\\', '/', $engineRoot)),
+        '/' . strtolower($jobId) . '/' . strtolower(ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME)
+    );
+    $owned = $ownedMeta === true || ($ownedMeta === null && $ownedByPath);
+    $writable = @is_writable($dataDir);
+
+    if ($names === []) {
+        return [
+            'state' => $owned ? 'EMPTY_OWNED' : 'ABSENT',
+            'owned' => $owned,
+            'writable' => $writable,
+            'has_mysql_system' => false,
+            'entry_count' => 0,
+        ];
+    }
+    if ($ownedMeta === false) {
+        return [
+            'state' => 'UNOWNED',
+            'owned' => false,
+            'writable' => $writable,
+            'has_mysql_system' => $hasMysql,
+            'entry_count' => count($names),
+        ];
+    }
+    if (!$owned && !$ownedByPath) {
+        return [
+            'state' => 'UNKNOWN',
+            'owned' => false,
+            'writable' => $writable,
+            'has_mysql_system' => $hasMysql,
+            'entry_count' => count($names),
+        ];
+    }
+    if (!$hasMysql) {
+        return [
+            'state' => 'PARTIAL_OWNED_CURRENT_ATTEMPT',
+            'owned' => true,
+            'writable' => $writable,
+            'has_mysql_system' => false,
+            'entry_count' => count($names),
+        ];
+    }
+    $ready = is_array($state) && !empty($state['ready']);
+
+    return [
+        'state' => $ready ? 'READY_OWNED' : 'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+        'owned' => true,
+        'writable' => $writable,
+        'has_mysql_system' => true,
+        'entry_count' => count($names),
+    ];
+}
+
+/**
+ * Quarantine terminal owned partial datadir under proven preconditions only.
+ *
+ * @return array{ok:bool,code:string,quarantined:bool}
+ */
+function orange_restore_private_engine_quarantine_partial_datadir(
+    string $workRoot,
+    string $jobId,
+    array $classification
+): array {
+    $state = (string) ($classification['state'] ?? 'UNKNOWN');
+    if (!in_array($state, [
+        'PARTIAL_OWNED_CURRENT_ATTEMPT',
+        'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+    ], true)) {
+        if ($state === 'UNOWNED' || $state === 'UNKNOWN') {
+            return [
+                'ok' => false,
+                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
+                'quarantined' => false,
+            ];
+        }
+
+        return ['ok' => true, 'code' => 'ok', 'quarantined' => false];
+    }
+    if (empty($classification['owned']) || empty($classification['writable'])) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
+            'quarantined' => false,
+        ];
+    }
+    if (orange_restore_private_engine_runtime_healthy($workRoot, $jobId)) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_OWNERSHIP_CONFLICT,
+            'quarantined' => false,
+        ];
+    }
+
+    $root = orange_restore_private_engine_root($workRoot, $jobId);
+    $dataDir = $root . DIRECTORY_SEPARATOR . 'data';
+    if (!is_dir($dataDir)) {
+        return ['ok' => true, 'code' => 'ok', 'quarantined' => false];
+    }
+    $stamp = gmdate('Ymd\THis');
+    $dest = $root . DIRECTORY_SEPARATOR . 'data.quarantine.' . $stamp;
+    if (is_dir($dest)) {
+        $dest .= '_' . bin2hex(random_bytes(2));
+    }
+    if (!@rename($dataDir, $dest)) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL,
+            'quarantined' => false,
+        ];
+    }
+    if (!@mkdir($dataDir, 0775, true) && !is_dir($dataDir)) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_MKDIR_FAILED,
+            'quarantined' => false,
+        ];
+    }
+
+    return ['ok' => true, 'code' => 'ok', 'quarantined' => true];
+}
+
+/**
+ * Map error-log classification to contract result A/B/C/D (Owner-sanitized).
+ *
+ * A = present + classified, B = present + unclassified, C = empty, D = absent
+ *
+ * @return array{result:string,category:string}
+ */
+function orange_restore_private_engine_init_log_contract(?string $errorLogPath): array
+{
+    if ($errorLogPath === null || $errorLogPath === '' || !is_file($errorLogPath)) {
+        return ['result' => 'D', 'category' => 'error_log_absent'];
+    }
+    $size = @filesize($errorLogPath);
+    if ($size === false) {
+        return ['result' => 'D', 'category' => 'error_log_absent'];
+    }
+    if ((int) $size === 0) {
+        return ['result' => 'C', 'category' => 'error_log_empty'];
+    }
+    if (!is_readable($errorLogPath)) {
+        return ['result' => 'B', 'category' => 'error_log_unreadable'];
+    }
+    if (function_exists('orange_restore_private_engine_trace_classify_error_log')) {
+        $cls = orange_restore_private_engine_trace_classify_error_log($errorLogPath);
+        $cat = (string) ($cls['category'] ?? 'error_log_present_unclassified');
+        if ($cat === 'error_log_present_unclassified' || $cat === 'error_log_unreadable') {
+            return ['result' => 'B', 'category' => $cat];
+        }
+        if ($cat === 'error_log_empty') {
+            return ['result' => 'C', 'category' => $cat];
+        }
+        if ($cat === 'error_log_absent') {
+            return ['result' => 'D', 'category' => $cat];
+        }
+
+        return ['result' => 'A', 'category' => $cat];
+    }
+    $raw = strtolower((string) @file_get_contents($errorLogPath));
+    if ($raw === '') {
+        return ['result' => 'C', 'category' => 'error_log_empty'];
+    }
+    if (str_contains($raw, 'not empty') || str_contains($raw, 'already exists')) {
+        return ['result' => 'A', 'category' => 'datadir_not_empty'];
+    }
+    if (str_contains($raw, 'permission') || str_contains($raw, 'access is denied')) {
+        return ['result' => 'A', 'category' => 'datadir_permission'];
+    }
+    if (str_contains($raw, 'error')) {
+        return ['result' => 'A', 'category' => 'mysqld_error_generic'];
+    }
+
+    return ['result' => 'B', 'category' => 'error_log_present_unclassified'];
+}
+
+/**
+ * Resolve MariaDB bootstrap helper under basedir/bin (install-db).
+ */
+function orange_restore_private_engine_resolve_install_db(string $basedir): string
+{
+    $bin = rtrim($basedir, "\\/") . DIRECTORY_SEPARATOR . 'bin';
+    $isWin = PHP_OS_FAMILY === 'Windows';
+    $names = $isWin
+        ? ['mariadb-install-db.exe', 'mysql_install_db.exe']
+        : ['mariadb-install-db', 'mysql_install_db'];
+    foreach ($names as $name) {
+        $p = $bin . DIRECTORY_SEPARATOR . $name;
+        if (is_file($p)) {
+            return $p;
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Family-aware private datadir initialization with mandatory private error log.
+ *
+ * MySQL: mysqld --initialize-insecure --log-error=…
+ * MariaDB: mariadb-install-db / mysql_install_db (mysqld --initialize-insecure is unsupported
+ *          on many MariaDB Windows builds and leaves PARTIAL datadir).
+ *
+ * @return array{exit_code:int,mysql_system:bool,init_log_result:string,init_log_category:string,method:string}
+ */
+function orange_restore_private_engine_init_with_log(
+    string $mysqld,
+    string $basedir,
+    string $dataDir,
+    string $errorLog,
+    string $family = ''
+): array {
+    $logDir = dirname($errorLog);
+    if (!is_dir($logDir) && !@mkdir($logDir, 0775, true) && !is_dir($logDir)) {
+        return [
+            'exit_code' => 1,
+            'mysql_system' => false,
+            'init_log_result' => 'D',
+            'init_log_category' => 'error_log_absent',
+            'method' => 'none',
+        ];
+    }
+    // Ensure log file exists before invoke so ABSENT cannot hide a failed init.
+    if (@file_put_contents($errorLog, '', LOCK_EX) === false) {
+        return [
+            'exit_code' => 1,
+            'mysql_system' => false,
+            'init_log_result' => 'D',
+            'init_log_category' => 'error_log_absent',
+            'method' => 'none',
+        ];
+    }
+
+    $bin = rtrim($basedir, "\\/") . DIRECTORY_SEPARATOR . 'bin';
+    if ($family === '') {
+        $family = orange_restore_private_engine_detect_family($basedir, $bin, $mysqld);
+    }
+
+    $method = 'mysql_initialize_insecure';
+    $init = ['exit_code' => 1, 'output' => ''];
+    if ($family === 'mariadb') {
+        $installDb = orange_restore_private_engine_resolve_install_db($basedir);
+        if ($installDb === '') {
+            @file_put_contents(
+                $errorLog,
+                "init_helper_absent family=mariadb\n",
+                FILE_APPEND | LOCK_EX
+            );
+            $contract = orange_restore_private_engine_init_log_contract($errorLog);
+
+            return [
+                'exit_code' => 1,
+                'mysql_system' => false,
+                'init_log_result' => (string) $contract['result'],
+                'init_log_category' => (string) $contract['category'],
+                'method' => 'mariadb_install_db_absent',
+            ];
+        }
+        $method = 'mariadb_install_db';
+        // Windows mariadb-install-db accepts --datadir (not --basedir); basedir is implied by exe location.
+        // It writes my.ini into CWD — run with cwd=parent(datadir). Omit --password for empty root.
+        $args = [
+            '--datadir=' . $dataDir,
+            '--verbose-bootstrap',
+        ];
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $args[] = '--basedir=' . $basedir;
+        }
+        $installCwd = dirname($dataDir);
+        // Windows install-db writes my.ini into CWD; prefer chdir+exec (avoids proc_open pipe deadlocks).
+        $prevCwd = getcwd();
+        $init = ['exit_code' => 1, 'output' => ''];
+        try {
+            if ($installCwd !== '' && is_dir($installCwd)) {
+                @chdir($installCwd);
+            }
+            $init = orange_restore_private_engine_run_capture($installDb, $args);
+        } finally {
+            if (is_string($prevCwd) && $prevCwd !== '') {
+                @chdir($prevCwd);
+            }
+        }
+    } else {
+        $args = [
+            '--initialize-insecure',
+            '--basedir=' . $basedir,
+            '--datadir=' . $dataDir,
+            '--log-error=' . $errorLog,
+        ];
+        $init = orange_restore_private_engine_run_capture($mysqld, $args);
+    }
+
+    // Append captured stdout/stderr into the private log when the process wrote only to pipe.
+    $pipeOut = trim((string) ($init['output'] ?? ''));
+    if ($pipeOut !== '') {
+        @file_put_contents($errorLog, $pipeOut . "\n", FILE_APPEND | LOCK_EX);
+    }
+    // Classify unknown-option / wrong-family clearly for Owner-safe category.
+    $rawLower = strtolower($pipeOut . ' ' . (string) @file_get_contents($errorLog));
+    if (str_contains($rawLower, 'unknown option') && str_contains($rawLower, 'initialize-insecure')) {
+        @file_put_contents(
+            $errorLog,
+            "classified=initialize_insecure_unsupported_for_family\n",
+            FILE_APPEND | LOCK_EX
+        );
+    }
+    $contract = orange_restore_private_engine_init_log_contract($errorLog);
+    if (str_contains($rawLower, 'unknown option') && str_contains($rawLower, 'initialize-insecure')) {
+        $contract['category'] = 'initialize_insecure_unsupported';
+        $contract['result'] = 'A';
+    }
+    $mysqlSystem = is_dir($dataDir . DIRECTORY_SEPARATOR . 'mysql');
+
+    return [
+        'exit_code' => (int) ($init['exit_code'] ?? 1),
+        'mysql_system' => $mysqlSystem,
+        'init_log_result' => (string) $contract['result'],
+        'init_log_category' => (string) $contract['category'],
+        'method' => $method,
+    ];
+}
+
+/**
+ * Persistable runtime_source contract for parent/worker parity.
+ *
+ * @param array<string, mixed> $discovered
+ */
+function orange_restore_private_engine_persistable_runtime_source(array $discovered): array
+{
+    $ok = !empty($discovered['ok']);
+    $src = (string) ($discovered['source'] ?? '');
+    $channel = (string) ($discovered['channel'] ?? 'none');
+    $runtimeSource = 'unavailable';
+    if ($ok) {
+        if (str_contains($src, 'portable') || $channel === 'verified_portable_cached') {
+            $runtimeSource = 'verified_portable_artifact';
+        } elseif (str_contains($src, 'service') || $channel === 'local_service' || str_contains($src, 'basedir')) {
+            $runtimeSource = 'verified_local_service_binary';
+        } else {
+            $runtimeSource = 'verified_local_service_binary';
+        }
+    } elseif (!empty($discovered['materializable'])) {
+        $runtimeSource = 'materializable_portable';
+    }
+    $persistable = in_array($runtimeSource, [
+        'verified_portable_artifact',
+        'verified_local_service_binary',
+    ], true);
+
+    return [
+        'runtime_source' => $runtimeSource,
+        'channel' => $channel,
+        'family' => (string) ($discovered['family'] ?? ''),
+        'persistable' => $persistable,
+    ];
 }
 
 /**
@@ -651,18 +1162,165 @@ function orange_restore_private_engine_port_open(string $host, int $port): bool
  * @param list<string> $args
  * @return array{exit_code:int,output:string}
  */
-function orange_restore_private_engine_run_capture(string $binary, array $args, ?string $defaultsFile = null): array
+/**
+ * Windows mysqld often mis-parses --basedir/--datadir when the path contains spaces.
+ * Prefer 8.3 short path, else a space-free junction under the private tools root.
+ */
+function orange_restore_private_engine_space_safe_basedir(string $projectRoot, string $basedir): string
 {
-    $cmd = [escapeshellarg($binary)];
-    if ($defaultsFile !== null && $defaultsFile !== '') {
-        $cmd[] = '--defaults-extra-file=' . escapeshellarg($defaultsFile);
+    $basedir = rtrim(str_replace('/', DIRECTORY_SEPARATOR, $basedir), "\\/");
+    if ($basedir === '' || !is_dir($basedir)) {
+        return $basedir;
     }
-    foreach ($args as $arg) {
-        $cmd[] = $arg;
+    $real = realpath($basedir);
+    $source = is_string($real) && $real !== '' ? $real : $basedir;
+    if (PHP_OS_FAMILY !== 'Windows' || !str_contains($source, ' ')) {
+        return $source;
     }
     $out = [];
     $code = 1;
-    @exec(implode(' ', $cmd) . ' 2>&1', $out, $code);
+    @exec('cmd /c for %I in (' . escapeshellarg($source) . ') do @echo %~sI', $out, $code);
+    $short = isset($out[0]) ? trim((string) $out[0]) : '';
+    $mysqldName = 'mysqld.exe';
+    if ($short !== ''
+        && !str_contains($short, ' ')
+        && is_dir($short)
+        && is_file($short . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . $mysqldName)
+    ) {
+        return $short;
+    }
+    if (!function_exists('orange_restore_private_engine_tools_root')) {
+        return $source;
+    }
+    try {
+        $tools = orange_restore_private_engine_tools_root($projectRoot);
+    } catch (Throwable) {
+        return $source;
+    }
+    if ($tools === '' || !is_dir($tools)) {
+        return $source;
+    }
+    $link = rtrim($tools, "\\/")
+        . DIRECTORY_SEPARATOR
+        . 'basedir_ns_'
+        . substr(hash('sha256', strtolower($source)), 0, 16);
+    if (!is_dir($link)) {
+        @exec(
+            'cmd /c mklink /J ' . escapeshellarg($link) . ' ' . escapeshellarg($source),
+            $linkOut,
+            $linkCode
+        );
+    }
+    if (is_dir($link) && is_file($link . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . $mysqldName)) {
+        return $link;
+    }
+
+    return $source;
+}
+
+/**
+ * Quote one CLI token for exec()/shell without corrupting --key=value paths.
+ * Windows escapeshellarg() can break MariaDB option parsers (--basedir="X" → unknown variable).
+ */
+function orange_restore_private_engine_shell_quote(string $token): string
+{
+    if ($token === '') {
+        return '""';
+    }
+    // Already a --flag=value with no whitespace → leave intact (paths without spaces).
+    if (preg_match('/^--[A-Za-z0-9_-]+=\S+$/', $token) === 1) {
+        return $token;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        // Escape embedded double-quotes; wrap when spaces/specials present.
+        if (preg_match('/[\s&<>|^()%]/', $token) === 1) {
+            return '"' . str_replace('"', '""', $token) . '"';
+        }
+
+        return $token;
+    }
+
+    return escapeshellarg($token);
+}
+
+/**
+ * @param list<string> $args
+ * @return array{exit_code:int,output:string}
+ */
+function orange_restore_private_engine_run_capture(
+    string $binary,
+    array $args,
+    ?string $defaultsFile = null,
+    ?string $cwd = null
+): array {
+    $cmd = [orange_restore_private_engine_shell_quote($binary)];
+    if ($defaultsFile !== null && $defaultsFile !== '') {
+        $cmd[] = '--defaults-extra-file=' . orange_restore_private_engine_shell_quote($defaultsFile);
+    }
+    foreach ($args as $arg) {
+        $arg = (string) $arg;
+        if (str_starts_with($arg, '--') && str_contains($arg, '=')) {
+            $eq = strpos($arg, '=');
+            $key = substr($arg, 0, $eq + 1);
+            $val = substr($arg, $eq + 1);
+            // Strip a single layer of shell quotes accidentally applied by callers.
+            if (strlen($val) >= 2) {
+                $q0 = $val[0];
+                $q1 = $val[strlen($val) - 1];
+                if (($q0 === '"' && $q1 === '"') || ($q0 === "'" && $q1 === "'")) {
+                    $val = substr($val, 1, -1);
+                }
+            }
+            $cmd[] = $key . (preg_match('/[\s&<>|^()%]/', $val) === 1
+                ? orange_restore_private_engine_shell_quote($val)
+                : $val);
+            continue;
+        }
+        $cmd[] = orange_restore_private_engine_shell_quote($arg);
+    }
+    $command = implode(' ', $cmd);
+    $out = [];
+    $code = 1;
+    if ($cwd !== null && $cwd !== '' && is_dir($cwd)) {
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = @proc_open(
+            $command,
+            $descriptors,
+            $pipes,
+            $cwd,
+            null,
+            PHP_OS_FAMILY === 'Windows' ? ['bypass_shell' => false] : []
+        );
+        if (is_resource($proc)) {
+            if (isset($pipes[0]) && is_resource($pipes[0])) {
+                fclose($pipes[0]);
+            }
+            $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string) stream_get_contents($pipes[1]) : '';
+            $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string) stream_get_contents($pipes[2]) : '';
+            if (isset($pipes[1]) && is_resource($pipes[1])) {
+                fclose($pipes[1]);
+            }
+            if (isset($pipes[2]) && is_resource($pipes[2])) {
+                fclose($pipes[2]);
+            }
+            $code = (int) proc_close($proc);
+            $merged = trim($stdout . ((trim($stderr) !== '') ? ("\n" . $stderr) : ''));
+            if ($merged === '') {
+                $out = [];
+            } else {
+                $split = preg_split('/\r\n|\n|\r/', $merged);
+                $out = is_array($split) ? $split : [];
+            }
+        } else {
+            @exec($command . ' 2>&1', $out, $code);
+        }
+    } else {
+        @exec($command . ' 2>&1', $out, $code);
+    }
 
     return [
         'exit_code' => $code,
@@ -677,38 +1335,76 @@ function orange_restore_private_engine_run_capture(string $binary, array $args, 
  */
 function orange_restore_private_engine_spawn_daemon(string $mysqld, array $args, string $errorLog): int
 {
-    $cmdParts = [escapeshellarg($mysqld)];
+    $normalizedArgs = [];
     foreach ($args as $arg) {
-        // Args are pre-built with values; avoid double-escaping path-like tokens.
-        $cmdParts[] = $arg;
+        $arg = (string) $arg;
+        if (str_starts_with($arg, '--') && str_contains($arg, '=')) {
+            $eq = strpos($arg, '=');
+            $key = substr($arg, 0, $eq + 1);
+            $val = substr($arg, $eq + 1);
+            if (strlen($val) >= 2) {
+                $q0 = $val[0];
+                $q1 = $val[strlen($val) - 1];
+                if (($q0 === '"' && $q1 === '"') || ($q0 === "'" && $q1 === "'")) {
+                    $val = substr($val, 1, -1);
+                }
+            }
+            $normalizedArgs[] = $key . $val;
+            continue;
+        }
+        $normalizedArgs[] = $arg;
     }
-    $command = implode(' ', $cmdParts);
     if (PHP_OS_FAMILY === 'Windows') {
-        $proc = @proc_open(
-            $command,
-            [
-                0 => ['pipe', 'r'],
-                1 => ['file', $errorLog, 'a'],
-                2 => ['file', $errorLog, 'a'],
-            ],
-            $pipes,
-            null,
-            null,
-            ['bypass_shell' => false]
-        );
-        if (!is_resource($proc)) {
+        // True detach via a temporary PowerShell script (avoids nested quoting breakage on spaced paths).
+        $psArgItems = [];
+        foreach ($normalizedArgs as $a) {
+            $psArgItems[] = "'" . str_replace("'", "''", $a) . "'";
+        }
+        $psBody = '$p = Start-Process -FilePath '
+            . "'" . str_replace("'", "''", $mysqld) . "'"
+            . ' -ArgumentList @(' . implode(',', $psArgItems) . ')'
+            . ' -WindowStyle Hidden -PassThru' . "\r\n"
+            . 'if ($null -eq $p) { exit 1 }' . "\r\n"
+            . 'Write-Output $p.Id' . "\r\n"
+            . 'exit 0' . "\r\n";
+        $psFile = rtrim(sys_get_temp_dir(), "\\/") . DIRECTORY_SEPARATOR
+            . 'orange_pse_spawn_' . bin2hex(random_bytes(4)) . '.ps1';
+        if (@file_put_contents($psFile, $psBody) === false) {
             throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED);
         }
-        if (isset($pipes[0]) && is_resource($pipes[0])) {
-            fclose($pipes[0]);
+        $launchOut = [];
+        $launchCode = 1;
+        try {
+            @exec(
+                'powershell -NoProfile -ExecutionPolicy Bypass -File ' . escapeshellarg($psFile),
+                $launchOut,
+                $launchCode
+            );
+        } finally {
+            @unlink($psFile);
         }
-        $status = proc_get_status($proc);
-        $pid = (int) ($status['pid'] ?? 0);
-        // Detach — do not proc_close wait.
+        if ($launchCode !== 0) {
+            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED);
+        }
+        $pid = isset($launchOut[0]) ? (int) trim((string) $launchOut[0]) : 0;
 
         return $pid > 0 ? $pid : 0;
     }
 
+    $cmdParts = [orange_restore_private_engine_shell_quote($mysqld)];
+    foreach ($normalizedArgs as $arg) {
+        if (str_starts_with($arg, '--') && str_contains($arg, '=')) {
+            $eq = strpos($arg, '=');
+            $key = substr($arg, 0, $eq + 1);
+            $val = substr($arg, $eq + 1);
+            $cmdParts[] = $key . (preg_match('/[\s&<>|^()%]/', $val) === 1
+                ? orange_restore_private_engine_shell_quote($val)
+                : $val);
+            continue;
+        }
+        $cmdParts[] = orange_restore_private_engine_shell_quote($arg);
+    }
+    $command = implode(' ', $cmdParts);
     @exec('nohup ' . $command . ' >/dev/null 2>&1 & echo $!', $out, $code);
     $pid = isset($out[0]) ? (int) trim((string) $out[0]) : 0;
 
@@ -846,11 +1542,16 @@ function orange_restore_private_engine_preflight(
     }
 
     $state = orange_restore_private_engine_load_state($workRoot, $jobId);
+    $ledger = orange_restore_private_engine_init_ledger_read($workRoot, $jobId);
     $engineReady = is_array($state)
         && !empty($state['ready'])
         && orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
 
     if ($engineReady) {
+        $persistedSource = is_array($state)
+            ? (string) ($state['runtime_source'] ?? $runtimeSource)
+            : $runtimeSource;
+
         return [
             'ok' => true,
             'code' => 'ok',
@@ -859,18 +1560,79 @@ function orange_restore_private_engine_preflight(
             'engine_ready' => true,
             'family' => (string) ($discovered['family'] ?? ($state['family'] ?? '')),
             'shadow_db_identity_hash' => (string) ($state['shadow_db_identity_hash'] ?? ''),
-            'runtime_source' => $runtimeSource,
+            'runtime_source' => $persistedSource,
             'materializable' => false,
-            'channel' => (string) ($discovered['channel'] ?? ''),
+            'channel' => (string) ($discovered['channel'] ?? ($state['runtime_channel'] ?? '')),
             'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
             'runtime_compatible' => true,
             'tools_root_ready' => $toolsReady,
             'process_execution_available' => true,
             'private_capability' => 'available',
             'manifest' => $manifest,
+            'init_ledger_phase' => is_array($ledger) ? (string) ($ledger['phase'] ?? 'READY') : 'READY',
         ];
     }
 
+    // Authoritative readiness: never false-green on UNOWNED/UNKNOWN or non-persistable source.
+    // Owned partial datadir may be green only when quarantine preconditions are proven (recovery path).
+    $engineRoot = orange_restore_private_engine_root_path($workRoot, $jobId);
+    $datadirClass = orange_restore_private_engine_classify_datadir($engineRoot, $jobId, $state);
+    $datadirState = (string) ($datadirClass['state'] ?? 'ABSENT');
+    $unresolvedInit = is_array($ledger)
+        && !empty($ledger['terminal_failure'])
+        && empty($ledger['resolved']);
+    $persistContract = orange_restore_private_engine_persistable_runtime_source(
+        $binaryOk ? $discovered : array_merge($discovered, ['ok' => false, 'materializable' => $materializable])
+    );
+    $sourceOkForGreen = $persistContract['persistable']
+        || ($runtimeSource === 'materializable_portable' && $materializable && $toolsReady);
+
+    $ownedPartial = in_array($datadirState, [
+        'PARTIAL_OWNED_CURRENT_ATTEMPT',
+        'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+    ], true);
+    $quarantineReady = $ownedPartial
+        && !empty($datadirClass['owned'])
+        && !empty($datadirClass['writable'])
+        && !orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
+    $hardBlock = in_array($datadirState, ['UNOWNED', 'UNKNOWN'], true)
+        || !$sourceOkForGreen
+        || ($unresolvedInit && $ownedPartial && !$quarantineReady)
+        || ($unresolvedInit && !$ownedPartial && !in_array($datadirState, ['ABSENT', 'EMPTY_OWNED'], true));
+
+    if ($hardBlock) {
+        $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_NOT_READY;
+        if ($datadirState === 'UNOWNED' || $datadirState === 'UNKNOWN') {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED;
+        } elseif ($ownedPartial && !$quarantineReady) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL;
+        } elseif ($unresolvedInit) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_UNRESOLVED_INIT_FAILURE;
+        } elseif (!$sourceOkForGreen) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE;
+        }
+
+        return array_merge($baseFail, [
+            'ok' => false,
+            'code' => $code,
+            'ready_token' => '',
+            'binary_available' => $binaryOk || $materializable,
+            'runtime_source' => $runtimeSource,
+            'materializable' => $materializable,
+            'channel' => (string) ($discovered['channel'] ?? ''),
+            'db_host_category' => (string) ($discovered['db_host_category'] ?? ORANGE_RESTORE_DB_HOST_UNKNOWN),
+            'runtime_compatible' => true,
+            'tools_root_ready' => $toolsReady || $binaryOk,
+            'process_execution_available' => true,
+            'private_capability' => $materializable && !$binaryOk ? 'materializable' : 'runtime_present',
+            'datadir_state' => $datadirState,
+            'datadir_recovery_required' => $ownedPartial ? true : false,
+            'init_ledger_phase' => is_array($ledger) ? (string) ($ledger['phase'] ?? '') : '',
+        ]);
+    }
+
+    // Pre-existing false READY: unresolved init + partial WITHOUT quarantine path → blocked above.
+    // Owned recoverable partial ⇒ green with recovery_required (provision will quarantine first).
     return [
         'ok' => true,
         'code' => 'ok',
@@ -890,6 +1652,9 @@ function orange_restore_private_engine_preflight(
         'process_execution_available' => true,
         'private_capability' => $materializable && !$binaryOk ? 'materializable' : 'runtime_present',
         'manifest' => $manifest,
+        'datadir_state' => $datadirState,
+        'datadir_recovery_required' => $quarantineReady,
+        'init_ledger_phase' => is_array($ledger) ? (string) ($ledger['phase'] ?? 'PREFLIGHT') : 'PREFLIGHT',
     ];
 }
 
@@ -956,10 +1721,27 @@ function orange_restore_private_engine_provision(
         try {
             orange_restore_private_engine_ensure_shadow_schema($workRoot, $jobId, $shadowDb);
             $state['ready'] = true;
+            $state['datadir_job_owned'] = true;
+            $state['loopback_only'] = true;
             $state['shadow_db_identity_hash'] = function_exists('orange_restore_shadow_target_identity_hash')
                 ? orange_restore_shadow_target_identity_hash($shadowDb, $jobId)
                 : hash('sha256', strtolower($shadowDb) . '|' . $jobId);
+            if (empty($state['runtime_source'])) {
+                $resolvedQuick = orange_restore_private_engine_resolve_runtime($projectRoot, false);
+                $contractQuick = orange_restore_private_engine_persistable_runtime_source($resolvedQuick);
+                $state['runtime_source'] = (string) $contractQuick['runtime_source'];
+                $state['runtime_channel'] = (string) $contractQuick['channel'];
+            }
             orange_restore_private_engine_write_state($workRoot, $jobId, $state);
+            orange_restore_private_engine_init_ledger_write($workRoot, $jobId, [
+                'phase' => 'READY',
+                'terminal_failure' => false,
+                'resolved' => true,
+                'safe_code' => 'ok',
+                'runtime_source' => (string) ($state['runtime_source'] ?? ''),
+                'runtime_channel' => (string) ($state['runtime_channel'] ?? ''),
+                'datadir_state' => 'READY_OWNED',
+            ]);
         } catch (Throwable $e) {
             $code = trim($e->getMessage());
             if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
@@ -981,8 +1763,19 @@ function orange_restore_private_engine_provision(
     $discovered = orange_restore_private_engine_resolve_runtime($projectRoot, true);
     if (!($discovered['ok'] ?? false)) {
         $code = (string) ($discovered['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE);
-        if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
+        if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_') && !str_starts_with($code, 'STEP7_PRIVATE_RUNTIME_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_BINARY_UNAVAILABLE;
+        }
+        try {
+            orange_restore_private_engine_init_ledger_write($workRoot, $jobId, [
+                'phase' => 'FAILED',
+                'terminal_failure' => true,
+                'resolved' => false,
+                'safe_code' => $code,
+                'runtime_source' => 'unavailable',
+            ]);
+        } catch (Throwable) {
+            // fail closed on provision result even if ledger write fails
         }
 
         return [
@@ -993,16 +1786,105 @@ function orange_restore_private_engine_provision(
         ];
     }
 
+    $runtimeContract = orange_restore_private_engine_persistable_runtime_source($discovered);
+    if (empty($runtimeContract['persistable'])) {
+        try {
+            orange_restore_private_engine_init_ledger_write($workRoot, $jobId, [
+                'phase' => 'FAILED',
+                'terminal_failure' => true,
+                'resolved' => false,
+                'safe_code' => ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE,
+                'runtime_source' => (string) $runtimeContract['runtime_source'],
+                'runtime_channel' => (string) $runtimeContract['channel'],
+            ]);
+        } catch (Throwable) {
+        }
+
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_RUNTIME_SOURCE_NOT_PERSISTABLE,
+            'engine_pid' => 0,
+            'ready' => false,
+        ];
+    }
+
+    $attemptToken = 'init_' . bin2hex(random_bytes(6));
+    $ledgerBase = [
+        'phase' => 'PREFLIGHT',
+        'attempt_token' => $attemptToken,
+        'terminal_failure' => false,
+        'resolved' => false,
+        'runtime_source' => (string) $runtimeContract['runtime_source'],
+        'runtime_channel' => (string) $runtimeContract['channel'],
+        'family' => (string) $runtimeContract['family'],
+        'quarantine_performed' => false,
+        'init_log_result' => '',
+        'init_log_category' => '',
+        'safe_code' => '',
+        'datadir_state' => '',
+    ];
+    try {
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+    } catch (Throwable) {
+        return [
+            'ok' => false,
+            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED,
+            'engine_pid' => 0,
+            'ready' => false,
+        ];
+    }
+
+    $failProvision = static function (
+        string $workRoot,
+        string $jobId,
+        array $ledgerBase,
+        string $phase,
+        string $code,
+        array $extra = []
+    ): array {
+        $ledger = array_merge($ledgerBase, $extra, [
+            'phase' => $phase,
+            'terminal_failure' => true,
+            'resolved' => false,
+            'safe_code' => $code,
+        ]);
+        try {
+            orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledger);
+            orange_restore_private_engine_write_state($workRoot, $jobId, [
+                'ready' => false,
+                'datadir_job_owned' => true,
+                'loopback_only' => true,
+                'runtime_source' => (string) ($ledger['runtime_source'] ?? ''),
+                'runtime_channel' => (string) ($ledger['runtime_channel'] ?? ''),
+                'family' => (string) ($ledger['family'] ?? ''),
+                'last_safe_code' => $code,
+                'init_phase' => $phase,
+            ]);
+        } catch (Throwable) {
+        }
+
+        return [
+            'ok' => false,
+            'code' => $code,
+            'engine_pid' => 0,
+            'ready' => false,
+        ];
+    };
+
     $root = orange_restore_private_engine_root($workRoot, $jobId);
+    $ledgerBase['phase'] = 'MKDIR';
+    orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
     foreach (['data', 'tmp', 'run'] as $sub) {
         $dir = $root . DIRECTORY_SEPARATOR . $sub;
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-            return [
-                'ok' => false,
-                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED,
-                'engine_pid' => 0,
-                'ready' => false,
-            ];
+            return $failProvision(
+                $workRoot,
+                $jobId,
+                $ledgerBase,
+                'FAILED',
+                ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_MKDIR_FAILED,
+                ['datadir_state' => 'ABSENT']
+            );
         }
     }
 
@@ -1013,12 +1895,13 @@ function orange_restore_private_engine_provision(
         $pn = strtolower(str_replace('\\', '/', $projectReal));
         $rn = strtolower(str_replace('\\', '/', $rootReal));
         if ($rn === $pn || str_starts_with($rn, $pn . '/')) {
-            return [
-                'ok' => false,
-                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED,
-                'engine_pid' => 0,
-                'ready' => false,
-            ];
+            return $failProvision(
+                $workRoot,
+                $jobId,
+                $ledgerBase,
+                'FAILED',
+                ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED
+            );
         }
     } catch (Throwable) {
         // continue with work-root assert already applied
@@ -1028,26 +1911,94 @@ function orange_restore_private_engine_provision(
     $tmpDir = $root . DIRECTORY_SEPARATOR . 'tmp';
     $errorLog = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_ERROR_LOG;
     $pidFile = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_PID_FILE;
-    $mysqld = (string) $discovered['mysqld'];
-    $mysql = (string) $discovered['mysql'];
-    $basedir = (string) $discovered['basedir'];
+    $basedir = orange_restore_private_engine_space_safe_basedir(
+        $projectRoot,
+        (string) $discovered['basedir']
+    );
+    $binDir = rtrim($basedir, "\\/") . DIRECTORY_SEPARATOR . 'bin';
+    $isWin = PHP_OS_FAMILY === 'Windows';
+    $mysqldCand = $binDir . DIRECTORY_SEPARATOR . ($isWin ? 'mysqld.exe' : 'mysqld');
+    $mysqlCand = $binDir . DIRECTORY_SEPARATOR . ($isWin ? 'mysql.exe' : 'mysql');
+    $mysqld = is_file($mysqldCand) ? $mysqldCand : (string) $discovered['mysqld'];
+    $mysql = is_file($mysqlCand) ? $mysqlCand : (string) $discovered['mysql'];
     $family = (string) $discovered['family'];
 
+    $ledgerBase['phase'] = 'CLASSIFY_DATADIR';
+    $stateProbe = orange_restore_private_engine_load_state($workRoot, $jobId);
+    $datadirClass = orange_restore_private_engine_classify_datadir($root, $jobId, $stateProbe);
+    $ledgerBase['datadir_state'] = (string) ($datadirClass['state'] ?? 'UNKNOWN');
+    orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+
+    if (in_array((string) $datadirClass['state'], ['UNOWNED', 'UNKNOWN'], true)) {
+        return $failProvision(
+            $workRoot,
+            $jobId,
+            $ledgerBase,
+            'FAILED',
+            ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_UNOWNED,
+            ['datadir_state' => (string) $datadirClass['state']]
+        );
+    }
+
     $mysqlSystem = $dataDir . DIRECTORY_SEPARATOR . 'mysql';
-    if (!is_dir($mysqlSystem)) {
-        $init = orange_restore_private_engine_run_capture($mysqld, [
-            '--initialize-insecure',
-            '--basedir=' . escapeshellarg($basedir),
-            '--datadir=' . escapeshellarg($dataDir),
-        ]);
-        if ($init['exit_code'] !== 0 || !is_dir($mysqlSystem)) {
-            return [
-                'ok' => false,
-                'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_FAILED,
-                'engine_pid' => 0,
-                'ready' => false,
-            ];
+    if (!is_dir($mysqlSystem)
+        && in_array((string) $datadirClass['state'], [
+            'PARTIAL_OWNED_CURRENT_ATTEMPT',
+            'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+        ], true)
+    ) {
+        $ledgerBase['phase'] = 'QUARANTINE';
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+        $q = orange_restore_private_engine_quarantine_partial_datadir($workRoot, $jobId, $datadirClass);
+        if (empty($q['ok'])) {
+            return $failProvision(
+                $workRoot,
+                $jobId,
+                $ledgerBase,
+                'FAILED',
+                (string) ($q['code'] ?? ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_DATADIR_PARTIAL),
+                ['datadir_state' => (string) $datadirClass['state']]
+            );
         }
+        $ledgerBase['quarantine_performed'] = !empty($q['quarantined']);
+        $datadirClass = orange_restore_private_engine_classify_datadir($root, $jobId, $stateProbe);
+        $ledgerBase['datadir_state'] = (string) ($datadirClass['state'] ?? 'EMPTY_OWNED');
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+    }
+
+    if (!is_dir($mysqlSystem)) {
+        $ledgerBase['phase'] = 'INITIALIZE';
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+        // Re-detect family at init time (portable MariaDB often exposes mysqld.exe).
+        $family = orange_restore_private_engine_detect_family($basedir, $basedir . DIRECTORY_SEPARATOR . 'bin', $mysqld);
+        $init = orange_restore_private_engine_init_with_log($mysqld, $basedir, $dataDir, $errorLog, $family);
+        $ledgerBase['init_log_result'] = (string) ($init['init_log_result'] ?? 'D');
+        $ledgerBase['init_log_category'] = (string) ($init['init_log_category'] ?? 'error_log_absent');
+        $ledgerBase['init_method'] = (string) ($init['method'] ?? '');
+        $ledgerBase['family'] = $family;
+        if ((int) ($init['exit_code'] ?? 1) !== 0 || empty($init['mysql_system'])) {
+            $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED;
+            if (($init['init_log_result'] ?? '') === 'D') {
+                $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INIT_LOG_UNAVAILABLE;
+            } elseif (($init['init_log_category'] ?? '') === 'initialize_insecure_unsupported') {
+                $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_INITIALIZE_FAILED;
+            }
+
+            return $failProvision(
+                $workRoot,
+                $jobId,
+                $ledgerBase,
+                'FAILED',
+                $code,
+                [
+                    'init_log_result' => (string) ($init['init_log_result'] ?? 'D'),
+                    'init_log_category' => (string) ($init['init_log_category'] ?? 'error_log_absent'),
+                    'init_method' => (string) ($init['method'] ?? ''),
+                    'datadir_state' => 'PARTIAL_OWNED_CURRENT_ATTEMPT',
+                ]
+            );
+        }
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
     }
 
     $port = orange_restore_private_engine_allocate_loopback_port();
@@ -1055,84 +2006,164 @@ function orange_restore_private_engine_provision(
     $adminPass = orange_restore_private_engine_random_secret(32);
     $runtimeUser = 'pse_shadow';
     $runtimePass = orange_restore_private_engine_random_secret(32);
+    $family = orange_restore_private_engine_detect_family(
+        $basedir,
+        $basedir . DIRECTORY_SEPARATOR . 'bin',
+        $mysqld
+    );
+    $ledgerBase['family'] = $family;
 
     // Bootstrap with networking disabled where supported, then open loopback-only.
+    $ledgerBase['phase'] = 'START';
+    orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
+    // Keep bootstrap flags conservative: unknown options abort MariaDB/MySQL startup.
     $bootstrapArgs = [
-        '--basedir=' . escapeshellarg($basedir),
-        '--datadir=' . escapeshellarg($dataDir),
-        '--tmpdir=' . escapeshellarg($tmpDir),
-        '--pid-file=' . escapeshellarg($pidFile),
-        '--log-error=' . escapeshellarg($errorLog),
+        '--basedir=' . $basedir,
+        '--datadir=' . $dataDir,
+        '--tmpdir=' . $tmpDir,
+        '--pid-file=' . $pidFile,
+        '--log-error=' . $errorLog,
         '--port=' . (string) $port,
         '--bind-address=127.0.0.1',
-        '--mysqlx=0',
-        '--skip-log-bin',
-        '--skip-replica-start',
-        '--symbolic-links=0',
     ];
-    // skip-networking conflicts with TCP bootstrap on some builds; keep bind-address loopback-only.
+    if ($family === 'mysql') {
+        $bootstrapArgs[] = '--mysqlx=0';
+        $bootstrapArgs[] = '--skip-log-bin';
+        $bootstrapArgs[] = '--skip-replica-start';
+        $bootstrapArgs[] = '--symbolic-links=0';
+    } else {
+        // MariaDB portable: avoid MySQL-only flags; optional binlog skip when accepted.
+        $bootstrapArgs[] = '--skip-log-bin';
+    }
 
     try {
         $enginePid = orange_restore_private_engine_spawn_daemon($mysqld, $bootstrapArgs, $errorLog);
     } catch (Throwable) {
-        return [
-            'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
-            'engine_pid' => 0,
-            'ready' => false,
-        ];
+        return $failProvision(
+            $workRoot,
+            $jobId,
+            $ledgerBase,
+            'FAILED',
+            ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED
+        );
     }
 
     $deadline = time() + 60;
     $up = false;
+    $portStable = 0;
+    $startedAt = time();
     while (time() < $deadline) {
-        if (orange_restore_private_engine_port_open('127.0.0.1', $port)) {
+        $portUp = orange_restore_private_engine_port_open('127.0.0.1', $port);
+        $logReady = false;
+        if (is_file($errorLog)) {
+            $tail = strtolower((string) @file_get_contents($errorLog));
+            $logReady = str_contains($tail, 'ready for connections')
+                || str_contains($tail, 'server socket created on ip');
+        }
+        if ($portUp) {
+            $portStable++;
+        } else {
+            $portStable = 0;
+        }
+        // Prefer log-ready; accept stable port after a few polls (log flush lag).
+        if (($portUp && $logReady) || $portStable >= 3) {
             $up = true;
             break;
+        }
+        // If the daemon exited before becoming ready, fail as start (not bootstrap user).
+        if ($enginePid > 0 && PHP_OS_FAMILY === 'Windows' && (time() - $startedAt) >= 5) {
+            $probe = [];
+            @exec('tasklist /FI "PID eq ' . (string) $enginePid . '" /NH', $probe);
+            $alive = false;
+            foreach ($probe as $line) {
+                if (str_contains((string) $line, (string) $enginePid)) {
+                    $alive = true;
+                    break;
+                }
+            }
+            if (!$alive) {
+                break;
+            }
         }
         usleep(300000);
     }
     if (!$up) {
-        return [
-            'ok' => false,
-            'code' => ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED,
-            'engine_pid' => $enginePid,
-            'ready' => false,
-        ];
+        return $failProvision(
+            $workRoot,
+            $jobId,
+            $ledgerBase,
+            'FAILED',
+            ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_START_FAILED
+        );
+    }
+    if ($enginePid <= 0) {
+        $enginePid = orange_restore_private_engine_read_pid_file($pidFile);
     }
 
+    $ledgerBase['phase'] = 'BOOTSTRAP';
+    orange_restore_private_engine_init_ledger_write($workRoot, $jobId, $ledgerBase);
     $bootOpt = $root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_BOOTSTRAP_OPT;
     try {
-        // Bootstrap as insecure root via localhost/127.0.0.1 (initialize-insecure).
-        $pdoBoot = null;
-        $bootHosts = ['127.0.0.1', 'localhost'];
-        $lastBootErr = null;
-        foreach ($bootHosts as $bootHost) {
-            try {
-                $pdoBoot = new PDO(
-                    'mysql:host=' . $bootHost . ';port=' . (string) $port . ';charset=utf8mb4',
-                    'root',
-                    '',
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+        // Bootstrap as insecure root via localhost/127.0.0.1 (initialize-insecure / install-db).
+        // MySQL 8.x Windows often rejects empty-root PDO/TCP while the mysql client succeeds —
+        // prefer CLI when available; keep PDO as secondary path.
+        $bootstrapped = false;
+        $bootDeadline = time() + 45;
+        while (time() < $bootDeadline && !$bootstrapped) {
+            if (is_file($mysql)) {
+                $cliBoot = orange_restore_private_engine_bootstrap_users_cli(
+                    $mysql,
+                    $port,
+                    $adminUser,
+                    $adminPass,
+                    $runtimeUser,
+                    $runtimePass,
+                    $shadowDb,
+                    $tmpDir
                 );
-                break;
-            } catch (Throwable $e) {
-                $lastBootErr = $e;
-                $pdoBoot = null;
+                if (!empty($cliBoot['ok'])) {
+                    $bootstrapped = true;
+                    $ledgerBase['bootstrap_cli_exit'] = 0;
+                    break;
+                }
+                $ledgerBase['bootstrap_cli_exit'] = (int) ($cliBoot['exit_code'] ?? 1);
+                $cliOut = strtolower((string) ($cliBoot['output'] ?? ''));
+                $cliOut = preg_replace('/password[^\s]*/i', '[secret]', $cliOut) ?? $cliOut;
+                $cliOut = preg_replace('/[A-Za-z]:\\\\[^\s]+/', '[path]', $cliOut) ?? $cliOut;
+                $ledgerBase['bootstrap_cli_hint'] = substr(trim($cliOut), 0, 240);
             }
+            $pdoBoot = null;
+            foreach (['127.0.0.1', 'localhost'] as $bootHost) {
+                try {
+                    $pdoBoot = new PDO(
+                        'mysql:host=' . $bootHost . ';port=' . (string) $port . ';charset=utf8mb4',
+                        'root',
+                        '',
+                        [
+                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_TIMEOUT => 5,
+                        ]
+                    );
+                    $pdoBoot->query('SELECT 1');
+                    orange_restore_private_engine_bootstrap_users_pdo(
+                        $pdoBoot,
+                        $adminUser,
+                        $adminPass,
+                        $runtimeUser,
+                        $runtimePass,
+                        $shadowDb
+                    );
+                    $bootstrapped = true;
+                    break 2;
+                } catch (Throwable) {
+                    $pdoBoot = null;
+                }
+            }
+            usleep(400000);
         }
-        if (!$pdoBoot instanceof PDO) {
+        if (!$bootstrapped) {
             throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED);
         }
-        unset($lastBootErr);
-        orange_restore_private_engine_bootstrap_users_pdo(
-            $pdoBoot,
-            $adminUser,
-            $adminPass,
-            $runtimeUser,
-            $runtimePass,
-            $shadowDb
-        );
         // Optional: also persist a hardened admin option file for recovery (ACL, never browser).
         orange_restore_private_engine_write_option_file($bootOpt, [
             'user' => $adminUser,
@@ -1150,14 +2181,26 @@ function orange_restore_private_engine_provision(
             'port' => (string) $port,
         ]);
 
-        // Verify runtime user can use shadow DB only on loopback.
-        $pdoRt = new PDO(
-            'mysql:host=127.0.0.1;port=' . (string) $port . ';dbname=' . $shadowDb . ';charset=utf8mb4',
-            $runtimeUser,
-            $runtimePass,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
-        $pdoRt->query('SELECT 1');
+        // Verify runtime user can use shadow DB only on loopback (retry briefly after grants).
+        $pdoRt = null;
+        $rtDeadline = time() + 20;
+        while (time() < $rtDeadline && !$pdoRt instanceof PDO) {
+            try {
+                $pdoRt = new PDO(
+                    'mysql:host=127.0.0.1;port=' . (string) $port . ';dbname=' . $shadowDb . ';charset=utf8mb4',
+                    $runtimeUser,
+                    $runtimePass,
+                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+                );
+                $pdoRt->query('SELECT 1');
+            } catch (Throwable) {
+                $pdoRt = null;
+                usleep(300000);
+            }
+        }
+        if (!$pdoRt instanceof PDO) {
+            throw new RuntimeException(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_RUNTIME_USER_FAILED);
+        }
 
         $pidFromFile = orange_restore_private_engine_read_pid_file($pidFile);
         $identity = function_exists('orange_restore_shadow_target_identity_hash')
@@ -1173,6 +2216,8 @@ function orange_restore_private_engine_provision(
             'family' => $family,
             'shadow_db_identity_hash' => $identity,
             'runtime_user_restricted' => true,
+            'runtime_source' => (string) $runtimeContract['runtime_source'],
+            'runtime_channel' => (string) $runtimeContract['channel'],
             'provisioned_at' => gmdate('c'),
             // Internal-only port retained in side channel file, not state JSON for browser.
         ]);
@@ -1180,6 +2225,14 @@ function orange_restore_private_engine_provision(
         $portFile = $root . DIRECTORY_SEPARATOR . '.engine_port';
         file_put_contents($portFile, (string) $port . "\n", LOCK_EX);
         orange_restore_private_engine_harden_secret_file($portFile);
+
+        orange_restore_private_engine_init_ledger_write($workRoot, $jobId, array_merge($ledgerBase, [
+            'phase' => 'READY',
+            'terminal_failure' => false,
+            'resolved' => true,
+            'safe_code' => 'ok',
+            'datadir_state' => 'READY_OWNED',
+        ]));
 
         return [
             'ok' => true,
@@ -1193,6 +2246,25 @@ function orange_restore_private_engine_provision(
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;
         }
+        try {
+            orange_restore_private_engine_init_ledger_write($workRoot, $jobId, array_merge($ledgerBase, [
+                'phase' => 'FAILED',
+                'terminal_failure' => true,
+                'resolved' => false,
+                'safe_code' => $code,
+            ]));
+            orange_restore_private_engine_write_state($workRoot, $jobId, [
+                'ready' => false,
+                'datadir_job_owned' => true,
+                'loopback_only' => true,
+                'runtime_source' => (string) $runtimeContract['runtime_source'],
+                'runtime_channel' => (string) $runtimeContract['channel'],
+                'family' => $family,
+                'last_safe_code' => $code,
+                'init_phase' => 'FAILED',
+            ]);
+        } catch (Throwable) {
+        }
 
         return [
             'ok' => false,
@@ -1200,6 +2272,158 @@ function orange_restore_private_engine_provision(
             'engine_pid' => $enginePid,
             'ready' => false,
         ];
+    }
+}
+
+/**
+ * Escape a string literal for MySQL/MariaDB single-quoted SQL.
+ */
+function orange_restore_private_engine_sql_quote_literal(string $value): string
+{
+    return str_replace(["\\", "'", "\0"], ["\\\\", "''", ''], $value);
+}
+
+/**
+ * Build CREATE DATABASE / USER / GRANT SQL for private-engine bootstrap.
+ */
+function orange_restore_private_engine_bootstrap_users_sql(
+    string $adminUser,
+    string $adminPass,
+    string $runtimeUser,
+    string $runtimePass,
+    string $shadowDb
+): string {
+    $quotedShadow = '`' . str_replace('`', '``', $shadowDb) . '`';
+    $sql = 'CREATE DATABASE IF NOT EXISTS ' . $quotedShadow
+        . " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n";
+    $hosts = ['127.0.0.1', 'localhost'];
+    foreach ($hosts as $host) {
+        foreach (
+            [
+                [$adminUser, $adminPass],
+                [$runtimeUser, $runtimePass],
+            ] as [$u, $p]
+        ) {
+            $eu = orange_restore_private_engine_sql_quote_literal((string) $u);
+            $ep = orange_restore_private_engine_sql_quote_literal((string) $p);
+            $eh = orange_restore_private_engine_sql_quote_literal((string) $host);
+            $sql .= "CREATE USER IF NOT EXISTS '{$eu}'@'{$eh}' IDENTIFIED BY '{$ep}';\n";
+            $sql .= "ALTER USER '{$eu}'@'{$eh}' IDENTIFIED BY '{$ep}';\n";
+        }
+        $ea = orange_restore_private_engine_sql_quote_literal($adminUser);
+        $er = orange_restore_private_engine_sql_quote_literal($runtimeUser);
+        $eh = orange_restore_private_engine_sql_quote_literal($host);
+        $sql .= "GRANT ALL PRIVILEGES ON *.* TO '{$ea}'@'{$eh}' WITH GRANT OPTION;\n";
+        $sql .= "GRANT ALL PRIVILEGES ON {$quotedShadow}.* TO '{$er}'@'{$eh}';\n";
+    }
+    $sql .= "FLUSH PRIVILEGES;\n";
+
+    return $sql;
+}
+
+/**
+ * Bootstrap users via mysql/mariadb client (preferred on MySQL 8.x Windows when PDO root TCP fails).
+ *
+ * @return array{ok:bool,exit_code:int,output:string}
+ */
+function orange_restore_private_engine_bootstrap_users_cli(
+    string $mysqlBin,
+    int $port,
+    string $adminUser,
+    string $adminPass,
+    string $runtimeUser,
+    string $runtimePass,
+    string $shadowDb,
+    string $tmpDir
+): array {
+    if ($mysqlBin === '' || !is_file($mysqlBin) || $port < 1024) {
+        return ['ok' => false, 'exit_code' => 1, 'output' => 'mysql_cli_unavailable'];
+    }
+    if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0775, true) && !is_dir($tmpDir)) {
+        return ['ok' => false, 'exit_code' => 1, 'output' => 'tmpdir_unavailable'];
+    }
+    $opt = $tmpDir . DIRECTORY_SEPARATOR . '.root_bootstrap.opt';
+    $sqlFile = $tmpDir . DIRECTORY_SEPARATOR . '.root_bootstrap.sql';
+    // Empty root password must be written explicitly (write_option_file skips empty values).
+    $optBody = "[client]\nuser=root\npassword=\nhost=127.0.0.1\nport="
+        . (string) $port
+        . "\nprotocol=TCP\n";
+    if (@file_put_contents($opt, $optBody, LOCK_EX) === false) {
+        return ['ok' => false, 'exit_code' => 1, 'output' => 'opt_write_failed'];
+    }
+    orange_restore_private_engine_harden_secret_file($opt);
+    $sql = orange_restore_private_engine_bootstrap_users_sql(
+        $adminUser,
+        $adminPass,
+        $runtimeUser,
+        $runtimePass,
+        $shadowDb
+    );
+    if (@file_put_contents($sqlFile, $sql, LOCK_EX) === false) {
+        @unlink($opt);
+
+        return ['ok' => false, 'exit_code' => 1, 'output' => 'sql_write_failed'];
+    }
+    try {
+        // Prefer proc_open argv form so Windows paths-with-spaces do not break cmd.exe redirects.
+        $cmd = [
+            $mysqlBin,
+            '--defaults-extra-file=' . $opt,
+            '--batch',
+            '--force',
+        ];
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = @proc_open(
+            $cmd,
+            $descriptors,
+            $pipes,
+            null,
+            null,
+            PHP_OS_FAMILY === 'Windows' ? ['bypass_shell' => true] : []
+        );
+        if (!is_resource($proc)) {
+            // Fallback: shell redirect (may fail on spaced basedir paths).
+            $shell = orange_restore_private_engine_shell_quote($mysqlBin)
+                . ' --defaults-extra-file=' . orange_restore_private_engine_shell_quote($opt)
+                . ' --batch --force < '
+                . orange_restore_private_engine_shell_quote($sqlFile);
+            $out = [];
+            $code = 1;
+            @exec($shell . ' 2>&1', $out, $code);
+
+            return [
+                'ok' => $code === 0,
+                'exit_code' => (int) $code,
+                'output' => implode("\n", $out),
+            ];
+        }
+        if (isset($pipes[0]) && is_resource($pipes[0])) {
+            fwrite($pipes[0], $sql);
+            fclose($pipes[0]);
+        }
+        $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string) stream_get_contents($pipes[1]) : '';
+        $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string) stream_get_contents($pipes[2]) : '';
+        if (isset($pipes[1]) && is_resource($pipes[1])) {
+            fclose($pipes[1]);
+        }
+        if (isset($pipes[2]) && is_resource($pipes[2])) {
+            fclose($pipes[2]);
+        }
+        $code = (int) proc_close($proc);
+        $merged = trim($stdout . ((trim($stderr) !== '') ? ("\n" . $stderr) : ''));
+
+        return [
+            'ok' => $code === 0,
+            'exit_code' => $code,
+            'output' => $merged,
+        ];
+    } finally {
+        @unlink($opt);
+        @unlink($sqlFile);
     }
 }
 
@@ -1378,5 +2602,8 @@ function orange_restore_private_engine_public_readiness(
         'runtime_vendor' => (string) ($manifest['vendor'] ?? ''),
         'runtime_version' => (string) ($manifest['version'] ?? ''),
         'sha256_pinned' => !empty($manifest['sha256_pinned']),
+        'datadir_state' => (string) ($pre['datadir_state'] ?? ''),
+        'datadir_recovery_required' => !empty($pre['datadir_recovery_required']),
+        'init_ledger_phase' => (string) ($pre['init_ledger_phase'] ?? ''),
     ];
 }

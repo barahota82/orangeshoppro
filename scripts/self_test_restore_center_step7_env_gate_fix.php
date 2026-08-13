@@ -192,7 +192,17 @@ s7e_ok(
     'mutation: fail before spawn'
 );
 
-// Cleanup disposable shadow if probe/ensure created any (probe is read-only; ensure not called here)
+// Cleanup: stop only the private-engine PID owned by this disposable job (never broad mysqld kill).
+$ownedPid = (int) ($boundMeta['private_engine_pid'] ?? 0);
+if ($ownedPid <= 0 && function_exists('orange_restore_private_engine_load_state')) {
+    $engState = orange_restore_private_engine_load_state($workRoot, $jid);
+    $ownedPid = is_array($engState) ? (int) ($engState['engine_pid'] ?? 0) : 0;
+}
+if ($ownedPid > 0 && PHP_OS_FAMILY === 'Windows') {
+    @exec('taskkill /PID ' . $ownedPid . ' /F /T 2>NUL');
+} elseif ($ownedPid > 0) {
+    @exec('kill ' . (string) $ownedPid . ' 2>/dev/null');
+}
 s7e_rm_tree($tmp);
 
 file_put_contents($ev . DIRECTORY_SEPARATOR . 'env_gate_fix_matrix.json', json_encode([

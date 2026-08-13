@@ -338,6 +338,13 @@ function orange_restore_private_engine_discover_materialized_runtime(string $pro
         return $empty;
     }
     $validated['version_prefix'] = (string) ($manifest['version'] ?? 'portable');
+    $markerFamily = strtolower((string) ($meta['family'] ?? ''));
+    $manifestFamily = strtolower((string) ($manifest['family'] ?? ''));
+    if ($markerFamily === 'mariadb' || $manifestFamily === 'mariadb') {
+        $validated['family'] = 'mariadb';
+    } elseif ($markerFamily === 'mysql' || $manifestFamily === 'mysql') {
+        $validated['family'] = (string) ($validated['family'] ?? $markerFamily);
+    }
 
     return $validated;
 }

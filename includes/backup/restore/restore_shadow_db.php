@@ -607,6 +607,7 @@ function orange_restore_shadow_probe_target_readiness(
                 $pdo = new PDO($dsn, $creds['user'], $creds['pass'], [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_TIMEOUT => 3,
                 ]);
                 $st = $pdo->prepare(
                     'SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1'

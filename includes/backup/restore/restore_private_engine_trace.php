@@ -718,6 +718,11 @@ function orange_restore_private_engine_trace_snapshot(
     } elseif ($claimJson['status'] === 'MALFORMED') {
         $claimActive = 'unknown';
         $missingCategories[] = 'claim_record_malformed';
+    } elseif (!$claimExists && $latestTerminal) {
+        // Terminal failed/success attempt with no claim file ⇒ released/absent, not a live blocker.
+        $claimActive = 'ABSENT_TERMINAL_OR_RELEASED';
+    } elseif (!$claimExists) {
+        $claimActive = 'ABSENT_TERMINAL_OR_RELEASED';
     }
 
     $mutexPath = orange_restore_private_engine_trace_mutex_path($workRoot, $jobId);
@@ -1107,7 +1112,11 @@ function orange_restore_private_engine_trace_snapshot(
         ),
         'claim_active_terminal_unknown' => orange_restore_private_engine_trace_field(
             $claimActive,
-            $claimExists ? ($claimActive === 'unknown' ? 'UNKNOWN' : ($claimActive === 'stale_candidate' ? 'STALE_CANDIDATE' : 'PROVEN')) : 'ABSENT'
+            $claimExists
+                ? ($claimActive === 'unknown' ? 'UNKNOWN' : ($claimActive === 'stale_candidate' ? 'STALE_CANDIDATE' : 'PROVEN'))
+                : ($claimActive === 'ABSENT_TERMINAL_OR_RELEASED'
+                    ? ($latestTerminal ? 'TERMINAL' : 'ABSENT')
+                    : 'ABSENT')
         ),
         'stage_mutex_exists' => orange_restore_private_engine_trace_field(
             $stageMutexExists,
