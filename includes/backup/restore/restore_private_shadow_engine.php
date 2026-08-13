@@ -1422,6 +1422,37 @@ function orange_restore_private_engine_read_pid_file(string $pidFile): int
 }
 
 /**
+ * Stop only the job-owned private engine process after a failed provision attempt.
+ */
+function orange_restore_private_engine_stop_owned_process(int $enginePid, string $pidFile = ''): void
+{
+    $pids = [];
+    if ($enginePid > 0) {
+        $pids[] = $enginePid;
+    }
+    if ($pidFile !== '') {
+        $pidFromFile = orange_restore_private_engine_read_pid_file($pidFile);
+        if ($pidFromFile > 0) {
+            $pids[] = $pidFromFile;
+        }
+    }
+    $pids = array_values(array_unique(array_filter($pids, static fn (int $pid): bool => $pid > 0)));
+    foreach ($pids as $pid) {
+        if (PHP_OS_FAMILY === 'Windows') {
+            @exec('taskkill /PID ' . (string) $pid . ' /F /T 2>NUL');
+            continue;
+        }
+        if (function_exists('posix_kill')) {
+            @posix_kill($pid, 15);
+            usleep(300000);
+            if (@posix_kill($pid, 0)) {
+                @posix_kill($pid, 9);
+            }
+        }
+    }
+}
+
+/**
  * Whether this PHP SAPI can spawn a private engine child process (zero-mutation check).
  */
 function orange_restore_private_engine_process_execution_available(): bool
@@ -2088,6 +2119,8 @@ function orange_restore_private_engine_provision(
         usleep(300000);
     }
     if (!$up) {
+        orange_restore_private_engine_stop_owned_process($enginePid, $pidFile);
+
         return $failProvision(
             $workRoot,
             $jobId,
@@ -2242,6 +2275,10 @@ function orange_restore_private_engine_provision(
         ];
     } catch (Throwable $e) {
         @unlink($bootOpt);
+        @unlink($root . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRIVATE_ENGINE_SECRET_FILE);
+        @unlink($root . DIRECTORY_SEPARATOR . '.engine_port');
+        orange_restore_private_engine_stop_owned_process($enginePid, $pidFile);
+
         $code = trim($e->getMessage());
         if (!str_starts_with($code, 'STEP7_PRIVATE_ENGINE_')) {
             $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_PROVISION_FAILED;

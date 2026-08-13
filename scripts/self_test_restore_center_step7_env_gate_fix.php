@@ -12,7 +12,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_env_gate_fix_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_env_gate_fix_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_env_gate_fix_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }

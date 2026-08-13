@@ -69,7 +69,9 @@ function s7pic_rm_rf(string $dir): void
     @rmdir($dir);
 }
 
-$evOut = 'D:\\orange_restore_step7_private_init_closure_evidence';
+$evOut = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_private_init_closure_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_private_init_closure_evidence';
 if (!is_dir($evOut)) {
     @mkdir($evOut, 0777, true);
 }
