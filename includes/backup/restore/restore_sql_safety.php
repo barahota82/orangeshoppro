@@ -324,11 +324,19 @@ function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, i
         return true;
     }
 
+    if ($last === 'ON') {
+        return in_array('INDEX', $preceding, true) || in_array('TRIGGER', $preceding, true);
+    }
+
     if ($last === 'REFERENCES') {
         return true;
     }
 
     if ($last === 'TRUNCATE') {
+        return true;
+    }
+
+    if ($last === 'DESCRIBE' || $last === 'EXPLAIN' || $last === 'CALL') {
         return true;
     }
 
@@ -346,7 +354,17 @@ function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, i
     }
 
     if ($last === 'TABLE') {
-        foreach (['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'] as $keyword) {
+        foreach (['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE', 'ANALYZE', 'CHECK', 'OPTIMIZE', 'REPAIR'] as $keyword) {
+            if (in_array($keyword, $preceding, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if (in_array($last, ['VIEW', 'TRIGGER', 'EVENT', 'PROCEDURE', 'FUNCTION'], true)) {
+        foreach (['CREATE', 'ALTER', 'DROP'] as $keyword) {
             if (in_array($keyword, $preceding, true)) {
                 return true;
             }
