@@ -12,8 +12,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/restore_sql_safety.php';
 require_once __DIR__ . '/restore_sql_runner.php';
+require_once __DIR__ . '/restore_package_compat.php';
+require_once __DIR__ . '/restore_sql_compat_engine.php';
 
-const ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION = '1.0.1';
+const ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION = '2.0.0';
 
 const ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE = 'ONE_CANONICAL_BACKUP_USE_PRELUDE';
 const ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE = 'CANONICAL_CREATE_DATABASE_AND_USE_PRELUDE';
@@ -209,69 +211,20 @@ function orange_restore_private_sql_scan_top_level_directives(string $sql): arra
 }
 
 /**
- * Detect fully-qualified db.table references outside strings/comments (lexemes).
- *
- * Aligns with Phase-2B.1 object-name context (INTO/FROM/JOIN/TABLE/…) so that
- * numeric literals tokenized as ident.dot.ident (e.g. DEFAULT 0.0000, VALUES 12.50)
- * are not false-positive cross-database hits. Real external schema.object refs still reject.
+ * Detect foreign/system schema.object refs (delegates to authoritative SQL compat engine).
  *
  * @return list<string> normalized foreign db names (not equal to allowed)
  */
 function orange_restore_private_sql_scan_cross_database_refs(string $sql, string $allowedDb): array
 {
     $allowed = orange_restore_private_sql_normalize_ident($allowedDb);
+    $analyze = orange_restore_sql_compat_analyze_sql($sql, $allowed);
     $found = [];
-    $buffer = $sql;
-    while (true) {
-        $split = orange_restore_sql_runner_split_next_statement($buffer);
-        if ($split === null) {
-            break;
-        }
-        $buffer = (string) ($split['remainder'] ?? '');
-        $statement = trim((string) ($split['statement'] ?? ''));
-        if ($statement === '' || orange_restore_sql_is_comment_only($statement)) {
-            continue;
-        }
-        $normalized = orange_restore_sql_strip_leading_comments($statement);
-        if ($normalized === '') {
-            continue;
-        }
-        $lexemes = orange_restore_sql_tokenize_executable($normalized);
-        $n = count($lexemes);
-        for ($i = 0; $i < $n - 2; $i++) {
-            $a = $lexemes[$i];
-            $b = $lexemes[$i + 1];
-            $c = $lexemes[$i + 2];
-            if (($a['type'] ?? '') !== 'ident' || ($b['type'] ?? '') !== 'dot' || ($c['type'] ?? '') !== 'ident') {
-                continue;
-            }
-            $leftRaw = (string) ($a['value'] ?? '');
-            $rightRaw = (string) ($c['value'] ?? '');
-            // Tokenizer treats digit runs as ident — decimal literals are not schema quals.
-            if (preg_match('/^[0-9]+$/', $leftRaw) === 1 && preg_match('/^[0-9]+$/', $rightRaw) === 1) {
-                continue;
-            }
-            if (!orange_restore_sql_is_schema_qualified_object_context($lexemes, $i)) {
-                continue;
-            }
-            $db = orange_restore_private_sql_normalize_ident($leftRaw);
-            if ($db === '' || ($allowed !== '' && $db === $allowed)) {
-                continue;
-            }
-            $prevIdent = '';
-            for ($j = $i - 1; $j >= 0; $j--) {
-                if (($lexemes[$j]['type'] ?? '') === 'ident') {
-                    $prevIdent = strtoupper((string) ($lexemes[$j]['value'] ?? ''));
-                    break;
-                }
-            }
-            if (in_array($prevIdent, ['USE', 'DATABASE'], true)) {
-                continue;
-            }
-            if (!in_array($db, $found, true)) {
-                $found[] = $db;
-            }
-        }
+    if ((int) ($analyze['system_schema_reference_count'] ?? 0) > 0) {
+        $found[] = 'system_schema';
+    }
+    if ((int) ($analyze['external_application_database_count'] ?? 0) > 0) {
+        $found[] = 'external_database';
     }
 
     return $found;
@@ -298,10 +251,8 @@ function orange_restore_private_sql_classify_dump(
     string $sql,
     string $trustedSourceDb
 ): array {
-    $trusted = orange_restore_private_sql_normalize_ident($trustedSourceDb);
-    $naiveUse = preg_match_all('/\bUSE\s+/i', $sql) ?: 0;
     try {
-        $directives = orange_restore_private_sql_scan_top_level_directives($sql);
+        $cert = orange_restore_sql_compat_analyze_sql($sql, $trustedSourceDb);
     } catch (Throwable) {
         return [
             'ok' => false,
@@ -313,162 +264,41 @@ function orange_restore_private_sql_classify_dump(
             'prelude_create' => false,
             'trusted_identity_match' => false,
             'directives' => [],
-            'naive_use_hits' => (int) $naiveUse,
+            'naive_use_hits' => 0,
             'structural_use_count' => 0,
+            'package_classification' => ORANGE_RESTORE_SQL_PKG_SCAN_FAILED,
         ];
     }
 
-    $uses = [];
-    $creates = [];
-    $drops = [];
-    $alters = [];
-    $admin = [];
-    foreach ($directives as $d) {
-        $kind = (string) ($d['kind'] ?? '');
-        if ($kind === 'USE') {
-            $uses[] = $d;
-        } elseif ($kind === 'CREATE_DATABASE') {
-            $creates[] = $d;
-        } elseif ($kind === 'DROP_DATABASE') {
-            $drops[] = $d;
-        } elseif ($kind === 'ALTER_DATABASE') {
-            $alters[] = $d;
-        } elseif (in_array($kind, ['GRANT', 'REVOKE', 'SET_GLOBAL', 'LOAD_DATA', 'SOURCE', 'DELIMITER'], true)) {
-            $admin[] = $d;
-        }
-    }
+    $internal = (string) ($cert['internal_classification'] ?? ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE);
+    $pkgClass = (string) ($cert['final_compatibility_classification'] ?? ORANGE_RESTORE_SQL_PKG_SCAN_FAILED);
+    $ok = !empty($cert['ok']) && !empty($cert['compatible']);
+    $safe = orange_restore_sql_compat_owner_safe_code($cert);
 
-    $structuralUse = count($uses);
-    $base = [
-        'use_count' => $structuralUse,
-        'create_database_count' => count($creates),
-        'prelude_use' => false,
-        'prelude_create' => false,
-        'trusted_identity_match' => false,
-        'directives' => array_map(static function (array $d): array {
-            return [
-                'kind' => (string) ($d['kind'] ?? ''),
-                'is_prelude_slot' => !empty($d['is_prelude_slot']),
-                'ident_present' => trim((string) ($d['ident'] ?? '')) !== '',
-                // never expose raw SQL / DB name
-            ];
-        }, $directives),
-        'naive_use_hits' => (int) $naiveUse,
-        'structural_use_count' => $structuralUse,
+    return [
+        'ok' => $ok,
+        'classification' => $internal !== '' ? $internal : ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE,
+        'safe_code' => $ok ? 'ok' : $safe,
+        'use_count' => (int) ($cert['structural_use_count'] ?? 0),
+        'create_database_count' => (int) ($cert['canonical_database_ddl_count'] ?? 0),
+        'prelude_use' => (int) ($cert['canonical_use_count'] ?? 0) > 0,
+        'prelude_create' => (int) ($cert['canonical_database_ddl_count'] ?? 0) > 0,
+        'trusted_identity_match' => $ok || $pkgClass !== ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_IDENTITY,
+        'directives' => [],
+        'naive_use_hits' => (int) ($cert['naive_use_hits'] ?? 0),
+        'structural_use_count' => (int) ($cert['structural_use_count'] ?? 0),
+        'package_classification' => $pkgClass,
+        'certificate' => [
+            'final_compatibility_classification' => $pkgClass,
+            'normalization_required' => !empty($cert['normalization_required']),
+            'normalization_supported' => !empty($cert['normalization_supported']),
+            'real_qualified_reference_count' => (int) ($cert['real_qualified_reference_count'] ?? 0),
+            'same_source_qualified_reference_count' => (int) ($cert['same_source_qualified_reference_count'] ?? 0),
+            'external_application_database_count' => (int) ($cert['external_application_database_count'] ?? 0),
+            'system_schema_reference_count' => (int) ($cert['system_schema_reference_count'] ?? 0),
+            'parser_policy_version' => ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION,
+        ],
     ];
-
-    if ($admin !== [] || $drops !== [] || $alters !== []) {
-        // DELIMITER alone is unsupported for private php_pdo contract.
-        $class = ORANGE_RESTORE_SQL_CLASS_DB_DDL;
-        if ($admin !== []) {
-            foreach ($admin as $a) {
-                if (($a['kind'] ?? '') === 'DELIMITER') {
-                    $class = ORANGE_RESTORE_SQL_CLASS_DB_DDL;
-                    break;
-                }
-            }
-        }
-
-        return array_merge($base, [
-            'ok' => false,
-            'classification' => $class,
-            'safe_code' => orange_restore_private_sql_safe_code_for_classification($class),
-        ]);
-    }
-
-    $cross = orange_restore_private_sql_scan_cross_database_refs($sql, $trusted !== '' ? $trustedSourceDb : '__none__');
-    // When trusted is empty, skip cross-db enforcement at classify time.
-    if ($trusted !== '' && $cross !== []) {
-        return array_merge($base, [
-            'ok' => false,
-            'classification' => ORANGE_RESTORE_SQL_CLASS_CROSS_DB,
-            'safe_code' => ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE,
-        ]);
-    }
-
-    if ($structuralUse === 0 && $creates === []) {
-        $class = ((int) $naiveUse > 0)
-            ? ORANGE_RESTORE_SQL_CLASS_FALSE_POSITIVE
-            : ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH;
-
-        return array_merge($base, [
-            'ok' => true,
-            'classification' => $class,
-            'safe_code' => 'ok',
-            'trusted_identity_match' => true,
-        ]);
-    }
-
-    $lateUse = false;
-    foreach ($uses as $u) {
-        if (empty($u['is_prelude_slot'])) {
-            $lateUse = true;
-            break;
-        }
-    }
-    $lateCreate = false;
-    foreach ($creates as $c) {
-        if (empty($c['is_prelude_slot'])) {
-            $lateCreate = true;
-            break;
-        }
-    }
-
-    if ($structuralUse > 1 || $lateUse || count($creates) > 1 || $lateCreate) {
-        return array_merge($base, [
-            'ok' => false,
-            'classification' => ORANGE_RESTORE_SQL_CLASS_MULTIPLE_OR_LATE,
-            'safe_code' => ORANGE_RESTORE_STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES,
-        ]);
-    }
-
-    $useIdent = orange_restore_private_sql_normalize_ident((string) ($uses[0]['ident'] ?? ''));
-    $createIdent = $creates !== []
-        ? orange_restore_private_sql_normalize_ident((string) ($creates[0]['ident'] ?? ''))
-        : '';
-    $match = $trusted !== '' && $useIdent !== '' && hash_equals($trusted, $useIdent);
-    if ($creates !== [] && $trusted !== '') {
-        $match = $match && $createIdent !== '' && hash_equals($trusted, $createIdent);
-    }
-
-    if ($trusted !== '' && !$match) {
-        return array_merge($base, [
-            'ok' => false,
-            'classification' => ORANGE_RESTORE_SQL_CLASS_MISMATCHED_IDENTITY,
-            'safe_code' => ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH,
-            'prelude_use' => !empty($uses[0]['is_prelude_slot']),
-            'prelude_create' => $creates !== [] && !empty($creates[0]['is_prelude_slot']),
-            'trusted_identity_match' => false,
-        ]);
-    }
-
-    if ($creates !== [] && $structuralUse === 1) {
-        return array_merge($base, [
-            'ok' => true,
-            'classification' => ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE,
-            'safe_code' => 'ok',
-            'prelude_use' => true,
-            'prelude_create' => true,
-            'trusted_identity_match' => true,
-        ]);
-    }
-
-    if ($structuralUse === 1 && $creates === []) {
-        return array_merge($base, [
-            'ok' => true,
-            'classification' => ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE,
-            'safe_code' => 'ok',
-            'prelude_use' => true,
-            'prelude_create' => false,
-            'trusted_identity_match' => true,
-        ]);
-    }
-
-    return array_merge($base, [
-        'ok' => false,
-        'classification' => ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE,
-        'safe_code' => ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED,
-    ]);
 }
 
 /**
@@ -516,127 +346,56 @@ function orange_restore_private_sql_read_gzip(string $gzipPath, int $maxBytes = 
  *
  * @return array{ok:bool,sql:string,removed_count:int,error:?string}
  */
-function orange_restore_private_sql_normalize_stream(string $sql, string $classification): array
-{
-    if ($classification === ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH
-        || $classification === ORANGE_RESTORE_SQL_CLASS_FALSE_POSITIVE) {
-        return ['ok' => true, 'sql' => $sql, 'removed_count' => 0, 'error' => null];
-    }
-    if ($classification !== ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE
-        && $classification !== ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE) {
+function orange_restore_private_sql_normalize_stream(
+    string $sql,
+    string $classification,
+    string $trustedSourceDb = '',
+    string $packageClassification = ''
+): array {
+    // Authoritative engine path when package classification is provided.
+    if ($packageClassification !== '') {
+        $norm = orange_restore_sql_compat_normalize_sql($sql, $trustedSourceDb, $packageClassification);
+
         return [
-            'ok' => false,
-            'sql' => '',
-            'removed_count' => 0,
-            'error' => orange_restore_private_sql_safe_code_for_classification($classification),
+            'ok' => !empty($norm['ok']),
+            'sql' => (string) ($norm['sql'] ?? ''),
+            'removed_count' => (int) ($norm['removed_count'] ?? 0),
+            'remapped_count' => (int) ($norm['remapped_count'] ?? 0),
+            'error' => $norm['error'] ?? null,
         ];
     }
 
-    $out = '';
-    $buffer = $sql;
-    $removed = 0;
-    $expectCreate = $classification === ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE;
-    $expectUse = true;
-    $preludeDone = false;
+    // Map legacy internal classes onto package classifications.
+    $pkg = match ($classification) {
+        ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH,
+        ORANGE_RESTORE_SQL_CLASS_FALSE_POSITIVE => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_UNCHANGED,
+        ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE,
+        ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
+        default => '',
+    };
+    if ($pkg !== '') {
+        $norm = orange_restore_sql_compat_normalize_sql($sql, $trustedSourceDb, $pkg);
 
-    while (true) {
-        $split = orange_restore_sql_runner_split_next_statement($buffer);
-        if ($split === null) {
-            $tail = $buffer;
-            if (trim($tail) !== '') {
-                $out .= $tail;
-            }
-            break;
-        }
-        $statement = (string) ($split['statement'] ?? '');
-        $buffer = (string) ($split['remainder'] ?? '');
-        $trimmed = trim($statement);
-        if ($trimmed === '' || orange_restore_sql_is_comment_only($trimmed)) {
-            $out .= $statement;
-            if ($buffer !== '' || true) {
-                // Preserve original statement text + re-append semicolon separation via statement content.
-            }
-            // Re-emit with trailing semicolon for executable continuity.
-            if (!str_ends_with(rtrim($statement), ';') && trim($statement) !== '') {
-                $out .= ';';
-            }
-            continue;
-        }
-        $normalized = orange_restore_sql_strip_leading_comments($trimmed);
-        $lexemes = orange_restore_sql_tokenize_executable($normalized);
-        $idents = [];
-        foreach ($lexemes as $lexeme) {
-            if (($lexeme['type'] ?? '') === 'ident') {
-                $idents[] = strtoupper((string) ($lexeme['value'] ?? ''));
-            }
-        }
-        $isCreateDb = ($idents[0] ?? '') === 'CREATE' && ($idents[1] ?? '') === 'DATABASE';
-        $isUse = ($idents[0] ?? '') === 'USE';
-        $isSessionSet = ($idents[0] ?? '') === 'SET'
-            && ($idents[1] ?? '') !== 'GLOBAL'
-            && !in_array('GLOBAL', $idents, true);
-
-        if (!$preludeDone && $expectCreate && $isCreateDb) {
-            $removed++;
-            $expectCreate = false;
-            continue;
-        }
-        if (!$preludeDone && $expectUse && $isUse && !$expectCreate) {
-            $removed++;
-            $expectUse = false;
-            $preludeDone = true;
-            continue;
-        }
-        if (!$preludeDone && !$expectCreate && $expectUse && $isUse) {
-            $removed++;
-            $expectUse = false;
-            $preludeDone = true;
-            continue;
-        }
-
-        if ($isSessionSet) {
-            $out .= rtrim($statement);
-            if ($trimmed !== '' && !str_ends_with(rtrim($statement), ';')) {
-                $out .= ';';
-            }
-            $out .= "\n";
-            continue;
-        }
-
-        $preludeDone = true;
-        $out .= rtrim($statement);
-        if ($trimmed !== '' && !str_ends_with(rtrim($statement), ';')) {
-            $out .= ';';
-        }
-        $out .= "\n";
-    }
-
-    $expectedRemoved = $classification === ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE ? 2 : 1;
-    if ($removed !== $expectedRemoved) {
         return [
-            'ok' => false,
-            'sql' => '',
-            'removed_count' => $removed,
-            'error' => ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED,
+            'ok' => !empty($norm['ok']),
+            'sql' => (string) ($norm['sql'] ?? ''),
+            'removed_count' => (int) ($norm['removed_count'] ?? 0),
+            'remapped_count' => (int) ($norm['remapped_count'] ?? 0),
+            'error' => $norm['error'] ?? null,
         ];
     }
 
-    // Post-normalize: no remaining top-level USE / CREATE DATABASE.
-    $post = orange_restore_private_sql_classify_dump($out, '');
-    if (($post['structural_use_count'] ?? 0) > 0 || ($post['create_database_count'] ?? 0) > 0) {
-        return [
-            'ok' => false,
-            'sql' => '',
-            'removed_count' => $removed,
-            'error' => ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED,
-        ];
-    }
-
-    return ['ok' => true, 'sql' => $out, 'removed_count' => $removed, 'error' => null];
+    return [
+        'ok' => false,
+        'sql' => '',
+        'removed_count' => 0,
+        'error' => orange_restore_private_sql_safe_code_for_classification($classification),
+    ];
 }
 
 /**
- * Private-engine statement validator: reuse staging rules (still reject USE/DDL).
+ * Private-engine statement validator — authoritative SQL compat engine only.
+ * Phase-2B.1 staging detector is intentionally NOT used on the private import path.
  *
  * @throws RuntimeException
  */
@@ -645,7 +404,7 @@ function orange_restore_private_sql_validate_statement(
     string $shadowDb,
     string $productionDb
 ): void {
-    orange_restore_sql_validate_statement_for_staging($sql, $shadowDb, $productionDb);
+    orange_restore_sql_compat_validate_statement_for_private_import($sql, $shadowDb, $productionDb);
 }
 
 /**
@@ -698,24 +457,33 @@ function orange_restore_package_private_engine_import_compat(
             'classification' => ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE,
         ];
     }
-    $trusted = $trustedSourceDb !== '' ? $trustedSourceDb : $productionDb;
+    $trustedFromManifest = orange_restore_sql_compat_trusted_source_from_manifest($manifest);
+    $trusted = $trustedSourceDb !== ''
+        ? orange_restore_private_sql_normalize_ident($trustedSourceDb)
+        : ($trustedFromManifest !== ''
+            ? $trustedFromManifest
+            : orange_restore_private_sql_normalize_ident($productionDb));
     $class = orange_restore_private_sql_classify_dump((string) $read['sql'], $trusted);
-    $okClass = in_array((string) ($class['classification'] ?? ''), [
-        ORANGE_RESTORE_SQL_CLASS_NO_DB_SWITCH,
-        ORANGE_RESTORE_SQL_CLASS_FALSE_POSITIVE,
-        ORANGE_RESTORE_SQL_CLASS_ONE_CANONICAL_USE,
-        ORANGE_RESTORE_SQL_CLASS_CREATE_AND_USE,
+    $pkgClass = (string) ($class['package_classification'] ?? '');
+    $ok = !empty($class['ok']) && in_array($pkgClass, [
+        ORANGE_RESTORE_SQL_PKG_COMPATIBLE_UNCHANGED,
+        ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
+        ORANGE_RESTORE_SQL_PKG_COMPATIBLE_SAME_SOURCE,
     ], true);
 
     return [
-        'ok' => $okClass && !empty($class['ok']),
-        'error' => $okClass ? null : (string) ($class['safe_code'] ?? ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED),
+        'ok' => $ok,
+        'error' => $ok ? null : (string) ($class['safe_code'] ?? ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED),
         'export_backend' => $backend,
         'classification' => (string) ($class['classification'] ?? ORANGE_RESTORE_SQL_CLASS_NOT_PROVABLE),
+        'package_classification' => $pkgClass,
+        'certificate' => is_array($class['certificate'] ?? null) ? $class['certificate'] : [],
+        'trusted_source_identity_hash' => hash('sha256', $trusted),
         'source_dump_sha256' => (string) ($read['sha256'] ?? ''),
         'naive_use_hits' => (int) ($class['naive_use_hits'] ?? 0),
         'structural_use_count' => (int) ($class['structural_use_count'] ?? 0),
         'policy_version' => ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION,
+        'engine_version' => ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION,
     ];
 }
 
@@ -729,7 +497,8 @@ function orange_restore_private_sql_prepare_normalized_import(
     string $jobId,
     string $sourceGzipPath,
     string $trustedSourceDb,
-    string $classification
+    string $classification,
+    string $packageClassification = ''
 ): array {
     $read = orange_restore_private_sql_read_gzip($sourceGzipPath);
     if (!($read['ok'] ?? false)) {
@@ -738,7 +507,12 @@ function orange_restore_private_sql_prepare_normalized_import(
             'code' => (string) ($read['error'] ?? ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED),
         ];
     }
-    $norm = orange_restore_private_sql_normalize_stream((string) $read['sql'], $classification);
+    $norm = orange_restore_private_sql_normalize_stream(
+        (string) $read['sql'],
+        $classification,
+        $trustedSourceDb,
+        $packageClassification
+    );
     if (!($norm['ok'] ?? false)) {
         return [
             'ok' => false,
@@ -773,8 +547,11 @@ function orange_restore_private_sql_prepare_normalized_import(
         'source_dump_sha256' => $sourceSha,
         'normalized_stream_sha256' => $normSha,
         'removed_count' => (int) ($norm['removed_count'] ?? 0),
+        'remapped_count' => (int) ($norm['remapped_count'] ?? 0),
         'policy_version' => ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION,
+        'engine_version' => ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION,
         'classification' => $classification,
+        'package_classification' => $packageClassification,
         'trusted_source_db_identity_hash' => hash('sha256', orange_restore_private_sql_normalize_ident($trustedSourceDb)),
     ];
 }
@@ -810,17 +587,20 @@ function orange_restore_private_sql_import_gzip(
     string $gzipPath,
     string $shadowDb,
     string $productionDb,
-    ?callable $log = null
+    ?callable $log = null,
+    string $trustedSourceDb = ''
 ): array {
-    $result = orange_restore_sql_runner_import_gzip(
+    $trusted = $trustedSourceDb !== '' ? $trustedSourceDb : $productionDb;
+    // Authoritative private import — does not call Phase-2B.1 staging validator.
+    $result = orange_restore_sql_compat_import_gzip(
         $pdo,
         $gzipPath,
         $shadowDb,
-        $productionDb,
+        $trusted,
         $log
     );
     if (!($result['ok'] ?? false)) {
-        $err = (string) ($result['error'] ?? '');
+        $err = (string) ($result['error'] ?? $result['code'] ?? '');
         $mapped = orange_restore_private_sql_map_import_error($err);
         $result['error'] = $mapped;
         $result['code'] = $mapped;
@@ -852,8 +632,25 @@ function orange_restore_private_sql_map_import_error(string $error): string
         || str_contains($error, 'ALTER DATABASE')) {
         return ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_LEVEL_DDL_FORBIDDEN;
     }
-    if (str_contains($error, 'cross-database') || str_contains($error, 'qualified')) {
+    if (str_contains($error, 'cross-database')
+        || str_contains($error, 'qualified')
+        || $error === ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN
+        || $error === ORANGE_RESTORE_STEP7_SQL_SYSTEM_SCHEMA_FORBIDDEN
+    ) {
         return ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE;
+    }
+    if ($error === ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN) {
+        return ORANGE_RESTORE_STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES;
+    }
+    if ($error === ORANGE_RESTORE_STEP7_SQL_SOURCE_IDENTITY_MISMATCH) {
+        return ORANGE_RESTORE_STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH;
+    }
+    if ($error === ORANGE_RESTORE_STEP7_SQL_POST_PREFLIGHT_PARITY_FAILED
+        || $error === ORANGE_RESTORE_STEP7_SQL_CANONICAL_PRELUDE_NORMALIZATION_FAILED
+        || $error === ORANGE_RESTORE_STEP7_SQL_SAME_SOURCE_NORMALIZATION_FAILED
+        || $error === ORANGE_RESTORE_STEP7_SQL_TRANSIENT_STREAM_FAILED
+    ) {
+        return ORANGE_RESTORE_STEP7_SQL_DUMP_NORMALIZATION_FAILED;
     }
     if (str_contains($error, 'forbidden pattern')) {
         return ORANGE_RESTORE_STEP7_SQL_DUMP_CANONICAL_PREAMBLE_UNSUPPORTED;

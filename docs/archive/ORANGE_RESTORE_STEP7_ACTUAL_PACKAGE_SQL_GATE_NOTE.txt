@@ -1,0 +1,46 @@
+ORANGE — Restore Center Step 7
+Actual-package SQL compatibility gate (single parser / preflight / import)
+=======================================================================
+Date: 2026-08-13
+Engine: ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION 2.0.0
+Policy: ORANGE_RESTORE_PRIVATE_IMPORT_POLICY_VERSION 2.0.0
+
+Why `6e96f814` missed the live path (primary classification H)
+-------------------------------------------------------------
+H — MULTIPLE_PROVEN_DEFECTS
+1) Prior Result A used a hand-written PDO-shaped fixture with unquoted
+   DECIMAL defaults; real SHOW CREATE / PDO INSERT often quotes DECIMAL
+   literals, while FLOAT/DOUBLE (and some server modes) emit unquoted
+   forms — fixture-only proof was not Production-path closure.
+2) Step-7 retry preflight had no package-specific SQL certificate, so
+   readiness/button could be green without scanning the bound dump.
+3) Private import still called the Phase-2B.1 staging SQL runner/validator
+   (second detector / allowed-DB = shadow), diverging from private classify.
+
+Repair (Restore-only)
+---------------------
+One authoritative Restore SQL compatibility engine used by:
+- package scan / certificate
+- directive + qualified-ref scan
+- prelude + same-source normalization
+- private import validation + import worker
+- Step-7 retry preflight (diagnostic / button / request)
+
+Phase-2B.1 staging policy in restore_sql_safety.php is unchanged.
+Backup Center Production dump generation is unchanged.
+Source package / original dump bytes remain immutable.
+
+تنفيذ
+-----
+- includes/backup/restore/restore_sql_compat_engine.php
+- includes/backup/restore/restore_private_sql_import_policy.php
+- includes/backup/restore/restore_center_orchestrator.php
+- includes/backup/restore/restore_shadow_db.php
+- scripts/self_test_restore_center_step7_actual_package_sql_gate.php
+- Evidence: D:\orange_restore_step7_actual_package_sql_gate_evidence\
+
+Live safety
+-----------
+Does not mutate live job/package/engine. Not a live Step-7 success certificate.
+Owner next: read-only Refresh + package-specific compatibility report only
+(do not press Step 7 in this task).

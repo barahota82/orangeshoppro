@@ -1524,6 +1524,71 @@ function orange_restore_step7_retry_preflight(
     $runtimeVerified = !empty($engine['binary_available']) || !empty($engine['materializable']);
     $runtimeCompatible = !empty($engine['runtime_compatible']);
     $sourceReady = trim((string) ($job['source_package_id'] ?? $job['package_id'] ?? '')) !== '';
+    // Package-specific SQL compatibility certificate (read-only; no stream/target/worker writes).
+    $sqlCertificate = [
+        'ok' => false,
+        'compatible' => false,
+        'final_compatibility_classification' => 'SQL_PACKAGE_SCAN_FAILED',
+        'exact_not_ready_reason' => 'STEP7_SQL_PACKAGE_SCAN_FAILED',
+        'parser_policy_version' => defined('ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION')
+            ? ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION
+            : '',
+        'package_scan_complete' => false,
+    ];
+    if (!function_exists('orange_restore_sql_compat_scan_package')) {
+        require_once __DIR__ . '/restore_sql_compat_engine.php';
+    }
+    if (!function_exists('orange_restore_shadow_resolve_source_package')) {
+        require_once __DIR__ . '/restore_shadow_db.php';
+    }
+    try {
+        $backupRoot = '';
+        if (function_exists('orange_backup_admin_resolve_backup_root')) {
+            require_once dirname(__DIR__) . '/backup_admin.php';
+            $backupRoot = orange_backup_admin_resolve_backup_root($projectRoot);
+        }
+        if ($backupRoot !== '' && $sourceReady) {
+            $src = orange_restore_shadow_resolve_source_package($workRoot, $jobId, $backupRoot, $job);
+            if (!empty($src['ok'])) {
+                $manifest = is_array($src['manifest'] ?? null) ? $src['manifest'] : [];
+                $dumpFile = trim((string) ($manifest['dump_file'] ?? ''));
+                $pkgPath = (string) ($src['package_path'] ?? '');
+                $dumpPath = ($pkgPath !== '' && $dumpFile !== '')
+                    ? ($pkgPath . DIRECTORY_SEPARATOR . $dumpFile)
+                    : '';
+                $trusted = orange_restore_sql_compat_trusted_source_from_manifest($manifest);
+                if ($trusted === '') {
+                    $trusted = orange_restore_sql_compat_normalize_ident(
+                        orange_restore_shadow_production_db_name($projectRoot)
+                    );
+                }
+                $fpOk = trim((string) ($src['fingerprint'] ?? '')) !== '' ? 'yes' : 'unknown';
+                $sumOk = 'unknown';
+                if ($dumpPath !== '' && is_file($dumpPath)) {
+                    $sqlCertificate = orange_restore_sql_compat_scan_package(
+                        $dumpPath,
+                        $manifest,
+                        $trusted,
+                        $fpOk,
+                        $sumOk
+                    );
+                    $sqlCertificate['package_scan_complete'] = true;
+                    $sqlCertificate['compatible'] = !empty($sqlCertificate['ok'])
+                        && in_array((string) ($sqlCertificate['final_compatibility_classification'] ?? ''), [
+                            ORANGE_RESTORE_SQL_PKG_COMPATIBLE_UNCHANGED,
+                            ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
+                            ORANGE_RESTORE_SQL_PKG_COMPATIBLE_SAME_SOURCE,
+                        ], true);
+                    // Never expose raw names in public preflight.
+                    unset($sqlCertificate['internal_classification']);
+                }
+            }
+        }
+    } catch (Throwable) {
+        $sqlCertificate['package_scan_complete'] = false;
+        $sqlCertificate['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
+    }
+    $sqlCompatOk = !empty($sqlCertificate['compatible']) && !empty($sqlCertificate['package_scan_complete']);
     $phpClass = (string) ($attemptCtx['php_worker_liveness_class'] ?? ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY);
     $dbClass = (string) ($attemptCtx['private_db_liveness_class'] ?? ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY);
     $phpLive = (string) ($attemptCtx['php_worker_liveness'] ?? 'unknown');
@@ -1592,25 +1657,38 @@ function orange_restore_step7_retry_preflight(
         $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
     } elseif (in_array($datadirState, ['UNOWNED', 'MALFORMED_OR_UNKNOWN', 'UNKNOWN'], true)) {
         $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
+    } elseif (!$sqlCompatOk && $sourceReady) {
+        $code = (string) ($sqlCertificate['exact_not_ready_reason'] ?? ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED);
+        if ($code === '' || $code === 'ok') {
+            $code = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
+        }
+        // Keep Owner Arabic parity for external/system via legacy CROSS_DB code.
+        if (in_array($code, [
+            ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN,
+            ORANGE_RESTORE_STEP7_SQL_SYSTEM_SCHEMA_FORBIDDEN,
+        ], true)) {
+            $code = ORANGE_RESTORE_STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE;
+        }
     } elseif ($engineReadyIdle
         && $requestable && !$inflight && $phpAbsenceOk && empty($active['active'])
         && $latestTerminal && $step8Locked && $parentTargetMatch && $parentRuntimeMatch
         && $runtimeVerified && $runtimeCompatible && $runtimePersistable
-        && $sourceReady && $engineStateCap && $initCap
+        && $sourceReady && $sqlCompatOk && $engineStateCap && $initCap
         && in_array($datadirState, ['ACTIVE_OWNED', 'READY_OWNED', 'EMPTY_OWNED'], true)) {
         // Owned healthy private engine service → controlled retry (not provisioning).
         $green = true;
         $code = 'ok';
         $token = ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
     } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT
-        && $requestable && !$inflight && ($processAbsenceProven || $phpAbsenceOk) && empty($active['active'])) {
+        && $requestable && !$inflight && ($processAbsenceProven || $phpAbsenceOk) && empty($active['active'])
+        && $sqlCompatOk) {
         $green = true;
         $code = 'ok';
     } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
         && $requestable && !$inflight && $processAbsenceProven && empty($active['active'])
         && $latestTerminal && $step8Locked && $parentTargetMatch && $parentRuntimeMatch
         && $runtimeVerified && $runtimeCompatible && $runtimePersistable
-        && $sourceReady && $engineStateCap && $initCap
+        && $sourceReady && $sqlCompatOk && $engineStateCap && $initCap
         && in_array($datadirState, ['ABSENT', 'EMPTY_OWNED', 'PARTIAL_OWNED_TERMINAL_ATTEMPT'], true)
         && (!str_contains($datadirState, 'PARTIAL') || ($recoveryRequired && $recoverySafe))) {
         $green = true;
@@ -1680,11 +1758,36 @@ function orange_restore_step7_retry_preflight(
         'initialization_error_capture_capability' => $initCap ? 'ready' : 'not_ready',
         'initialization_result_error_capture_capability' => $initCap ? 'ready' : 'not_ready',
         'source_package_ready' => $sourceReady,
+        'sql_package_compatibility' => [
+            'package_scan_complete' => !empty($sqlCertificate['package_scan_complete']),
+            'compatible' => !empty($sqlCertificate['compatible']),
+            'final_compatibility_classification' => (string) ($sqlCertificate['final_compatibility_classification'] ?? ''),
+            'exact_not_ready_reason' => (string) ($sqlCertificate['exact_not_ready_reason'] ?? ''),
+            'parser_policy_version' => (string) ($sqlCertificate['parser_policy_version'] ?? ''),
+            'package_fingerprint_verified' => (string) ($sqlCertificate['package_fingerprint_verified'] ?? 'unknown'),
+            'sql_dump_checksum_verified' => (string) ($sqlCertificate['sql_dump_checksum_verified'] ?? 'unknown'),
+            'normalization_required' => !empty($sqlCertificate['normalization_required']),
+            'normalization_supported' => !empty($sqlCertificate['normalization_supported']),
+            'original_dump_unchanged' => !empty($sqlCertificate['original_dump_unchanged']),
+            'real_qualified_reference_count' => (int) ($sqlCertificate['real_qualified_reference_count'] ?? 0),
+            'same_source_qualified_reference_count' => (int) ($sqlCertificate['same_source_qualified_reference_count'] ?? 0),
+            'external_application_database_count' => (int) ($sqlCertificate['external_application_database_count'] ?? 0),
+            'system_schema_reference_count' => (int) ($sqlCertificate['system_schema_reference_count'] ?? 0),
+            'distinct_database_identity_count' => (int) ($sqlCertificate['distinct_database_identity_count'] ?? 0),
+            'ambiguous_token_count' => (int) ($sqlCertificate['ambiguous_token_count'] ?? 0),
+            'false_positive_comment_string_count' => (int) ($sqlCertificate['false_positive_comment_string_count'] ?? 0),
+            'canonical_use_count' => (int) ($sqlCertificate['canonical_use_count'] ?? 0),
+            'canonical_database_ddl_count' => (int) ($sqlCertificate['canonical_database_ddl_count'] ?? 0),
+            'statement_count' => (int) ($sqlCertificate['statement_count'] ?? 0),
+            'stored_object_reference_count_by_type' => is_array($sqlCertificate['stored_object_reference_count_by_type'] ?? null)
+                ? $sqlCertificate['stored_object_reference_count_by_type']
+                : [],
+        ],
         'Step_8_locked' => $step8Locked,
         'step8_locked' => $step8Locked,
         'parent_worker_target_match' => $parentTargetMatch,
         'parent_worker_runtime_match' => $parentRuntimeMatch,
-        'step7_action_enabled' => $green && $requestable && !$inflight && empty($active['active']),
+        'step7_action_enabled' => $green && $requestable && !$inflight && empty($active['active']) && $sqlCompatOk,
         'engine' => $engine,
         'active_attempt_detail' => $active,
         'attempt_context' => $attemptCtx,

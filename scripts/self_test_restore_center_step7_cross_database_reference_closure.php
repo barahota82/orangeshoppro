@@ -50,7 +50,13 @@ $pdoSrc = (string) file_get_contents($projectRoot . '/includes/backup/backup_pdo
 
 s7xref_ok(str_contains($pdoSrc, 'function orange_backup_pdo_write_preamble'), 'backup PDO preamble traced');
 s7xref_ok(str_contains($pdoSrc, 'SHOW CREATE TABLE'), 'backup PDO uses SHOW CREATE TABLE');
-s7xref_ok(str_contains($policySrc, 'orange_restore_sql_is_schema_qualified_object_context'), 'private scanner uses object context');
+$engineSrc = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_sql_compat_engine.php');
+s7xref_ok(
+    str_contains($engineSrc, 'orange_restore_sql_is_schema_qualified_object_context')
+    || str_contains($policySrc, 'orange_restore_sql_is_schema_qualified_object_context'),
+    'private scanner uses object context'
+);
+s7xref_ok(str_contains($policySrc, 'restore_sql_compat_engine.php'), 'private policy delegates to authoritative engine');
 s7xref_ok(str_contains($safetySrc, "'USE database switch'"), 'Phase-2B.1 USE ban preserved');
 $markers['BACKUP_PDO_CONTRACT_TRACED'] = 1;
 $markers['PHASE2B1_GLOBAL_POLICY_INTACT'] = str_contains($safetySrc, "'USE database switch'") ? 1 : 0;
