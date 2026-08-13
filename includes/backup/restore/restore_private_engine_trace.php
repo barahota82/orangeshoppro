@@ -894,17 +894,24 @@ function orange_restore_private_engine_trace_snapshot(
     $runtimeUserPrepared = is_array($state) && !empty($state['runtime_user_restricted']);
     $shadowDbPrepared = is_array($state) && trim((string) ($state['shadow_db_identity_hash'] ?? '')) !== '';
 
-    $readinessToken = '';
-    if ($status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY) {
+    // Authoritative retry preflight (same as diagnostic/button/request) — never invent green.
+    // Caller must have loaded restore_center_orchestrator.php (avoid circular require).
+    $retryPreflight = [];
+    if (function_exists('orange_restore_step7_retry_preflight')) {
+        try {
+            $retryPreflight = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId);
+        } catch (Throwable) {
+            $retryPreflight = [];
+        }
+    }
+    $readinessToken = (string) ($retryPreflight['ready_token'] ?? '');
+    if ($readinessToken === '' && $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY) {
         $readinessToken = 'STEP7_READY';
-    } elseif ($connectionSucceeded && $step7Requestable) {
-        $readinessToken = ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT;
-    } elseif (!empty($runtimeInternal['verified']) || !empty($runtimeInternal['extracted_complete'])) {
-        $readinessToken = defined('ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING')
-            ? ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
-            : 'READY_FOR_PRIVATE_SHADOW_PROVISIONING';
-    } else {
-        $readinessToken = 'NOT_READY';
+    } elseif ($readinessToken === '') {
+        $readinessToken = (string) ($retryPreflight['final_readiness'] ?? 'NOT_READY');
+        if ($readinessToken === '') {
+            $readinessToken = 'NOT_READY';
+        }
     }
 
     // Package gate artifacts (presence categories only).
@@ -926,15 +933,13 @@ function orange_restore_private_engine_trace_snapshot(
         'PARTIAL_OWNED_CURRENT_ATTEMPT',
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
     ], true);
-    $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
-        ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
-        : [];
-    $recoverySafe = ((string) ($datadirInfo['state'] ?? '') === 'PARTIAL_OWNED_TERMINAL_ATTEMPT')
-        && empty($attemptCtx['active_attempt'])
-        && ($attemptCtx['php_worker_liveness'] ?? '') !== 'alive'
-        && ($attemptCtx['private_db_liveness'] ?? '') !== 'alive'
-        && ($attemptCtx['php_worker_liveness'] ?? 'unknown') !== 'unknown'
-        && ($attemptCtx['private_db_liveness'] ?? 'unknown') !== 'unknown';
+    $attemptCtx = is_array($retryPreflight['attempt_context'] ?? null)
+        ? $retryPreflight['attempt_context']
+        : (function_exists('orange_restore_private_engine_attempt_context')
+            ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
+            : []);
+    $recoverySafe = !empty($retryPreflight['recovery_safe'])
+        || !empty($retryPreflight['partial_recovery_safe']);
     $legacyRuntimeAbsent = !is_array($state) || empty($state['runtime_source']);
     $legacyEngineStateAbsent = !is_array($state);
     $legacyErrorLogAbsent = ($errClass['status'] ?? '') === 'ABSENT';
@@ -1414,17 +1419,48 @@ function orange_restore_private_engine_trace_snapshot(
         ),
     ];
     $sectionG['partial_recovery_required'] = orange_restore_private_engine_trace_field(
-        $partialDatadir && (string) ($datadirInfo['state'] ?? '') === 'PARTIAL_OWNED_TERMINAL_ATTEMPT',
+        !empty($retryPreflight['recovery_required'])
+            || ($partialDatadir && (string) ($datadirInfo['state'] ?? '') === 'PARTIAL_OWNED_TERMINAL_ATTEMPT'),
         'PROVEN'
     );
     $sectionG['partial_recovery_safe'] = orange_restore_private_engine_trace_field(
         $recoverySafe ? 'yes' : 'no',
-        $recoverySafe ? 'PROVEN' : 'PROVEN'
-    );
-    $sectionG['recovery_mode'] = orange_restore_private_engine_trace_field(
-        $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
         'PROVEN'
     );
+    $sectionG['recovery_mode'] = orange_restore_private_engine_trace_field(
+        (string) ($retryPreflight['recovery_mode'] ?? ($recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none')),
+        'PROVEN'
+    );
+    $sectionRetryPreflight = [
+        'final_readiness' => orange_restore_private_engine_trace_field(
+            (string) ($retryPreflight['final_readiness'] ?? 'NOT_READY'),
+            'PROVEN'
+        ),
+        'exact_not_ready_reason' => orange_restore_private_engine_trace_field(
+            (string) ($retryPreflight['exact_not_ready_reason'] ?? ''),
+            ((string) ($retryPreflight['exact_not_ready_reason'] ?? '')) !== '' ? 'PROVEN' : 'ABSENT'
+        ),
+        'php_worker_liveness_class' => orange_restore_private_engine_trace_field(
+            (string) ($retryPreflight['php_worker_liveness_class'] ?? ''),
+            'PROVEN'
+        ),
+        'private_db_liveness_class' => orange_restore_private_engine_trace_field(
+            (string) ($retryPreflight['private_db_liveness_class'] ?? ''),
+            'PROVEN'
+        ),
+        'process_absence_proven' => orange_restore_private_engine_trace_field(
+            !empty($retryPreflight['process_absence_proven']) ? 'yes' : 'no',
+            'PROVEN'
+        ),
+        'process_absence_conclusion' => orange_restore_private_engine_trace_field(
+            (string) ($retryPreflight['process_absence_conclusion'] ?? ''),
+            'PROVEN'
+        ),
+        'step7_action_enabled' => orange_restore_private_engine_trace_field(
+            !empty($retryPreflight['step7_action_enabled']) ? 'yes' : 'no',
+            'PROVEN'
+        ),
+    ];
 
     $arabicReport = orange_restore_private_engine_trace_arabic_report([
         'job_id' => $jobId,
@@ -1445,9 +1481,14 @@ function orange_restore_private_engine_trace_snapshot(
         'runtime_source' => (string) $currentCaps['current_runtime_source'],
         'historical_runtime' => $legacyRuntimeAbsent ? 'LEGACY_ATTEMPT_RUNTIME_IDENTITY_ABSENT' : 'present',
         'recovery_safe' => $recoverySafe ? 'yes' : 'no',
-        'recovery_mode' => $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
+        'recovery_mode' => (string) ($retryPreflight['recovery_mode'] ?? ($recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none')),
         'engine_state_capture' => $currentCaps['engine_state_capture'],
         'init_error_capture' => $currentCaps['initialization_error_capture'],
+        'exact_not_ready_reason' => (string) ($retryPreflight['exact_not_ready_reason'] ?? ''),
+        'final_readiness' => (string) ($retryPreflight['final_readiness'] ?? $readinessToken),
+        'php_liveness_class' => (string) ($retryPreflight['php_worker_liveness_class'] ?? ''),
+        'db_liveness_class' => (string) ($retryPreflight['private_db_liveness_class'] ?? ''),
+        'process_absence_proven' => !empty($retryPreflight['process_absence_proven']) ? 'yes' : 'no',
         'missing_categories' => $missingCategories,
         'next_evidence' => $nextEvidence,
         'install_mutex_separate' => true,
@@ -1490,6 +1531,18 @@ function orange_restore_private_engine_trace_snapshot(
             'E_private_job_environment' => $sectionE,
             'F_step7_import_boundary' => $sectionF,
             'G_residual_retry_safety' => $sectionG,
+            'H_authoritative_retry_preflight' => $sectionRetryPreflight,
+        ],
+        'retry_preflight' => [
+            'final_readiness' => (string) ($retryPreflight['final_readiness'] ?? 'NOT_READY'),
+            'exact_not_ready_reason' => (string) ($retryPreflight['exact_not_ready_reason'] ?? ''),
+            'ready_token' => (string) ($retryPreflight['ready_token'] ?? ''),
+            'step7_action_enabled' => !empty($retryPreflight['step7_action_enabled']),
+            'process_absence_proven' => !empty($retryPreflight['process_absence_proven']),
+            'php_worker_liveness_class' => (string) ($retryPreflight['php_worker_liveness_class'] ?? ''),
+            'private_db_liveness_class' => (string) ($retryPreflight['private_db_liveness_class'] ?? ''),
+            'recovery_safe' => !empty($retryPreflight['recovery_safe']),
+            'recovery_mode' => (string) ($retryPreflight['recovery_mode'] ?? 'none'),
         ],
         'arabic_report' => $arabicReport,
         'notes_ar' => [
@@ -1514,8 +1567,17 @@ function orange_restore_private_engine_trace_arabic_report(array $ctx): string
     $lines[] = 'التصنيف النهائي: ' . (string) ($ctx['classification'] ?? '—');
     $lines[] = 'أحدث رمز آمن: ' . (string) (($ctx['latest_safe_code'] ?? '') !== '' ? $ctx['latest_safe_code'] : 'غائب');
     $lines[] = 'المطالبة (claim): ' . (string) ($ctx['claim_active'] ?? 'absent');
-    $lines[] = 'عامل PHP: ' . (string) ($ctx['php_alive'] ?? 'unknown');
-    $lines[] = 'محرك قاعدة الظل الخاص: ' . (string) ($ctx['engine_alive'] ?? 'unknown');
+    $lines[] = 'الجاهزية النهائية: ' . (string) ($ctx['final_readiness'] ?? 'NOT_READY');
+    if ((string) ($ctx['exact_not_ready_reason'] ?? '') !== '') {
+        $lines[] = 'سبب NOT_READY الدقيق: ' . (string) $ctx['exact_not_ready_reason'];
+    }
+    $lines[] = 'عامل PHP: ' . (string) (($ctx['php_liveness_class'] ?? '') !== ''
+        ? $ctx['php_liveness_class']
+        : ($ctx['php_alive'] ?? 'unknown'));
+    $lines[] = 'محرك قاعدة الظل الخاص: ' . (string) (($ctx['db_liveness_class'] ?? '') !== ''
+        ? $ctx['db_liveness_class']
+        : ($ctx['engine_alive'] ?? 'unknown'));
+    $lines[] = 'إثبات غياب العملية: ' . (string) ($ctx['process_absence_proven'] ?? 'no');
     $lines[] = 'حالة مجلد البيانات: ' . (string) ($ctx['datadir_state'] ?? 'ABSENT');
     $lines[] = 'استرداد آمن: ' . (string) ($ctx['recovery_safe'] ?? 'no');
     $lines[] = 'وضع الاسترداد: ' . (string) ($ctx['recovery_mode'] ?? 'none');

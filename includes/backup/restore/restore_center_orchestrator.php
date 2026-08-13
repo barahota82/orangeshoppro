@@ -1221,6 +1221,16 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED),
         ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN),
         ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN),
+        ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN),
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN),
+        ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE),
+        ORANGE_RESTORE_STEP7_PROCESS_EVIDENCE_CONTRADICTORY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PROCESS_EVIDENCE_CONTRADICTORY),
+        ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED),
+        ORANGE_RESTORE_STEP7_RUNTIME_INSTALL_IN_PROGRESS => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_RUNTIME_INSTALL_IN_PROGRESS),
+        ORANGE_RESTORE_STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY),
+        ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH),
+        ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY),
+        ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT),
         ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY),
         ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY),
         ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN),
@@ -1249,8 +1259,22 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
 
     if (str_starts_with($safeCode, 'STEP7_PRIVATE_ENGINE_')
         || str_starts_with($safeCode, 'STEP7_PRIVATE_')
+        || str_starts_with($safeCode, 'STEP7_PHP_')
+        || str_starts_with($safeCode, 'STEP7_PROCESS_')
+        || str_starts_with($safeCode, 'STEP7_STAGE_')
+        || str_starts_with($safeCode, 'STEP7_RUNTIME_')
+        || str_starts_with($safeCode, 'STEP7_CURRENT_')
+        || str_starts_with($safeCode, 'STEP7_SOURCE_')
+        || str_starts_with($safeCode, 'STEP7_GENUINE_')
+        || str_starts_with($safeCode, 'STEP7_TERMINAL_')
+        || str_starts_with($safeCode, 'STEP7_DATADIR_')
+        || str_starts_with($safeCode, 'STEP7_ENGINE_')
+        || str_starts_with($safeCode, 'STEP7_INIT_')
+        || str_starts_with($safeCode, 'STEP7_RETRY_')
         || $safeCode === ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED
-        || $safeCode === ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH) {
+        || $safeCode === ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH
+        || $safeCode === ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH
+        || $safeCode === ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT) {
         return orange_restore_private_engine_operator_reason_ar($safeCode);
     }
 
@@ -1291,8 +1315,85 @@ function orange_restore_center_step7_genuine_active_attempt(
 }
 
 /**
+ * Read-only stage mutex probe (acquire+release immediately; no job writes).
+ */
+function orange_restore_step7_stage_mutex_status_readonly(
+    string $workRoot,
+    string $jobId
+): string {
+    if (!function_exists('orange_restore_center_worker_mutex_path')) {
+        return 'absent_or_released';
+    }
+    $path = orange_restore_center_worker_mutex_path($workRoot, $jobId, 'shadow_db');
+    if (!is_file($path)) {
+        return 'absent_or_released';
+    }
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) {
+        return 'unresolved';
+    }
+    if (!@flock($handle, LOCK_EX | LOCK_NB)) {
+        fclose($handle);
+
+        return 'held';
+    }
+    @flock($handle, LOCK_UN);
+    fclose($handle);
+
+    return 'absent_or_released';
+}
+
+/**
+ * Read-only runtime-install mutex classification (separate from Step-7 attempt).
+ *
+ * @return array{status:string,separate_from_step7_attempt:bool,in_progress:bool}
+ */
+function orange_restore_step7_runtime_install_mutex_status_readonly(string $projectRoot): array
+{
+    $toolsRoot = '';
+    if (function_exists('orange_restore_private_engine_tools_root')) {
+        $toolsRoot = (string) orange_restore_private_engine_tools_root($projectRoot);
+    }
+    $lockFile = $toolsRoot !== ''
+        ? ($toolsRoot . DIRECTORY_SEPARATOR . '.locks' . DIRECTORY_SEPARATOR . 'runtime_install.lock')
+        : '';
+    if ($lockFile === '' || !is_file($lockFile)) {
+        return [
+            'status' => 'absent_or_released',
+            'separate_from_step7_attempt' => true,
+            'in_progress' => false,
+        ];
+    }
+    $handle = @fopen($lockFile, 'c+');
+    if ($handle === false) {
+        return [
+            'status' => 'unresolved_separate',
+            'separate_from_step7_attempt' => true,
+            'in_progress' => false,
+        ];
+    }
+    if (!@flock($handle, LOCK_EX | LOCK_NB)) {
+        fclose($handle);
+
+        return [
+            'status' => 'held_separate_from_step7_attempt',
+            'separate_from_step7_attempt' => true,
+            'in_progress' => true,
+        ];
+    }
+    @flock($handle, LOCK_UN);
+    fclose($handle);
+
+    return [
+        'status' => 'absent_or_released',
+        'separate_from_step7_attempt' => true,
+        'in_progress' => false,
+    ];
+}
+
+/**
  * Authoritative read-only Step-7 retry preflight (zero filesystem/job writes).
- * Used by diagnostic readiness, button authority, and request mutation gate.
+ * Used by diagnostic readiness, private-engine trace, button authority, and request mutation gate.
  *
  * @return array<string, mixed>
  */
@@ -1309,7 +1410,24 @@ function orange_restore_step7_retry_preflight(
     }
     $job = orange_restore_fw_read($workRoot, $jobId) ?: [];
     $pub = orange_restore_fw_public_row($job);
-    $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
+    // Read-only active check — do NOT call reconcile/clear (write-nothing contract).
+    $active = ['active' => false, 'class' => '', 'attempt_id' => '', 'claim' => null];
+    if (function_exists('orange_restore_center_worker_run_claim_path')
+        && function_exists('orange_restore_center_read_run_claim')
+        && function_exists('orange_restore_center_claim_blocks_schedule')) {
+        $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
+        $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
+        if (is_array($claim) && orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')) {
+            $active = [
+                'active' => true,
+                'class' => defined('ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS')
+                    ? ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS
+                    : 'CLAIM_BLOCKS',
+                'attempt_id' => trim((string) ($claim['attempt_id'] ?? '')),
+                'claim' => $claim,
+            ];
+        }
+    }
     $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
     $env = orange_backup_load_env_array($projectRoot);
     $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
@@ -1336,7 +1454,10 @@ function orange_restore_step7_retry_preflight(
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
     ], true);
     $terminalFailed = $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED;
+    $terminalReady = $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY;
+    $latestTerminal = $terminalFailed || $terminalReady || !empty($attemptCtx['latest_attempt_terminal']);
     $requestable = !empty($pub['shadow_restore_requestable']);
+    $step8Locked = empty($pub['is_shadow_restore_ready']) && !$terminalReady;
     $token = (string) ($engine['ready_token'] ?? '');
     $datadirState = (string) ($engine['datadir_state'] ?? 'ABSENT');
     $recoveryRequired = !empty($engine['datadir_recovery_required']);
@@ -1347,33 +1468,81 @@ function orange_restore_step7_retry_preflight(
     $initCap = array_key_exists('init_error_capture_ready', $engine)
         ? !empty($engine['init_error_capture_ready'])
         : true;
+    $initResultCap = $initCap && function_exists('orange_restore_private_engine_init_ledger_write');
     $runtimePersistable = (string) ($engine['runtime_source'] ?? '') !== 'unavailable'
         && (string) ($engine['runtime_source'] ?? '') !== '';
+    $runtimeVerified = !empty($engine['binary_available']) || !empty($engine['materializable']);
+    $runtimeCompatible = !empty($engine['runtime_compatible']);
+    $sourceReady = trim((string) ($job['source_package_id'] ?? $job['package_id'] ?? '')) !== '';
+    $phpClass = (string) ($attemptCtx['php_worker_liveness_class'] ?? ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY);
+    $dbClass = (string) ($attemptCtx['private_db_liveness_class'] ?? ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY);
+    $phpLive = (string) ($attemptCtx['php_worker_liveness'] ?? 'unknown');
+    $dbLive = (string) ($attemptCtx['private_db_liveness'] ?? 'unknown');
+    $processAbsenceProven = !empty($attemptCtx['process_absence_proven']);
+    $absenceConclusion = (string) ($attemptCtx['process_absence_conclusion']
+        ?? ($processAbsenceProven
+            ? ORANGE_RESTORE_STEP7_ABSENCE_PROVEN
+            : ORANGE_RESTORE_STEP7_ABSENCE_NOT_PROVABLE));
+    $stageMutex = orange_restore_step7_stage_mutex_status_readonly($workRoot, $jobId);
+    $installMutex = orange_restore_step7_runtime_install_mutex_status_readonly($projectRoot);
+    $parentTargetMatch = $match && ($resolved['ok'] ?? false);
+    $parentRuntimeMatch = $match && $runtimeVerified;
+    $claimStatus = !empty($active['active']) ? 'active' : 'ABSENT_TERMINAL_OR_RELEASED';
+
     $code = 'ok';
     $green = false;
-    if (!empty($active['active'])) {
-        $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
+    if (!empty($active['active']) || $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+        $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+        || $datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
+        $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+    } elseif ($stageMutex === 'held' || $stageMutex === 'unresolved') {
+        $code = ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED;
+    } elseif (!empty($installMutex['in_progress'])) {
+        $code = ORANGE_RESTORE_STEP7_RUNTIME_INSTALL_IN_PROGRESS;
+    } elseif ($phpClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE) {
+        $code = ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE;
+    } elseif ($phpClass === ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY) {
+        $code = ORANGE_RESTORE_STEP7_PROCESS_EVIDENCE_CONTRADICTORY;
+    } elseif ($phpLive === 'unknown'
+        || $phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+        $code = ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN;
+    } elseif ($dbLive === 'unknown'
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+        $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN;
+    } elseif (!$processAbsenceProven && in_array($datadirState, [
+        'PARTIAL_OWNED_TERMINAL_ATTEMPT',
+        'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
+        'PARTIAL_OWNED_CURRENT_ATTEMPT',
+    ], true)) {
+        $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
     } elseif (!($resolved['ok'] ?? false)) {
         $code = ORANGE_RESTORE_STEP7_SHADOW_DB_TARGET_UNAVAILABLE;
-    } elseif (!$match && $boundHash !== '') {
+    } elseif (!$parentTargetMatch && $boundHash !== '') {
         $code = ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH;
-    } elseif (!$engineStateCap) {
-        $code = ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY;
-    } elseif (!$initCap) {
-        $code = ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY;
-    } elseif ($datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
-        $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
+    } elseif (!$parentRuntimeMatch) {
+        $code = ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH;
+    } elseif (!$sourceReady) {
+        $code = ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY;
+    } elseif (!$engineStateCap || !$initCap || !$initResultCap) {
+        $code = ORANGE_RESTORE_STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY;
     } elseif ($datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT' && !$recoverySafe) {
         $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
     } elseif (in_array($datadirState, ['UNOWNED', 'MALFORMED_OR_UNKNOWN', 'UNKNOWN'], true)) {
         $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
-    } elseif (($attemptCtx['php_worker_liveness'] ?? '') === 'unknown'
-        || ($attemptCtx['private_db_liveness'] ?? '') === 'unknown') {
-        $code = ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN;
-    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT && $requestable && !$inflight) {
+    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_CONTROLLED_ATTEMPT
+        && $requestable && !$inflight && $processAbsenceProven && empty($active['active'])) {
         $green = true;
         $code = 'ok';
-    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING && $requestable && !$inflight) {
+    } elseif ($token === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING
+        && $requestable && !$inflight && $processAbsenceProven && empty($active['active'])
+        && $latestTerminal && $step8Locked && $parentTargetMatch && $parentRuntimeMatch
+        && $runtimeVerified && $runtimeCompatible && $runtimePersistable
+        && $sourceReady && $engineStateCap && $initCap
+        && in_array($datadirState, ['ABSENT', 'EMPTY_OWNED', 'PARTIAL_OWNED_TERMINAL_ATTEMPT'], true)
+        && (!str_contains($datadirState, 'PARTIAL') || ($recoveryRequired && $recoverySafe))) {
         $green = true;
         $code = 'ok';
     } elseif ((string) ($engine['code'] ?? '') !== '' && (string) ($engine['code'] ?? '') !== 'ok') {
@@ -1386,36 +1555,60 @@ function orange_restore_step7_retry_preflight(
     if (!$green) {
         $token = '';
     }
+    $exactReason = $green ? '' : $code;
+    $finalReadiness = $green
+        ? ($token !== '' ? $token : 'READY')
+        : 'NOT_READY';
 
     return [
         'ok' => $green,
         'code' => $code,
         'ready_token' => $token,
+        'final_readiness' => $finalReadiness,
+        'exact_not_ready_reason' => $exactReason,
         'read_only' => true,
         'job_write_count' => 0,
         'filesystem_mutation_count' => 0,
+        'process_mutation_count' => 0,
         'state_requestable' => $requestable,
+        'latest_attempt_state' => $status,
+        'latest_attempt_terminal' => $latestTerminal,
         'active_attempt' => !empty($active['active']),
-        'latest_attempt_terminal' => $terminalFailed || !empty($attemptCtx['latest_attempt_terminal']),
-        'claim_status' => !empty($active['active']) ? 'active' : 'ABSENT_TERMINAL_OR_RELEASED',
-        'stage_mutex_status' => 'absent_or_released',
-        'runtime_install_mutex_status' => 'separate_from_step7_attempt',
-        'php_worker_liveness' => (string) ($attemptCtx['php_worker_liveness'] ?? 'unknown'),
-        'private_db_liveness' => (string) ($attemptCtx['private_db_liveness'] ?? 'unknown'),
+        'claim_state' => $claimStatus,
+        'claim_status' => $claimStatus,
+        'stage_mutex_state' => $stageMutex,
+        'stage_mutex_status' => $stageMutex,
+        'runtime_install_mutex_state' => (string) ($installMutex['status'] ?? 'absent_or_released'),
+        'runtime_install_mutex_status' => (string) ($installMutex['status'] ?? 'absent_or_released'),
+        'runtime_install_mutex_separate_from_step7_attempt' => !empty($installMutex['separate_from_step7_attempt']),
+        'PHP_worker_liveness' => $phpLive,
+        'php_worker_liveness' => $phpLive,
+        'php_worker_liveness_class' => $phpClass,
+        'private_DB_process_liveness' => $dbLive,
+        'private_db_liveness' => $dbLive,
+        'private_db_liveness_class' => $dbClass,
+        'process_absence_proven' => $processAbsenceProven,
+        'process_absence_conclusion' => $absenceConclusion,
         'current_runtime_source' => (string) ($engine['runtime_source'] ?? 'unavailable'),
-        'current_runtime_verified' => !empty($engine['binary_available']) || !empty($engine['materializable']),
-        'current_runtime_compatible' => !empty($engine['runtime_compatible']),
+        'current_runtime_verified' => $runtimeVerified,
+        'current_runtime_compatible' => $runtimeCompatible,
         'current_runtime_identity_persistable' => $runtimePersistable,
         'datadir_category' => $datadirState,
         'datadir_ownership_proven' => !empty($engine['ownership_proven']),
+        'recovery_required' => $recoveryRequired,
         'partial_recovery_required' => $recoveryRequired,
+        'recovery_safe' => $recoverySafe,
         'partial_recovery_safe' => $recoverySafe,
         'recovery_mode' => $recoverySafe ? 'AUTOMATIC_ON_NEXT_EXPLICIT_ATTEMPT' : 'none',
         'engine_state_capture_capability' => $engineStateCap ? 'ready' : 'not_ready',
+        'initialization_result_capture_capability' => $initResultCap ? 'ready' : 'not_ready',
+        'initialization_error_capture_capability' => $initCap ? 'ready' : 'not_ready',
         'initialization_result_error_capture_capability' => $initCap ? 'ready' : 'not_ready',
-        'source_package_ready' => trim((string) ($job['source_package_id'] ?? $job['package_id'] ?? '')) !== '',
-        'parent_worker_target_match' => $match && ($resolved['ok'] ?? false),
-        'parent_worker_runtime_match' => $match && (!empty($engine['binary_available']) || !empty($engine['materializable'])),
+        'source_package_ready' => $sourceReady,
+        'Step_8_locked' => $step8Locked,
+        'step8_locked' => $step8Locked,
+        'parent_worker_target_match' => $parentTargetMatch,
+        'parent_worker_runtime_match' => $parentRuntimeMatch,
         'step7_action_enabled' => $green && $requestable && !$inflight && empty($active['active']),
         'engine' => $engine,
         'active_attempt_detail' => $active,
@@ -2384,11 +2577,30 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                 'process_execution_available' => $procOk,
                 'db_host_category' => (string) ($enginePub['db_host_category'] ?? 'UNKNOWN'),
                 'datadir_category' => (string) ($retryPre['datadir_category'] ?? ''),
+                'datadir_ownership_proven' => !empty($retryPre['datadir_ownership_proven']),
                 'partial_recovery_required' => !empty($retryPre['partial_recovery_required']),
                 'partial_recovery_safe' => !empty($retryPre['partial_recovery_safe']),
+                'recovery_required' => !empty($retryPre['recovery_required']),
+                'recovery_safe' => !empty($retryPre['recovery_safe']),
                 'recovery_mode' => (string) ($retryPre['recovery_mode'] ?? 'none'),
                 'engine_state_capture_capability' => (string) ($retryPre['engine_state_capture_capability'] ?? 'not_ready'),
+                'initialization_result_capture_capability' => (string) ($retryPre['initialization_result_capture_capability'] ?? 'not_ready'),
+                'initialization_error_capture_capability' => (string) ($retryPre['initialization_error_capture_capability'] ?? 'not_ready'),
                 'initialization_result_error_capture_capability' => (string) ($retryPre['initialization_result_error_capture_capability'] ?? 'not_ready'),
+                'exact_not_ready_reason' => (string) ($retryPre['exact_not_ready_reason'] ?? ''),
+                'final_readiness' => (string) ($retryPre['final_readiness'] ?? 'NOT_READY'),
+                'php_worker_liveness' => (string) ($retryPre['php_worker_liveness'] ?? 'unknown'),
+                'php_worker_liveness_class' => (string) ($retryPre['php_worker_liveness_class'] ?? ''),
+                'private_db_liveness' => (string) ($retryPre['private_db_liveness'] ?? 'unknown'),
+                'private_db_liveness_class' => (string) ($retryPre['private_db_liveness_class'] ?? ''),
+                'process_absence_proven' => !empty($retryPre['process_absence_proven']),
+                'process_absence_conclusion' => (string) ($retryPre['process_absence_conclusion'] ?? ''),
+                'claim_status' => (string) ($retryPre['claim_status'] ?? ''),
+                'stage_mutex_status' => (string) ($retryPre['stage_mutex_status'] ?? ''),
+                'runtime_install_mutex_status' => (string) ($retryPre['runtime_install_mutex_status'] ?? ''),
+                'source_package_ready' => !empty($retryPre['source_package_ready']),
+                'step8_locked' => !empty($retryPre['step8_locked']),
+                'latest_attempt_terminal' => !empty($retryPre['latest_attempt_terminal']),
                 'retry_preflight' => $retryPre,
                 'read_only' => true,
             ];

@@ -789,8 +789,8 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
     $projectRoot = function_exists('orange_backup_project_root')
         ? orange_backup_project_root()
         : dirname(__DIR__, 2);
-    if (!function_exists('orange_restore_private_engine_public_readiness')) {
-        require_once __DIR__ . '/restore/restore_private_shadow_engine.php';
+    if (!function_exists('orange_restore_step7_retry_preflight')) {
+        require_once __DIR__ . '/restore/restore_center_orchestrator.php';
     }
     $rows = [];
     foreach (orange_restore_fw_list_jobs($workRoot) as $row) {
@@ -801,26 +801,30 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
         if ($type === 'country_recovery' && !$mayCountry) {
             continue;
         }
-        // Step7-only action gate: state-requestable ≠ runtime ready.
-        if (!empty($row['shadow_restore_requestable'])) {
+        // Step7 button authority = same authoritative retry preflight as diagnostic/request.
+        if (!empty($row['shadow_restore_requestable']) || !empty($row['is_shadow_restore_failed'])) {
             $jobId = (string) ($row['job_id'] ?? '');
             try {
-                $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
-                $token = (string) ($engine['ready_token'] ?? '');
+                $pre = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId);
+                $token = (string) ($pre['ready_token'] ?? '');
+                $engine = is_array($pre['engine'] ?? null) ? $pre['engine'] : [];
                 $row['step7_ready_token'] = $token;
                 $row['ready_for_private_shadow_provisioning'] = $token
                     === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
                 $row['ready_for_controlled_step7_attempt'] = $token
                     === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT';
-                $row['step7_action_enabled'] = $row['ready_for_private_shadow_provisioning']
-                    || $row['ready_for_controlled_step7_attempt'];
+                $row['step7_action_enabled'] = !empty($pre['step7_action_enabled']);
+                $row['exact_not_ready_reason'] = (string) ($pre['exact_not_ready_reason'] ?? '');
+                $row['final_readiness'] = (string) ($pre['final_readiness'] ?? 'NOT_READY');
                 $row['private_capability'] = (string) ($engine['private_capability'] ?? 'unavailable');
-                $row['step7_readiness_code'] = (string) ($engine['code'] ?? '');
+                $row['step7_readiness_code'] = (string) ($pre['code'] ?? '');
             } catch (Throwable) {
                 $row['step7_ready_token'] = '';
                 $row['ready_for_private_shadow_provisioning'] = false;
                 $row['ready_for_controlled_step7_attempt'] = false;
                 $row['step7_action_enabled'] = false;
+                $row['exact_not_ready_reason'] = 'STEP7_RETRY_PREFLIGHT_UNKNOWN';
+                $row['final_readiness'] = 'NOT_READY';
                 $row['private_capability'] = 'unavailable';
                 $row['step7_readiness_code'] = 'STEP7_PRIVATE_READINESS_UNKNOWN';
             }

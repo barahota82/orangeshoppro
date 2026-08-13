@@ -72,10 +72,36 @@ const ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE = 'STEP7_TERMINAL_
 const ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED = 'STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED';
 const ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN = 'STEP7_DATADIR_OWNERSHIP_UNKNOWN';
 const ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN = 'STEP7_PRIVATE_PROCESS_STATE_UNKNOWN';
+const ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN = 'STEP7_PHP_WORKER_LIVENESS_UNKNOWN';
+const ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN = 'STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN';
+const ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE = 'STEP7_PROCESS_INSPECTION_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PROCESS_EVIDENCE_CONTRADICTORY = 'STEP7_PROCESS_EVIDENCE_CONTRADICTORY';
+const ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED = 'STEP7_STAGE_MUTEX_UNRESOLVED';
+const ORANGE_RESTORE_STEP7_RUNTIME_INSTALL_IN_PROGRESS = 'STEP7_RUNTIME_INSTALL_IN_PROGRESS';
+const ORANGE_RESTORE_STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY = 'STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY';
+const ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH = 'STEP7_PARENT_WORKER_RUNTIME_MISMATCH';
+const ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY = 'STEP7_SOURCE_PACKAGE_NOT_READY';
 const ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY = 'STEP7_ENGINE_STATE_CAPTURE_NOT_READY';
 const ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY = 'STEP7_INIT_ERROR_CAPTURE_NOT_READY';
 const ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN = 'STEP7_RETRY_PREFLIGHT_UNKNOWN';
 const ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT = 'STEP7_ACTIVE_ATTEMPT';
+const ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT = 'STEP7_GENUINE_ACTIVE_ATTEMPT';
+
+/** Process liveness classifications (never coerce METADATA_ABSENT → dead). */
+const ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE = 'MATCHED_ACTIVE';
+const ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD = 'MATCHED_TERMINAL_OR_DEAD';
+const ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY = 'METADATA_ABSENT_LEGACY';
+const ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND = 'NO_JOB_SCOPED_PROCESS_FOUND';
+const ORANGE_RESTORE_STEP7_PROC_PID_IDENTITY_MISMATCH = 'PID_PRESENT_IDENTITY_MISMATCH';
+const ORANGE_RESTORE_STEP7_PROC_PID_REUSED = 'PID_REUSED_DIFFERENT_START_IDENTITY';
+const ORANGE_RESTORE_STEP7_PROC_EXISTS_OTHER_JOB = 'PROCESS_EXISTS_OTHER_JOB';
+const ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE = 'PROCESS_INSPECTION_UNAVAILABLE';
+const ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY = 'PROCESS_EVIDENCE_CONTRADICTORY';
+
+/** Legacy process-absence conclusions (only A may green recovery). */
+const ORANGE_RESTORE_STEP7_ABSENCE_PROVEN = 'NO_MATCHING_TASK_OWNED_PROCESS_PROVEN';
+const ORANGE_RESTORE_STEP7_ABSENCE_ACTIVE = 'MATCHING_TASK_OWNED_PROCESS_ACTIVE';
+const ORANGE_RESTORE_STEP7_ABSENCE_NOT_PROVABLE = 'PROCESS_ABSENCE_NOT_PROVABLE';
 
 // Supply-chain helpers (after constants — avoid circular redefinition).
 require_once __DIR__ . '/restore_private_engine_runtime_manifest.php';
@@ -123,10 +149,20 @@ function orange_restore_private_engine_operator_reason_ar(string $safeCode): str
         ORANGE_RESTORE_STEP7_PRIVATE_TERMINAL_PARTIAL_RECOVERY_FAILED => 'تعذر حجر مجلد البيانات الجزئي الطرفي بأمان. لم تبدأ التهيئة ولا الاستيراد.',
         ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN => 'ملكية مجلد بيانات محرك الظل غير مؤكدة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN => 'حالة عملية محرك الظل أو عامل PHP غير مؤكدة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN => 'حيوية عامل PHP غير مؤكدة بأمان. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN => 'حيوية محرك قاعدة الظل الخاص غير مؤكدة بأمان. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE => 'فحص العمليات للقراءة فقط غير متاح على الخادم. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PROCESS_EVIDENCE_CONTRADICTORY => 'أدلة حيوية العمليات متناقضة. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_STAGE_MUTEX_UNRESOLVED => 'قفل مرحلة Step 7 غير محلول. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_RUNTIME_INSTALL_IN_PROGRESS => 'تثبيت/توريد محرك الظل قيد التقدم (منفصل عن محاولة Step 7). لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_CURRENT_CAPTURE_CAPABILITY_NOT_READY => 'قدرات التقاط حالة/أخطاء التهيئة غير جاهزة في النشر الحالي. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_PARENT_WORKER_RUNTIME_MISMATCH => 'عدم تطابق هوية المحرك بين الأب والعامل. لم يبدأ التنفيذ.',
+        ORANGE_RESTORE_STEP7_SOURCE_PACKAGE_NOT_READY => 'حزمة المصدر غير جاهزة لهذه المهمة. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_ENGINE_STATE_CAPTURE_NOT_READY => 'قدرة تسجيل حالة المحرك غير جاهزة في النشر الحالي. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_INIT_ERROR_CAPTURE_NOT_READY => 'قدرة التقاط نتيجة/سجل التهيئة غير جاهزة في النشر الحالي. لم يبدأ التنفيذ.',
         ORANGE_RESTORE_STEP7_RETRY_PREFLIGHT_UNKNOWN => 'فشل التحقق المسبق لإعادة محاولة Step 7. حدّث الحالة.',
         ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT => 'توجد محاولة Step 7 نشطة. لا تُقبل محاولة جديدة.',
+        ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT => 'توجد محاولة Step 7 نشطة مثبتة. لا تُقبل محاولة جديدة.',
         ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING => 'الجاهزية: يمكن تجهيز محرك قاعدة الظل الخاص عند الضغط على خطوة استعادة قاعدة الظل.',
     ];
 
@@ -644,7 +680,111 @@ function orange_restore_private_engine_init_ledger_write(string $workRoot, strin
  * @return array{state:string,owned:bool,writable:bool,has_mysql_system:bool,entry_count:int}
  */
 /**
- * Read-only attempt/control liveness context for datadir classification (no writes).
+ * Whether read-only OS process inspection is available (no mutation).
+ */
+function orange_restore_step7_process_inspection_available(): bool
+{
+    if (isset($GLOBALS['orange_restore_step7_process_inspection_override'])) {
+        return (bool) $GLOBALS['orange_restore_step7_process_inspection_override'];
+    }
+    if (!function_exists('exec') && !function_exists('proc_open')) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Narrow job-scoped process probe. Returns match counts only — never paths/PIDs/commands.
+ *
+ * @return array{inspection_available:bool,php_job_match:bool,db_job_match:bool}
+ */
+function orange_restore_step7_job_scoped_process_probe(string $workRoot, string $jobId): array
+{
+    if (isset($GLOBALS['orange_restore_step7_job_scoped_process_probe_override'])
+        && is_array($GLOBALS['orange_restore_step7_job_scoped_process_probe_override'])) {
+        return $GLOBALS['orange_restore_step7_job_scoped_process_probe_override'];
+    }
+    $empty = ['inspection_available' => false, 'php_job_match' => false, 'db_job_match' => false];
+    if ($jobId === '' || !orange_restore_step7_process_inspection_available()) {
+        return $empty;
+    }
+    $jobNeedle = strtolower($jobId);
+    $dirNeedle = strtolower(ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME);
+    $phpMatch = false;
+    $dbMatch = false;
+    $available = false;
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        // Emit only MATCH_PHP / MATCH_DB / NONE — never echo CommandLine.
+        $ps = '$needJob=\'' . str_replace('\'', '\'\'', $jobNeedle) . '\';'
+            . '$needDir=\'' . str_replace('\'', '\'\'', $dirNeedle) . '\';'
+            . '$c=@(); try { $c=@(Get-CimInstance Win32_Process -ErrorAction Stop '
+            . '| Where-Object { $_.Name -match \'^(php|mysqld|mariadbd)(\.exe)?$\' }) } catch { Write-Output \'INSPECT_FAIL\'; exit 2 }' . "\n"
+            . 'foreach($p in $c){ $cl=([string]$p.CommandLine).ToLowerInvariant(); '
+            . 'if($cl -notlike ("*"+$needJob+"*")){ continue } '
+            . 'if($cl -notlike ("*"+$needDir+"*") -and $cl -notlike \'*restore*shadow*\'){ continue } '
+            . 'if($p.Name -match \'^php\'){ Write-Output \'MATCH_PHP\' } '
+            . 'elseif($p.Name -match \'mysqld|mariadbd\'){ Write-Output \'MATCH_DB\' } }' . "\n"
+            . 'Write-Output \'DONE\'; exit 0';
+        $psFile = rtrim(sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR
+            . 'orange_s7_proc_' . bin2hex(random_bytes(4)) . '.ps1';
+        if (@file_put_contents($psFile, $ps) === false) {
+            return $empty;
+        }
+        $out = [];
+        $code = 1;
+        try {
+            @exec('powershell -NoProfile -ExecutionPolicy Bypass -File ' . escapeshellarg($psFile), $out, $code);
+        } finally {
+            @unlink($psFile);
+        }
+        if ($code === 2 || in_array('INSPECT_FAIL', $out, true)) {
+            return $empty;
+        }
+        $available = $code === 0 || in_array('DONE', $out, true);
+        foreach ($out as $line) {
+            $t = trim((string) $line);
+            if ($t === 'MATCH_PHP') {
+                $phpMatch = true;
+            } elseif ($t === 'MATCH_DB') {
+                $dbMatch = true;
+            }
+        }
+    } else {
+        $available = is_dir('/proc');
+        if ($available) {
+            foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $cmdFile) {
+                $raw = @file_get_contents($cmdFile);
+                if (!is_string($raw) || $raw === '') {
+                    continue;
+                }
+                $cl = strtolower(str_replace("\0", ' ', $raw));
+                if (!str_contains($cl, $jobNeedle)) {
+                    continue;
+                }
+                if (!str_contains($cl, $dirNeedle) && !str_contains($cl, 'restore') && !str_contains($cl, 'shadow')) {
+                    continue;
+                }
+                if (str_contains($cl, 'php')) {
+                    $phpMatch = true;
+                }
+                if (str_contains($cl, 'mysqld') || str_contains($cl, 'mariadbd')) {
+                    $dbMatch = true;
+                }
+            }
+        }
+    }
+
+    return [
+        'inspection_available' => $available,
+        'php_job_match' => $phpMatch,
+        'db_job_match' => $dbMatch,
+    ];
+}
+
+/**
+ * Read-only attempt/control liveness context (no writes). Never maps METADATA_ABSENT → dead.
  *
  * @return array<string, mixed>
  */
@@ -671,39 +811,97 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
         ? ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY
         : 'shadow_restore_ready');
 
-    $phpAlive = 'dead';
     $claimBlocks = false;
+    $phpClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
+    $claimPresent = false;
     if (function_exists('orange_restore_center_worker_run_claim_path')
-        && function_exists('orange_restore_center_read_run_claim')
-        && function_exists('orange_restore_center_process_alive')) {
+        && function_exists('orange_restore_center_read_run_claim')) {
         $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
         $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
         if (is_array($claim)) {
+            $claimPresent = true;
             $pid = (int) ($claim['pid'] ?? 0);
             $state = (string) ($claim['state'] ?? '');
-            if ($state !== 'released' && $pid > 0) {
-                $phpAlive = orange_restore_center_process_alive($pid) ? 'alive' : 'dead';
+            if ($state === 'released' || $pid <= 0) {
+                $phpClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
+            } elseif (!function_exists('orange_restore_center_process_alive')) {
+                $phpClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+            } elseif (orange_restore_center_process_alive($pid)) {
+                $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
                 $claimBlocks = function_exists('orange_restore_center_claim_blocks_schedule')
                     ? orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')
-                    : ($phpAlive === 'alive');
+                    : true;
+            } else {
+                $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
             }
         }
-    } elseif (function_exists('orange_restore_center_step7_genuine_active_attempt')) {
-        $active = orange_restore_center_step7_genuine_active_attempt($workRoot, $jobId, $job);
-        $claimBlocks = !empty($active['active']);
-        $phpAlive = $claimBlocks ? 'alive' : 'dead';
     }
 
-    $dbAlive = 'dead';
+    $dbClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
     $state = orange_restore_private_engine_load_state($workRoot, $jobId);
     $enginePid = is_array($state) ? (int) ($state['engine_pid'] ?? 0) : 0;
-    if ($enginePid > 0 && function_exists('orange_restore_center_process_alive')) {
-        $dbAlive = orange_restore_center_process_alive($enginePid) ? 'alive' : 'dead';
-    } elseif (orange_restore_private_engine_runtime_healthy($workRoot, $jobId)) {
-        $dbAlive = 'alive';
+    if ($enginePid > 0) {
+        if (!function_exists('orange_restore_center_process_alive')) {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+        } elseif (orange_restore_center_process_alive($enginePid)) {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+        } else {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+        }
+    } elseif (is_array($state) && !empty($state['ready']) && orange_restore_private_engine_runtime_healthy($workRoot, $jobId)) {
+        $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
     }
 
-    $activeAttempt = $claimBlocks || ($inflight && $phpAlive === 'alive');
+    $probe = ['inspection_available' => false, 'php_job_match' => false, 'db_job_match' => false];
+    $needLegacyProbe = ($phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY);
+    if ($needLegacyProbe) {
+        $probe = orange_restore_step7_job_scoped_process_probe($workRoot, $jobId);
+        if (!$probe['inspection_available']) {
+            if ($phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+                $phpClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+            }
+            if ($dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+            }
+        } else {
+            if ($phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+                $phpClass = !empty($probe['php_job_match'])
+                    ? ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+                    : ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND;
+            }
+            if ($dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+                $dbClass = !empty($probe['db_job_match'])
+                    ? ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+                    : ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND;
+            }
+        }
+    }
+
+    $nonActiveProven = [
+        ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND,
+        ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD,
+        ORANGE_RESTORE_STEP7_PROC_PID_IDENTITY_MISMATCH,
+        ORANGE_RESTORE_STEP7_PROC_PID_REUSED,
+        ORANGE_RESTORE_STEP7_PROC_EXISTS_OTHER_JOB,
+    ];
+    $phpActive = $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    $dbActive = $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    $activeAttempt = $claimBlocks || ($inflight && $phpActive);
+
+    $processAbsenceProven = !$phpActive && !$dbActive && !$activeAttempt
+        && in_array($phpClass, $nonActiveProven, true)
+        && in_array($dbClass, $nonActiveProven, true)
+        && ($terminalFailed || $terminalReady || !$claimPresent);
+
+    if ($phpActive || $dbActive || $activeAttempt) {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_ACTIVE;
+    } elseif ($processAbsenceProven) {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_PROVEN;
+    } else {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_NOT_PROVABLE;
+    }
+
     $step8Depends = false;
     if (function_exists('orange_restore_fw_public_row')) {
         $pub = orange_restore_fw_public_row($job);
@@ -714,13 +912,28 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
             && !$inflight;
     }
 
+    // Compatibility aliases for older callers: never invent "dead" for legacy absence.
+    $phpCompat = $phpActive ? 'alive'
+        : (in_array($phpClass, $nonActiveProven, true) ? 'inactive' : 'unknown');
+    $dbCompat = $dbActive ? 'alive'
+        : (in_array($dbClass, $nonActiveProven, true) ? 'inactive' : 'unknown');
+
     return [
         'active_attempt' => $activeAttempt,
         'latest_attempt_terminal' => $terminalFailed || $terminalReady,
-        'php_worker_liveness' => $phpAlive,
-        'private_db_liveness' => $dbAlive,
+        'php_worker_liveness' => $phpCompat,
+        'private_db_liveness' => $dbCompat,
+        'php_worker_liveness_class' => $phpClass,
+        'private_db_liveness_class' => $dbClass,
+        'process_absence_proven' => $processAbsenceProven,
+        'process_absence_conclusion' => $absenceConclusion,
+        'process_inspection_available' => !empty($probe['inspection_available'])
+            || ($phpClass !== ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+                && $dbClass !== ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE),
         'step8_depends_on_datadir' => $step8Depends,
         'job_status' => $status,
+        'claim_present' => $claimPresent,
+        'claim_blocks' => $claimBlocks,
     ];
 }
 
@@ -777,9 +990,30 @@ function orange_restore_private_engine_classify_datadir(
     $terminalAttempt = !empty($ctx['latest_attempt_terminal']);
     $phpLive = (string) ($ctx['php_worker_liveness'] ?? 'unknown');
     $dbLive = (string) ($ctx['private_db_liveness'] ?? 'unknown');
+    $phpClass = (string) ($ctx['php_worker_liveness_class'] ?? '');
+    $dbClass = (string) ($ctx['private_db_liveness_class'] ?? '');
     $step8Depends = !empty($ctx['step8_depends_on_datadir']);
-    $procUnknown = $phpLive === 'unknown' || $dbLive === 'unknown';
-    $anyAlive = $phpLive === 'alive' || $dbLive === 'alive';
+    $unknownClasses = [
+        ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY,
+        ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE,
+        ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY,
+        '',
+    ];
+    $procUnknown = $phpLive === 'unknown' || $dbLive === 'unknown'
+        || in_array($phpClass, $unknownClasses, true)
+        || in_array($dbClass, $unknownClasses, true);
+    // Fixture compat: explicit dead/inactive without class keys is treated as known-inactive.
+    if ($ctx !== [] && $phpClass === '' && $dbClass === ''
+        && in_array($phpLive, ['dead', 'inactive'], true)
+        && in_array($dbLive, ['dead', 'inactive'], true)) {
+        $procUnknown = false;
+    }
+    $anyAlive = $phpLive === 'alive' || $dbLive === 'alive'
+        || $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    $absenceOk = array_key_exists('process_absence_proven', $ctx)
+        ? !empty($ctx['process_absence_proven'])
+        : (!$procUnknown && !$anyAlive && !$activeAttempt);
 
     if ($names === []) {
         return array_merge($base, [
@@ -828,6 +1062,7 @@ function orange_restore_private_engine_classify_datadir(
             && !$activeAttempt
             && !$anyAlive
             && !$procUnknown
+            && $absenceOk
             && !$step8Depends
             && ($terminalAttempt || $ctx === []);
 
@@ -840,6 +1075,7 @@ function orange_restore_private_engine_classify_datadir(
             'ownership_proven' => $ownershipProven,
             'recovery_required' => $recoveryRequired,
             'recovery_safe' => $recoverySafe,
+            'process_absence_proven' => $absenceOk && !$anyAlive && !$activeAttempt,
         ]);
     }
     $ready = is_array($state) && !empty($state['ready']);
@@ -862,7 +1098,9 @@ function orange_restore_private_engine_classify_datadir(
         'entry_count' => count($names),
         'ownership_proven' => $ownershipProven,
         'recovery_required' => !$ready,
-        'recovery_safe' => !$ready && $ownershipProven && $writable && !$activeAttempt && !$anyAlive && !$procUnknown && !$step8Depends,
+        'recovery_safe' => !$ready && $ownershipProven && $writable && !$activeAttempt
+            && !$anyAlive && !$procUnknown && $absenceOk && !$step8Depends,
+        'process_absence_proven' => $absenceOk && !$anyAlive && !$activeAttempt,
     ]);
 }
 
@@ -1801,11 +2039,15 @@ function orange_restore_private_engine_preflight(
         'PARTIAL_OWNED_OLDER_TERMINAL_ATTEMPT',
     ], true);
     $recoverySafe = !empty($datadirClass['recovery_safe']);
+    $processAbsenceOk = !empty($attemptCtx['process_absence_proven'])
+        || (!array_key_exists('process_absence_proven', $attemptCtx) && $recoverySafe);
     $quarantineReady = $datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT'
         && $recoverySafe
+        && $processAbsenceOk
         && !orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
     $hardBlock = in_array($datadirState, ['UNOWNED', 'UNKNOWN', 'MALFORMED_OR_UNKNOWN', 'PARTIAL_OWNED_ACTIVE_ATTEMPT'], true)
         || !$sourceOkForGreen
+        || !$processAbsenceOk
         || ($ownedPartial && $datadirState === 'PARTIAL_OWNED_TERMINAL_ATTEMPT' && !$quarantineReady)
         || ($unresolvedInit && $ownedPartial && !$quarantineReady)
         || ($unresolvedInit && !$ownedPartial && !in_array($datadirState, ['ABSENT', 'EMPTY_OWNED'], true));
@@ -1825,7 +2067,25 @@ function orange_restore_private_engine_preflight(
         if ($datadirState === 'UNOWNED' || $datadirState === 'UNKNOWN' || $datadirState === 'MALFORMED_OR_UNKNOWN') {
             $code = ORANGE_RESTORE_STEP7_DATADIR_OWNERSHIP_UNKNOWN;
         } elseif ($datadirState === 'PARTIAL_OWNED_ACTIVE_ATTEMPT') {
-            $code = ORANGE_RESTORE_STEP7_ACTIVE_ATTEMPT;
+            $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+        } elseif (!$processAbsenceOk) {
+            $phpCls = (string) ($attemptCtx['php_worker_liveness_class'] ?? '');
+            $dbCls = (string) ($attemptCtx['private_db_liveness_class'] ?? '');
+            if ($phpCls === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+                || $dbCls === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE) {
+                $code = ORANGE_RESTORE_STEP7_PROCESS_INSPECTION_UNAVAILABLE;
+            } elseif ($phpCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+                || $dbCls === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+                $code = ORANGE_RESTORE_STEP7_GENUINE_ACTIVE_ATTEMPT;
+            } elseif (($attemptCtx['php_worker_liveness'] ?? '') === 'unknown') {
+                $code = ORANGE_RESTORE_STEP7_PHP_WORKER_LIVENESS_UNKNOWN;
+            } elseif (($attemptCtx['private_db_liveness'] ?? '') === 'unknown') {
+                $code = ORANGE_RESTORE_STEP7_PRIVATE_ENGINE_LIVENESS_UNKNOWN;
+            } elseif ($ownedPartial) {
+                $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
+            } else {
+                $code = ORANGE_RESTORE_STEP7_PRIVATE_PROCESS_STATE_UNKNOWN;
+            }
         } elseif ($ownedPartial && !$quarantineReady) {
             $code = ORANGE_RESTORE_STEP7_TERMINAL_PARTIAL_RECOVERY_NOT_SAFE;
         } elseif (!$engineStateCaptureReady) {
@@ -2855,6 +3115,15 @@ function orange_restore_private_engine_public_readiness(
         'sha256_pinned' => !empty($manifest['sha256_pinned']),
         'datadir_state' => (string) ($pre['datadir_state'] ?? ''),
         'datadir_recovery_required' => !empty($pre['datadir_recovery_required']),
+        'datadir_recovery_safe' => !empty($pre['datadir_recovery_safe']),
+        'ownership_proven' => !empty($pre['ownership_proven']),
+        'engine_state_capture_ready' => array_key_exists('engine_state_capture_ready', $pre)
+            ? !empty($pre['engine_state_capture_ready'])
+            : true,
+        'init_error_capture_ready' => array_key_exists('init_error_capture_ready', $pre)
+            ? !empty($pre['init_error_capture_ready'])
+            : true,
         'init_ledger_phase' => (string) ($pre['init_ledger_phase'] ?? ''),
+        'ok' => !empty($pre['ok']),
     ];
 }

@@ -1417,19 +1417,47 @@ body.rc-modal-open{overflow:hidden!important}
             const hostCat = readiness
                 ? String(readiness.db_host_category || (readiness.private_engine && readiness.private_engine.db_host_category) || 'UNKNOWN')
                 : 'UNKNOWN';
+            const pre = (readiness && readiness.retry_preflight && typeof readiness.retry_preflight === 'object')
+                ? readiness.retry_preflight
+                : (readiness || {});
             const actionEnabled = !!(readiness && readiness.step7_action_enabled)
-                || readyControlled || readyProvision;
+                || !!(pre.step7_action_enabled);
+            const finalReady = String(pre.final_readiness || tokenLabel || 'NOT_READY');
+            const exactReason = String(pre.exact_not_ready_reason || readiness.exact_not_ready_reason || '');
+            const yn = function (v) { return v ? 'نعم' : 'لا'; };
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
-                + '<li><strong>' + esc(tokenLabel) + '</strong></li>'
+                + '<li><strong>الجاهزية النهائية: ' + esc(finalReady) + '</strong></li>'
+                + (exactReason && finalReady === 'NOT_READY'
+                    ? '<li>سبب NOT_READY الدقيق: <code>' + esc(exactReason) + '</code></li>' : '')
+                + '<li>الحالة قابلة للطلب: ' + yn(!!(pre.state_requestable || (readiness && readiness.requestable))) + '</li>'
+                + '<li>زر الخطوة مفعّل: ' + yn(actionEnabled) + '</li>'
                 + '<li>قدرة المحرك الخاص: ' + esc(privateCap) + '</li>'
-                + '<li>تطابق هدف الأب/العامل: ' + (match ? 'نعم' : 'لا') + '</li>'
-                + '<li>تطابق محرك الأب/العامل: ' + (runtimeMatch ? 'نعم' : 'لا') + '</li>'
+                + '<li>المحاولة طرفية: ' + yn(!!pre.latest_attempt_terminal) + '</li>'
+                + '<li>محاولة نشطة: ' + yn(!!pre.active_attempt) + '</li>'
+                + '<li>حالة المطالبة: ' + esc(String(pre.claim_status || pre.claim_state || '—')) + '</li>'
+                + '<li>قفل المرحلة: ' + esc(String(pre.stage_mutex_status || pre.stage_mutex_state || '—')) + '</li>'
+                + '<li>قفل تثبيت المحرك (منفصل): ' + esc(String(pre.runtime_install_mutex_status || '—')) + '</li>'
+                + '<li>حيوية عامل PHP: ' + esc(String(pre.php_worker_liveness_class || pre.php_worker_liveness || '—')) + '</li>'
+                + '<li>حيوية محرك DB الخاص: ' + esc(String(pre.private_db_liveness_class || pre.private_db_liveness || '—')) + '</li>'
+                + '<li>إثبات غياب العملية: ' + yn(!!pre.process_absence_proven) + '</li>'
+                + '<li>فئة مجلد البيانات: ' + esc(String(pre.datadir_category || '—')) + '</li>'
+                + '<li>ملكية المجلد مثبتة: ' + yn(!!pre.datadir_ownership_proven) + '</li>'
+                + '<li>recovery_required: ' + yn(!!(pre.recovery_required || pre.partial_recovery_required)) + '</li>'
+                + '<li>recovery_safe: ' + yn(!!(pre.recovery_safe || pre.partial_recovery_safe)) + '</li>'
+                + '<li>recovery_mode: ' + esc(String(pre.recovery_mode || 'none')) + '</li>'
+                + '<li>قدرة التقاط حالة المحرك: ' + esc(String(pre.engine_state_capture_capability || '—')) + '</li>'
+                + '<li>قدرة التقاط نتيجة التهيئة: ' + esc(String(pre.initialization_result_capture_capability || '—')) + '</li>'
+                + '<li>قدرة التقاط أخطاء التهيئة: ' + esc(String(pre.initialization_error_capture_capability || pre.initialization_result_error_capture_capability || '—')) + '</li>'
+                + '<li>تطابق هدف الأب/العامل: ' + yn(match || !!pre.parent_worker_target_match) + '</li>'
+                + '<li>تطابق محرك الأب/العامل: ' + yn(runtimeMatch || !!pre.parent_worker_runtime_match) + '</li>'
                 + '<li>المصدر: ' + esc((readiness && readiness.source) ? String(readiness.source) : '—') + '</li>'
-                + '<li>مصدر المحرك: ' + esc(runtimeSource) + '</li>'
-                + '<li>المحرك موثّق: ' + (runtimeVerified ? 'نعم' : 'لا') + '</li>'
-                + '<li>المحرك متوافق: ' + (runtimeCompatible ? 'نعم' : 'لا') + '</li>'
-                + '<li>جذر الأدوات جاهز: ' + (toolsReady ? 'نعم' : 'لا') + '</li>'
-                + '<li>زر الخطوة مفعّل: ' + (actionEnabled ? 'نعم' : 'لا') + '</li>'
+                + '<li>مصدر المحرك الحالي: ' + esc(String(pre.current_runtime_source || runtimeSource)) + '</li>'
+                + '<li>المحرك موثّق: ' + yn(runtimeVerified || !!pre.current_runtime_verified) + '</li>'
+                + '<li>المحرك متوافق: ' + yn(runtimeCompatible || !!pre.current_runtime_compatible) + '</li>'
+                + '<li>هوية المحرك قابلة للتثبيت: ' + yn(!!pre.current_runtime_identity_persistable) + '</li>'
+                + '<li>جذر الأدوات جاهز: ' + yn(toolsReady) + '</li>'
+                + '<li>حزمة المصدر جاهزة: ' + yn(!!pre.source_package_ready) + '</li>'
+                + '<li>الخطوة 8 مقفلة: ' + yn(pre.step8_locked !== false && pre.Step_8_locked !== false) + '</li>'
                 + '<li>فئة مضيف قاعدة الإنتاج: ' + esc(hostCat) + '</li>'
                 + '</ul>';
         }
