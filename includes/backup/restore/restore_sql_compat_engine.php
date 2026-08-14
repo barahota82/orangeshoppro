@@ -415,6 +415,35 @@ function orange_restore_sql_compat_resource_limit_certificate(array $base): arra
  * @param array<string, mixed> $manifest
  * @return array<string, mixed>
  */
+/**
+ * Remaining wall budget for a read-only package scan under hosting max_execution_time.
+ * Fail-closed: when budget is exhausted, caller must return RESOURCE_LIMIT (never Fatal).
+ */
+function orange_restore_sql_compat_scan_wall_budget_seconds(): float
+{
+    $configured = ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS;
+    $maxExec = (int) ini_get('max_execution_time');
+    if ($maxExec <= 0) {
+        return $configured;
+    }
+    $started = isset($_SERVER['REQUEST_TIME_FLOAT'])
+        ? (float) $_SERVER['REQUEST_TIME_FLOAT']
+        : (isset($GLOBALS['orange_restore_sql_compat_scan_request_t0'])
+            ? (float) $GLOBALS['orange_restore_sql_compat_scan_request_t0']
+            : microtime(true));
+    if (!isset($GLOBALS['orange_restore_sql_compat_scan_request_t0'])) {
+        $GLOBALS['orange_restore_sql_compat_scan_request_t0'] = $started;
+    }
+    $elapsed = microtime(true) - $started;
+    // Keep a small safety margin so json_response / trace assembly can finish.
+    $remaining = ((float) $maxExec) - $elapsed - 2.5;
+    if ($remaining <= 0.05) {
+        return 0.0;
+    }
+
+    return min($configured, $remaining);
+}
+
 function orange_restore_sql_compat_scan_package(
     string $gzipPath,
     array $manifest,
@@ -422,6 +451,8 @@ function orange_restore_sql_compat_scan_package(
     string $packageFingerprintVerified = 'unknown',
     string $dumpChecksumVerified = 'unknown'
 ): array {
+    static $requestMemo = [];
+
     $policy = ORANGE_RESTORE_SQL_COMPAT_ENGINE_VERSION;
     $base = [
         'parser_policy_version' => $policy,
@@ -469,14 +500,36 @@ function orange_restore_sql_compat_scan_package(
         return $base;
     }
 
+    $mtime = (int) (@filemtime($gzipPath) ?: 0);
+    $fsize = (int) (@filesize($gzipPath) ?: 0);
+    $memoKey = $gzipPath . "\0" . $trustedSourceDb . "\0" . $packageFingerprintVerified
+        . "\0" . $dumpChecksumVerified . "\0" . $mtime . "\0" . $fsize;
+    if (isset($requestMemo[$memoKey]) && is_array($requestMemo[$memoKey])) {
+        $hit = $requestMemo[$memoKey];
+        $hit['scan_memo_hit'] = true;
+
+        return $hit;
+    }
+
     if (orange_restore_sql_compat_memory_guard_exceeded(65536)) {
-        return orange_restore_sql_compat_resource_limit_certificate($base);
+        $requestMemo[$memoKey] = orange_restore_sql_compat_resource_limit_certificate($base);
+
+        return $requestMemo[$memoKey];
+    }
+
+    $wallBudget = orange_restore_sql_compat_scan_wall_budget_seconds();
+    if ($wallBudget <= 0.05) {
+        $requestMemo[$memoKey] = orange_restore_sql_compat_resource_limit_certificate($base);
+
+        return $requestMemo[$memoKey];
     }
 
     $sha = hash_file('sha256', $gzipPath) ?: '';
     $base['source_dump_sha256'] = $sha;
     $h = @gzopen($gzipPath, 'rb');
     if ($h === false) {
+        $requestMemo[$memoKey] = $base;
+
         return $base;
     }
 
@@ -499,7 +552,14 @@ function orange_restore_sql_compat_scan_package(
     $schemaOrDataSeen = false;
     $trusted = orange_restore_sql_compat_normalize_ident($trustedSourceDb);
 
-    $hitResourceLimit = static function () use (&$base, &$h, &$bytesRead, &$statementCount): array {
+    $memoize = static function (array $result) use (&$requestMemo, $memoKey): array {
+        unset($result['scan_memo_hit']);
+        $requestMemo[$memoKey] = $result;
+
+        return $result;
+    };
+
+    $hitResourceLimit = static function () use (&$base, &$h, &$bytesRead, &$statementCount, $memoize): array {
         if ($h !== false && $h !== null) {
             @gzclose($h);
             $h = false;
@@ -507,12 +567,21 @@ function orange_restore_sql_compat_scan_package(
         $base['bytes_read'] = $bytesRead;
         $base['statement_count'] = $statementCount;
 
-        return orange_restore_sql_compat_resource_limit_certificate($base);
+        return $memoize(orange_restore_sql_compat_resource_limit_certificate($base));
+    };
+
+    $wallExceeded = static function () use ($t0, $wallBudget): bool {
+        if ((microtime(true) - $t0) > $wallBudget) {
+            return true;
+        }
+        // Re-check hosting remaining budget so a second scan in the same request
+        // cannot Fatal into Owner-visible server_error.
+        return orange_restore_sql_compat_scan_wall_budget_seconds() <= 0.05;
     };
 
     try {
         while (!gzeof($h)) {
-            if ((microtime(true) - $t0) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS) {
+            if ($wallExceeded()) {
                 return $hitResourceLimit();
             }
             if (orange_restore_sql_compat_memory_guard_exceeded(131072)) {
@@ -522,7 +591,7 @@ function orange_restore_sql_compat_scan_package(
             if ($chunk === false) {
                 gzclose($h);
 
-                return $base;
+                return $memoize($base);
             }
             if ($chunk === '') {
                 continue;
@@ -538,7 +607,7 @@ function orange_restore_sql_compat_scan_package(
             }
 
             while (true) {
-                if ((microtime(true) - $t0) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS) {
+                if ($wallExceeded()) {
                     return $hitResourceLimit();
                 }
                 try {
@@ -583,7 +652,7 @@ function orange_restore_sql_compat_scan_package(
                 } catch (Throwable) {
                     gzclose($h);
 
-                    return array_merge($base, [
+                    return $memoize(array_merge($base, [
                         'ok' => false,
                         'compatible' => false,
                         'statement_count' => $statementCount,
@@ -593,7 +662,7 @@ function orange_restore_sql_compat_scan_package(
                         'internal_classification' => 'SQL_DUMP_STRUCTURE_NOT_PROVABLE',
                         'ambiguous_token_count' => 1,
                         'bytes_read' => $bytesRead,
-                    ]);
+                    ]));
                 }
 
                 $idents = [];
@@ -747,7 +816,7 @@ function orange_restore_sql_compat_scan_package(
         $msg = $e->getMessage();
         if ($msg === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT
             || str_contains($msg, 'Allowed memory size')) {
-            return orange_restore_sql_compat_resource_limit_certificate($base);
+            return $memoize(orange_restore_sql_compat_resource_limit_certificate($base));
         }
         error_log('[orange] sql compat bounded scan: ' . get_class($e) . ' ' . $msg);
         $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
@@ -755,7 +824,7 @@ function orange_restore_sql_compat_scan_package(
         $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
         $base['internal_classification'] = 'SQL_PACKAGE_SCAN_EXCEPTION';
 
-        return $base;
+        return $memoize($base);
     }
     if ($h !== false && $h !== null) {
         @gzclose($h);
@@ -773,7 +842,7 @@ function orange_restore_sql_compat_scan_package(
             $base['internal_classification'] = 'SQL_DUMP_STRUCTURE_NOT_PROVABLE';
             $base['ambiguous_token_count'] = 1;
 
-            return $base;
+            return $memoize($base);
         }
     }
 
@@ -820,16 +889,16 @@ function orange_restore_sql_compat_scan_package(
             $naiveUse
         );
     } catch (Throwable) {
-        return array_merge($base, $cert, [
+        return $memoize(array_merge($base, $cert, [
             'ok' => false,
             'compatible' => false,
             'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_SCAN_FAILED,
             'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED,
             'safe_code' => ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED,
-        ]);
+        ]));
     }
 
-    return array_merge($base, $classified, [
+    return $memoize(array_merge($base, $classified, [
         'source_dump_sha256' => $sha,
         'parser_policy_version' => $policy,
         'engine_version' => $policy,
@@ -842,7 +911,7 @@ function orange_restore_sql_compat_scan_package(
         'scan_mode' => 'bounded_streaming',
         'resource_limit_hit' => false,
         'bytes_read' => $bytesRead,
-    ]);
+    ]));
 }
 
 /**

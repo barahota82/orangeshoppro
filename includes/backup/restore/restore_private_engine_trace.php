@@ -602,7 +602,8 @@ function orange_restore_private_engine_trace_attempt_scan(string $workRoot, stri
 function orange_restore_private_engine_trace_snapshot(
     string $projectRoot,
     string $workRoot,
-    string $jobId
+    string $jobId,
+    array $options = []
 ): array {
     $GLOBALS['orange_restore_private_engine_trace_work_root'] = $workRoot;
     $mutationCounters = [
@@ -896,10 +897,23 @@ function orange_restore_private_engine_trace_snapshot(
 
     // Authoritative retry preflight (same as diagnostic/button/request) — never invent green.
     // Caller must have loaded restore_center_orchestrator.php (avoid circular require).
+    // Diagnostics MUST pass precomputed retry_preflight so the Full-package SQL scan runs once
+    // per request (second scan under hosting max_execution_time collapses to server_error).
     $retryPreflight = [];
-    if (function_exists('orange_restore_step7_retry_preflight')) {
+    if (isset($options['retry_preflight']) && is_array($options['retry_preflight'])) {
+        $retryPreflight = $options['retry_preflight'];
+    } elseif (function_exists('orange_restore_step7_retry_preflight')) {
         try {
-            $retryPreflight = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId);
+            $preflightOpts = [];
+            if (array_key_exists('include_sql_package_scan', $options)) {
+                $preflightOpts['include_sql_package_scan'] = (bool) $options['include_sql_package_scan'];
+            }
+            $retryPreflight = orange_restore_step7_retry_preflight(
+                $projectRoot,
+                $workRoot,
+                $jobId,
+                $preflightOpts
+            );
         } catch (Throwable) {
             $retryPreflight = [];
         }

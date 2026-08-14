@@ -2891,11 +2891,19 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         'step7_action_enabled' => is_array($shadowReadiness)
             && !empty($shadowReadiness['step7_action_enabled']),
         'log_tails' => $logSnippets,
-        'private_engine_live_trace' => (static function () use ($workRoot, $jobId): array {
+        'private_engine_live_trace' => (static function () use ($workRoot, $jobId, $shadowReadiness): array {
             try {
                 $projectRootDiag = dirname(__DIR__, 3);
+                $precomputed = is_array($shadowReadiness['retry_preflight'] ?? null)
+                    ? $shadowReadiness['retry_preflight']
+                    : [];
 
-                return orange_restore_private_engine_trace_snapshot($projectRootDiag, $workRoot, $jobId);
+                return orange_restore_private_engine_trace_snapshot(
+                    $projectRootDiag,
+                    $workRoot,
+                    $jobId,
+                    ['retry_preflight' => $precomputed]
+                );
             } catch (Throwable $e) {
                 return [
                     'trace_version' => defined('ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION')
