@@ -13,6 +13,37 @@ require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orch
 
 restore_admin_api_require_get();
 
+/** Static auto-deploy identity marker (no Git/env/paths; additive response only). */
+if (!defined('ORANGE_STEP7_DIAG_DEPLOY_SENTINEL')) {
+    define('ORANGE_STEP7_DIAG_DEPLOY_SENTINEL', 'ORANGE_STEP7_DIAG_SENTINEL_94D_CHAIN_A1');
+}
+
+/**
+ * Attach deploy sentinel to an already-built diagnostic payload (no recalculation).
+ *
+ * @param array<string, mixed> $payload
+ * @return array<string, mixed>
+ */
+function orange_restore_diagnostic_api_with_deploy_sentinel(array $payload): array
+{
+    $payload['deploy_sentinel'] = ORANGE_STEP7_DIAG_DEPLOY_SENTINEL;
+
+    return $payload;
+}
+
+/**
+ * Emit diagnostic JSON with deploy sentinel header + field (exclusive to this route).
+ *
+ * @param array<string, mixed> $payload
+ */
+function orange_restore_diagnostic_api_emit(array $payload, int $http = 200): void
+{
+    if (!headers_sent()) {
+        header('X-Orange-Step7-Diagnostic-Sentinel: ' . ORANGE_STEP7_DIAG_DEPLOY_SENTINEL);
+    }
+    json_response(orange_restore_diagnostic_api_with_deploy_sentinel($payload), $http);
+}
+
 /**
  * @return array<string, mixed>
  */
@@ -27,7 +58,7 @@ function orange_restore_diagnostic_api_structured_failure(
         && is_file(dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php')) {
         require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php';
     }
-    json_response([
+    orange_restore_diagnostic_api_emit([
         'success' => false,
         'read_only' => true,
         'job_id' => $jobId,
@@ -209,7 +240,7 @@ try {
         );
     }
 
-    json_response($payload);
+    orange_restore_diagnostic_api_emit($payload);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
     $safe = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
