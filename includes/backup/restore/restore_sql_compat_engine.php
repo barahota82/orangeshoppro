@@ -32,6 +32,7 @@ const ORANGE_RESTORE_SQL_PKG_SCAN_FAILED = 'SQL_PACKAGE_SCAN_FAILED';
 
 /** Exact failure codes (§13). */
 const ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED = 'STEP7_SQL_PACKAGE_SCAN_FAILED';
+const ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT = 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT';
 const ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS = 'STEP7_SQL_STRUCTURE_AMBIGUOUS';
 const ORANGE_RESTORE_STEP7_SQL_SOURCE_IDENTITY_MISMATCH = 'STEP7_SQL_SOURCE_IDENTITY_MISMATCH';
 const ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN = 'STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN';
@@ -41,6 +42,12 @@ const ORANGE_RESTORE_STEP7_SQL_CANONICAL_PRELUDE_NORMALIZATION_FAILED = 'STEP7_S
 const ORANGE_RESTORE_STEP7_SQL_SAME_SOURCE_NORMALIZATION_FAILED = 'STEP7_SQL_SAME_SOURCE_NORMALIZATION_FAILED';
 const ORANGE_RESTORE_STEP7_SQL_TRANSIENT_STREAM_FAILED = 'STEP7_SQL_TRANSIENT_STREAM_FAILED';
 const ORANGE_RESTORE_STEP7_SQL_POST_PREFLIGHT_PARITY_FAILED = 'STEP7_SQL_POST_PREFLIGHT_PARITY_FAILED';
+
+/** Bounded streaming scan defaults (read-only certificate; no silent truncation). */
+const ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_BUFFER_BYTES = 8388608; // 8 MiB rolling statement buffer
+const ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_STATEMENTS = 2000000;
+const ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS = 25.0;
+const ORANGE_RESTORE_SQL_COMPAT_SCAN_MEMORY_HEADROOM_BYTES = 8388608; // keep 8 MiB free
 
 /** @var list<string> */
 const ORANGE_RESTORE_SQL_SYSTEM_SCHEMAS = [
@@ -335,7 +342,72 @@ function orange_restore_sql_compat_scan_directives(string $sql): array
 }
 
 /**
+ * Parse PHP memory_limit ini into bytes (0 = unknown/unlimited).
+ */
+function orange_restore_sql_compat_memory_limit_bytes(): int
+{
+    $raw = trim((string) ini_get('memory_limit'));
+    if ($raw === '' || $raw === '-1') {
+        return 0;
+    }
+    if (!preg_match('/^\s*(\d+)\s*([KMG])?\s*$/i', $raw, $m)) {
+        return 0;
+    }
+    $n = (int) $m[1];
+    $u = strtoupper((string) ($m[2] ?? ''));
+
+    return match ($u) {
+        'G' => $n * 1073741824,
+        'M' => $n * 1048576,
+        'K' => $n * 1024,
+        default => $n,
+    };
+}
+
+/**
+ * True when allocating ~$need more bytes would breach headroom under memory_limit.
+ */
+function orange_restore_sql_compat_memory_guard_exceeded(int $needBytes = 0): bool
+{
+    $limit = orange_restore_sql_compat_memory_limit_bytes();
+    if ($limit <= 0) {
+        return false;
+    }
+    $used = memory_get_usage(true);
+    $ceiling = $limit - ORANGE_RESTORE_SQL_COMPAT_SCAN_MEMORY_HEADROOM_BYTES;
+    if ($ceiling < 1048576) {
+        $ceiling = (int) max(1048576, (int) floor($limit * 0.85));
+    }
+
+    return ($used + max(0, $needBytes)) >= $ceiling;
+}
+
+/**
+ * Resource-limit certificate shell (no silent truncation).
+ *
+ * @param array<string, mixed> $base
+ * @return array<string, mixed>
+ */
+function orange_restore_sql_compat_resource_limit_certificate(array $base): array
+{
+    $base['ok'] = false;
+    $base['compatible'] = false;
+    $base['package_scan_complete'] = false;
+    $base['normalization_required'] = false;
+    $base['normalization_supported'] = false;
+    $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
+    $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
+    $base['safe_code'] = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
+    $base['internal_classification'] = 'SQL_PACKAGE_SCAN_RESOURCE_LIMIT';
+    $base['scan_mode'] = 'bounded_streaming';
+    $base['resource_limit_hit'] = true;
+
+    return $base;
+}
+
+/**
  * Full package SQL scan → redacted certificate (§9).
+ * Bounded streaming: never loads the entire dump into one string.
  *
  * @param array<string, mixed> $manifest
  * @return array<string, mixed>
@@ -385,10 +457,17 @@ function orange_restore_sql_compat_scan_package(
             : '',
         'source_dump_sha256' => '',
         'internal_classification' => '',
+        'scan_mode' => 'bounded_streaming',
+        'resource_limit_hit' => false,
+        'bytes_read' => 0,
     ];
 
     if (!is_file($gzipPath) || !function_exists('gzopen')) {
         return $base;
+    }
+
+    if (orange_restore_sql_compat_memory_guard_exceeded(65536)) {
+        return orange_restore_sql_compat_resource_limit_certificate($base);
     }
 
     $sha = hash_file('sha256', $gzipPath) ?: '';
@@ -397,39 +476,357 @@ function orange_restore_sql_compat_scan_package(
     if ($h === false) {
         return $base;
     }
-    $sql = '';
+
+    $t0 = microtime(true);
+    $buffer = '';
+    $bytesRead = 0;
+    $naiveUse = 0;
+    $uses = [];
+    $creates = [];
+    $admin = [];
+    $statementCount = 0;
+    $sameSource = 0;
+    $external = 0;
+    $system = 0;
+    $distinct = [];
+    $falsePositive = 0;
+    $stored = ['view' => 0, 'trigger' => 0, 'procedure' => 0, 'function' => 0, 'event' => 0];
+    $qualifiedCount = 0;
+    $preludeSlot = true;
+    $schemaOrDataSeen = false;
+    $trusted = orange_restore_sql_compat_normalize_ident($trustedSourceDb);
+
+    $hitResourceLimit = static function () use (&$base, &$h, &$bytesRead, &$statementCount): array {
+        if ($h !== false && $h !== null) {
+            @gzclose($h);
+            $h = false;
+        }
+        $base['bytes_read'] = $bytesRead;
+        $base['statement_count'] = $statementCount;
+
+        return orange_restore_sql_compat_resource_limit_certificate($base);
+    };
+
     try {
         while (!gzeof($h)) {
+            if ((microtime(true) - $t0) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS) {
+                return $hitResourceLimit();
+            }
+            if (orange_restore_sql_compat_memory_guard_exceeded(131072)) {
+                return $hitResourceLimit();
+            }
             $chunk = gzread($h, 65536);
             if ($chunk === false) {
                 gzclose($h);
 
                 return $base;
             }
-            $sql .= $chunk;
-            if (strlen($sql) > 268435456) {
-                gzclose($h);
-                $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
-                $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
+            if ($chunk === '') {
+                continue;
+            }
+            $bytesRead += strlen($chunk);
+            $base['bytes_read'] = $bytesRead;
+            if (orange_restore_sql_compat_memory_guard_exceeded(strlen($chunk) + 65536)) {
+                return $hitResourceLimit();
+            }
+            $buffer .= $chunk;
+            if (strlen($buffer) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_BUFFER_BYTES) {
+                return $hitResourceLimit();
+            }
 
-                return $base;
+            while (true) {
+                if ((microtime(true) - $t0) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_WALL_SECONDS) {
+                    return $hitResourceLimit();
+                }
+                try {
+                    $split = orange_restore_sql_runner_split_next_statement($buffer);
+                } catch (RuntimeException $e) {
+                    // Incomplete statement at chunk boundary — read more (scan-only; import runner unchanged).
+                    if (str_contains($e->getMessage(), 'unterminated string or comment')) {
+                        if (strlen($buffer) > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_BUFFER_BYTES) {
+                            return $hitResourceLimit();
+                        }
+                        $split = null;
+                    } else {
+                        throw $e;
+                    }
+                }
+                if ($split === null) {
+                    break;
+                }
+                $buffer = (string) ($split['remainder'] ?? '');
+                $statement = trim((string) ($split['statement'] ?? ''));
+                if ($statement === '' || orange_restore_sql_is_comment_only($statement)) {
+                    if (preg_match('/\bUSE\s+/i', $statement) === 1) {
+                        $falsePositive++;
+                        $naiveUse++;
+                    }
+                    continue;
+                }
+                $normalized = orange_restore_sql_strip_leading_comments($statement);
+                if ($normalized === '') {
+                    continue;
+                }
+                $statementCount++;
+                if ($statementCount > ORANGE_RESTORE_SQL_COMPAT_SCAN_MAX_STATEMENTS) {
+                    return $hitResourceLimit();
+                }
+                if (preg_match_all('/\bUSE\s+/i', $normalized, $um) ) {
+                    $naiveUse += count($um[0] ?? []);
+                }
+
+                try {
+                    $lexemes = orange_restore_sql_compat_tokenize_events($normalized);
+                } catch (Throwable) {
+                    gzclose($h);
+
+                    return array_merge($base, [
+                        'ok' => false,
+                        'compatible' => false,
+                        'statement_count' => $statementCount,
+                        'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_AMBIGUOUS,
+                        'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS,
+                        'safe_code' => ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS,
+                        'internal_classification' => 'SQL_DUMP_STRUCTURE_NOT_PROVABLE',
+                        'ambiguous_token_count' => 1,
+                        'bytes_read' => $bytesRead,
+                    ]);
+                }
+
+                $idents = [];
+                foreach ($lexemes as $lexeme) {
+                    if (($lexeme['type'] ?? '') === 'ident') {
+                        $idents[] = strtoupper((string) ($lexeme['value'] ?? ''));
+                    }
+                }
+
+                $kind = '';
+                $ident = '';
+                if ($idents !== []) {
+                    if ($idents[0] === 'USE') {
+                        $kind = 'USE';
+                        foreach ($lexemes as $lexeme) {
+                            if (($lexeme['type'] ?? '') !== 'ident') {
+                                continue;
+                            }
+                            $v = (string) ($lexeme['value'] ?? '');
+                            if (strtoupper($v) === 'USE') {
+                                continue;
+                            }
+                            $ident = $v;
+                            break;
+                        }
+                    } elseif ($idents[0] === 'CREATE' && ($idents[1] ?? '') === 'DATABASE') {
+                        $kind = 'CREATE_DATABASE';
+                        $seenDb = false;
+                        foreach ($lexemes as $lexeme) {
+                            if (($lexeme['type'] ?? '') !== 'ident') {
+                                continue;
+                            }
+                            $v = strtoupper((string) ($lexeme['value'] ?? ''));
+                            if (!$seenDb) {
+                                if ($v === 'DATABASE') {
+                                    $seenDb = true;
+                                }
+                                continue;
+                            }
+                            if (in_array($v, ['IF', 'NOT', 'EXISTS'], true)) {
+                                continue;
+                            }
+                            $ident = (string) ($lexeme['value'] ?? '');
+                            break;
+                        }
+                    } elseif ($idents[0] === 'DROP' && ($idents[1] ?? '') === 'DATABASE') {
+                        $kind = 'DROP_DATABASE';
+                    } elseif ($idents[0] === 'ALTER' && ($idents[1] ?? '') === 'DATABASE') {
+                        $kind = 'ALTER_DATABASE';
+                    } elseif (in_array($idents[0], ['GRANT', 'REVOKE'], true)) {
+                        $kind = $idents[0];
+                    } elseif ($idents[0] === 'SET' && ($idents[1] ?? '') === 'GLOBAL') {
+                        $kind = 'SET_GLOBAL';
+                    } elseif ($idents[0] === 'LOAD' && ($idents[1] ?? '') === 'DATA') {
+                        $kind = 'LOAD_DATA';
+                    } elseif ($idents[0] === 'SOURCE') {
+                        $kind = 'SOURCE';
+                    } elseif ($idents[0] === 'DELIMITER') {
+                        $kind = 'DELIMITER';
+                    }
+                }
+
+                $isSessionSet = ($idents[0] ?? '') === 'SET'
+                    && ($idents[1] ?? '') !== 'GLOBAL'
+                    && !in_array('GLOBAL', $idents, true);
+
+                if ($kind !== '') {
+                    $row = [
+                        'kind' => $kind,
+                        'ident' => orange_restore_sql_compat_normalize_ident($ident),
+                        'is_prelude_slot' => $preludeSlot && !$schemaOrDataSeen,
+                    ];
+                    if ($kind === 'USE') {
+                        $uses[] = $row;
+                    } elseif ($kind === 'CREATE_DATABASE') {
+                        $creates[] = $row;
+                    } elseif (in_array($kind, [
+                        'DROP_DATABASE', 'ALTER_DATABASE', 'GRANT', 'REVOKE',
+                        'SET_GLOBAL', 'LOAD_DATA', 'SOURCE', 'DELIMITER',
+                    ], true)) {
+                        $admin[] = $row;
+                    }
+                    if (!(in_array($kind, ['USE', 'CREATE_DATABASE'], true) && $preludeSlot && !$schemaOrDataSeen)) {
+                        $preludeSlot = false;
+                        $schemaOrDataSeen = true;
+                    }
+                } elseif (!$isSessionSet) {
+                    $schemaOrDataSeen = true;
+                    $preludeSlot = false;
+                }
+
+                $upper = strtoupper($normalized);
+                if (str_contains($upper, 'CREATE VIEW') || str_contains($upper, 'CREATE OR REPLACE VIEW')) {
+                    $stored['view']++;
+                }
+                if (str_contains($upper, 'CREATE TRIGGER')) {
+                    $stored['trigger']++;
+                }
+                if (str_contains($upper, 'CREATE PROCEDURE') || str_contains($upper, 'CREATE DEFINER')) {
+                    if (str_contains($upper, 'PROCEDURE')) {
+                        $stored['procedure']++;
+                    }
+                    if (str_contains($upper, 'FUNCTION')) {
+                        $stored['function']++;
+                    }
+                }
+                if (str_contains($upper, 'CREATE EVENT')) {
+                    $stored['event']++;
+                }
+
+                foreach (orange_restore_sql_compat_scan_qualified_in_lexemes($lexemes) as $q) {
+                    $qualifiedCount++;
+                    $db = (string) ($q['db'] ?? '');
+                    if ($db === '') {
+                        continue;
+                    }
+                    $distinct[$db] = true;
+                    if (($q['kind'] ?? '') === 'system' || orange_restore_sql_compat_is_system_schema($db)) {
+                        $system++;
+                        continue;
+                    }
+                    if ($trusted !== '' && $db === $trusted) {
+                        $sameSource++;
+                        continue;
+                    }
+                    $external++;
+                }
+
+                // Bound directive lists (counts matter; keep small prelude samples only).
+                if (count($uses) > 8 || count($creates) > 8 || count($admin) > 8) {
+                    // Multiple switches already decided incompatible — keep scanning counts only.
+                    if (count($uses) > 8) {
+                        $uses = array_slice($uses, 0, 8);
+                    }
+                    if (count($creates) > 8) {
+                        $creates = array_slice($creates, 0, 8);
+                    }
+                    if (count($admin) > 8) {
+                        $admin = array_slice($admin, 0, 8);
+                    }
+                }
             }
         }
-    } finally {
-        gzclose($h);
-    }
-
-    try {
-        $result = orange_restore_sql_compat_analyze_sql($sql, $trustedSourceDb);
-    } catch (Throwable) {
-        $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
+    } catch (Throwable $e) {
+        if ($h !== false && $h !== null) {
+            @gzclose($h);
+            $h = false;
+        }
+        $base['bytes_read'] = $bytesRead;
+        $base['statement_count'] = $statementCount;
+        $msg = $e->getMessage();
+        if ($msg === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT
+            || str_contains($msg, 'Allowed memory size')) {
+            return orange_restore_sql_compat_resource_limit_certificate($base);
+        }
+        error_log('[orange] sql compat bounded scan: ' . get_class($e) . ' ' . $msg);
         $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
         $base['safe_code'] = ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED;
+        $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_SCAN_FAILED;
+        $base['internal_classification'] = 'SQL_PACKAGE_SCAN_EXCEPTION';
 
         return $base;
     }
+    if ($h !== false && $h !== null) {
+        @gzclose($h);
+        $h = false;
+    }
 
-    return array_merge($base, $result, [
+    if ($buffer !== '' && trim($buffer) !== '') {
+        // Trailing incomplete statement → ambiguous / scan failed (not silent truncate).
+        if (!orange_restore_sql_is_comment_only(trim($buffer))) {
+            $base['bytes_read'] = $bytesRead;
+            $base['statement_count'] = $statementCount;
+            $base['final_compatibility_classification'] = ORANGE_RESTORE_SQL_PKG_AMBIGUOUS;
+            $base['exact_not_ready_reason'] = ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS;
+            $base['safe_code'] = ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS;
+            $base['internal_classification'] = 'SQL_DUMP_STRUCTURE_NOT_PROVABLE';
+            $base['ambiguous_token_count'] = 1;
+
+            return $base;
+        }
+    }
+
+    // Rebuild a synthetic SQL for classification parity with analyze_sql using accumulators.
+    $canonicalUse = 0;
+    $canonicalDdl = 0;
+    foreach ($uses as $u) {
+        if (!empty($u['is_prelude_slot'])) {
+            $canonicalUse++;
+        }
+    }
+    foreach ($creates as $c) {
+        if (!empty($c['is_prelude_slot'])) {
+            $canonicalDdl++;
+        }
+    }
+
+    $cert = [
+        'statement_count' => $statementCount,
+        'canonical_use_count' => $canonicalUse,
+        'canonical_database_ddl_count' => $canonicalDdl,
+        'real_qualified_reference_count' => $qualifiedCount,
+        'same_source_qualified_reference_count' => $sameSource,
+        'external_application_database_count' => $external,
+        'system_schema_reference_count' => $system,
+        'distinct_database_identity_count' => count($distinct),
+        'false_positive_comment_string_count' => $falsePositive + max(0, $naiveUse - count($uses)),
+        'ambiguous_token_count' => 0,
+        'stored_object_reference_count_by_type' => $stored,
+        'naive_use_hits' => $naiveUse,
+        'structural_use_count' => count($uses),
+        'bytes_read' => $bytesRead,
+        'scan_mode' => 'bounded_streaming',
+        'resource_limit_hit' => false,
+    ];
+
+    try {
+        $classified = orange_restore_sql_compat_classify_accumulators(
+            $cert,
+            $uses,
+            $creates,
+            $admin,
+            $trusted,
+            $naiveUse
+        );
+    } catch (Throwable) {
+        return array_merge($base, $cert, [
+            'ok' => false,
+            'compatible' => false,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_SCAN_FAILED,
+            'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED,
+            'safe_code' => ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED,
+        ]);
+    }
+
+    return array_merge($base, $classified, [
         'source_dump_sha256' => $sha,
         'parser_policy_version' => $policy,
         'engine_version' => $policy,
@@ -439,6 +836,204 @@ function orange_restore_sql_compat_scan_package(
         'trusted_source_identity_hash' => $trustedSourceDb !== ''
             ? hash('sha256', orange_restore_sql_compat_normalize_ident($trustedSourceDb))
             : '',
+        'scan_mode' => 'bounded_streaming',
+        'resource_limit_hit' => false,
+        'bytes_read' => $bytesRead,
+    ]);
+}
+
+/**
+ * Shared classification from streaming accumulators (parity with analyze_sql outcomes).
+ *
+ * @param array<string, mixed> $cert
+ * @param list<array{kind:string,ident:string,is_prelude_slot:bool}> $uses
+ * @param list<array{kind:string,ident:string,is_prelude_slot:bool}> $creates
+ * @param list<array{kind:string,ident:string,is_prelude_slot:bool}> $admin
+ * @return array<string, mixed>
+ */
+function orange_restore_sql_compat_classify_accumulators(
+    array $cert,
+    array $uses,
+    array $creates,
+    array $admin,
+    string $trusted,
+    int $naiveUse
+): array {
+    $sameSource = (int) ($cert['same_source_qualified_reference_count'] ?? 0);
+    $external = (int) ($cert['external_application_database_count'] ?? 0);
+    $system = (int) ($cert['system_schema_reference_count'] ?? 0);
+
+    if ($admin !== []) {
+        return array_merge($cert, [
+            'ok' => false,
+            'compatible' => false,
+            'normalization_required' => false,
+            'normalization_supported' => false,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_MULTIPLE,
+            'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN,
+            'safe_code' => ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN,
+            'internal_classification' => 'DATABASE_LEVEL_DDL_OUTSIDE_APPROVED_PRELUDE',
+        ]);
+    }
+
+    if ($system > 0) {
+        return array_merge($cert, [
+            'ok' => false,
+            'compatible' => false,
+            'normalization_required' => false,
+            'normalization_supported' => false,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_SYSTEM,
+            'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_SYSTEM_SCHEMA_FORBIDDEN,
+            'safe_code' => ORANGE_RESTORE_STEP7_SQL_SYSTEM_SCHEMA_FORBIDDEN,
+            'legacy_safe_code' => 'STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE',
+            'internal_classification' => 'CROSS_DATABASE_QUALIFIED_REFERENCES',
+        ]);
+    }
+
+    if ($external > 0) {
+        return array_merge($cert, [
+            'ok' => false,
+            'compatible' => false,
+            'normalization_required' => false,
+            'normalization_supported' => false,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_EXTERNAL,
+            'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN,
+            'safe_code' => ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN,
+            'legacy_safe_code' => 'STEP7_SQL_DUMP_CROSS_DATABASE_REFERENCE',
+            'internal_classification' => 'CROSS_DATABASE_QUALIFIED_REFERENCES',
+        ]);
+    }
+
+    $lateUse = false;
+    foreach ($uses as $u) {
+        if (empty($u['is_prelude_slot'])) {
+            $lateUse = true;
+            break;
+        }
+    }
+    $lateCreate = false;
+    foreach ($creates as $c) {
+        if (empty($c['is_prelude_slot'])) {
+            $lateCreate = true;
+            break;
+        }
+    }
+    if (count($uses) > 1 || $lateUse || count($creates) > 1 || $lateCreate) {
+        return array_merge($cert, [
+            'ok' => false,
+            'compatible' => false,
+            'normalization_required' => false,
+            'normalization_supported' => false,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_MULTIPLE,
+            'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN,
+            'safe_code' => ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN,
+            'legacy_safe_code' => 'STEP7_SQL_DUMP_MULTIPLE_DATABASE_SWITCHES',
+            'internal_classification' => 'MULTIPLE_OR_LATE_DATABASE_SWITCH',
+        ]);
+    }
+
+    if (count($uses) === 1) {
+        $useIdent = (string) ($uses[0]['ident'] ?? '');
+        $createIdent = $creates !== [] ? (string) ($creates[0]['ident'] ?? '') : '';
+        $match = $trusted !== '' && $useIdent !== '' && hash_equals($trusted, $useIdent);
+        if ($creates !== [] && $trusted !== '') {
+            $match = $match && $createIdent !== '' && hash_equals($trusted, $createIdent);
+        }
+        if ($trusted !== '' && !$match) {
+            return array_merge($cert, [
+                'ok' => false,
+                'compatible' => false,
+                'normalization_required' => false,
+                'normalization_supported' => false,
+                'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_INCOMPATIBLE_IDENTITY,
+                'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_SOURCE_IDENTITY_MISMATCH,
+                'safe_code' => ORANGE_RESTORE_STEP7_SQL_SOURCE_IDENTITY_MISMATCH,
+                'legacy_safe_code' => 'STEP7_SQL_DUMP_DATABASE_IDENTITY_MISMATCH',
+                'internal_classification' => 'MISMATCHED_DATABASE_IDENTITY',
+            ]);
+        }
+    }
+
+    if ($sameSource > 0 && count($uses) === 0 && $creates === []) {
+        return array_merge($cert, [
+            'ok' => true,
+            'compatible' => true,
+            'normalization_required' => true,
+            'normalization_supported' => true,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_SAME_SOURCE,
+            'exact_not_ready_reason' => '',
+            'safe_code' => 'ok',
+            'internal_classification' => 'NO_TOP_LEVEL_DATABASE_SWITCH',
+        ]);
+    }
+
+    if ($sameSource > 0 && (count($uses) === 1 || $creates !== [])) {
+        return array_merge($cert, [
+            'ok' => true,
+            'compatible' => true,
+            'normalization_required' => true,
+            'normalization_supported' => true,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_SAME_SOURCE,
+            'exact_not_ready_reason' => '',
+            'safe_code' => 'ok',
+            'internal_classification' => $creates !== []
+                ? 'CANONICAL_CREATE_DATABASE_AND_USE_PRELUDE'
+                : 'ONE_CANONICAL_BACKUP_USE_PRELUDE',
+        ]);
+    }
+
+    if (count($uses) === 1 && $creates !== []) {
+        return array_merge($cert, [
+            'ok' => true,
+            'compatible' => true,
+            'normalization_required' => true,
+            'normalization_supported' => true,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
+            'exact_not_ready_reason' => '',
+            'safe_code' => 'ok',
+            'internal_classification' => 'CANONICAL_CREATE_DATABASE_AND_USE_PRELUDE',
+        ]);
+    }
+
+    if (count($uses) === 1 && $creates === []) {
+        return array_merge($cert, [
+            'ok' => true,
+            'compatible' => true,
+            'normalization_required' => true,
+            'normalization_supported' => true,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
+            'exact_not_ready_reason' => '',
+            'safe_code' => 'ok',
+            'internal_classification' => 'ONE_CANONICAL_BACKUP_USE_PRELUDE',
+        ]);
+    }
+
+    if (count($uses) === 0 && $creates === []) {
+        $internal = ($naiveUse > 0)
+            ? 'FALSE_POSITIVE_IN_COMMENT_STRING_OR_ROUTINE'
+            : 'NO_TOP_LEVEL_DATABASE_SWITCH';
+
+        return array_merge($cert, [
+            'ok' => true,
+            'compatible' => true,
+            'normalization_required' => false,
+            'normalization_supported' => true,
+            'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_COMPATIBLE_UNCHANGED,
+            'exact_not_ready_reason' => '',
+            'safe_code' => 'ok',
+            'internal_classification' => $internal,
+        ]);
+    }
+
+    return array_merge($cert, [
+        'ok' => false,
+        'compatible' => false,
+        'normalization_required' => false,
+        'normalization_supported' => false,
+        'final_compatibility_classification' => ORANGE_RESTORE_SQL_PKG_AMBIGUOUS,
+        'exact_not_ready_reason' => ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS,
+        'safe_code' => ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS,
+        'internal_classification' => 'SQL_DUMP_STRUCTURE_NOT_PROVABLE',
     ]);
 }
 

@@ -1304,8 +1304,19 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PARENT_WORKER_IDENTITY_MISMATCH),
         ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN),
         ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED => orange_restore_private_engine_operator_reason_ar(ORANGE_RESTORE_STEP7_NOT_READY_MUTATION_REJECTED),
+        ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT => 'تعذر إكمال شهادة توافق ملف SQL ضمن حدود الموارد الآمنة. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED => 'تعذر فحص توافق ملف SQL للحزمة. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_STRUCTURE_AMBIGUOUS => 'بنية ملف SQL غير حاسمة للفحص الآمن. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_SOURCE_IDENTITY_MISMATCH => 'هوية قاعدة المصدر في ملف SQL غير متطابقة. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_EXTERNAL_DATABASE_FORBIDDEN => 'ملف SQL يشير إلى قاعدة تطبيق خارجية غير مسموحة. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_SYSTEM_SCHEMA_FORBIDDEN => 'ملف SQL يشير إلى مخطط نظام غير مسموح. الخطوة غير جاهزة.',
+        ORANGE_RESTORE_STEP7_SQL_MULTIPLE_DATABASES_FORBIDDEN => 'ملف SQL يحتوي أكثر من قاعدة/تبديل غير مسموح. الخطوة غير جاهزة.',
         ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE => 'تعذر بدء استعادة قاعدة الظل. أعد المحاولة من شاشة الاسترداد.',
     ];
+
+    if (isset($messages[$safeCode])) {
+        return $messages[$safeCode];
+    }
 
     if (str_starts_with($safeCode, 'STEP7_PRIVATE_ENGINE_')
         || str_starts_with($safeCode, 'STEP7_PRIVATE_')
@@ -1328,7 +1339,7 @@ function orange_restore_center_step7_operator_reason_ar(string $safeCode): strin
         return orange_restore_private_engine_operator_reason_ar($safeCode);
     }
 
-    return $messages[$safeCode] ?? $messages[ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE];
+    return $messages[ORANGE_RESTORE_STEP7_UNKNOWN_START_FAILURE];
 }
 
 /**
@@ -1572,9 +1583,16 @@ function orange_restore_step7_retry_preflight(
                         $fpOk,
                         $sumOk
                     );
-                    $sqlCertificate['package_scan_complete'] = true;
+                    $reason = (string) ($sqlCertificate['exact_not_ready_reason'] ?? '');
+                    $class = (string) ($sqlCertificate['final_compatibility_classification'] ?? '');
+                    $resourceHit = !empty($sqlCertificate['resource_limit_hit'])
+                        || $reason === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
+                    $hardScanFail = $class === ORANGE_RESTORE_SQL_PKG_SCAN_FAILED
+                        && ($reason === ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_FAILED || $reason === '');
+                    $sqlCertificate['package_scan_complete'] = !$resourceHit && !$hardScanFail;
                     $sqlCertificate['compatible'] = !empty($sqlCertificate['ok'])
-                        && in_array((string) ($sqlCertificate['final_compatibility_classification'] ?? ''), [
+                        && !empty($sqlCertificate['package_scan_complete'])
+                        && in_array($class, [
                             ORANGE_RESTORE_SQL_PKG_COMPATIBLE_UNCHANGED,
                             ORANGE_RESTORE_SQL_PKG_COMPATIBLE_PRELUDE,
                             ORANGE_RESTORE_SQL_PKG_COMPATIBLE_SAME_SOURCE,
@@ -2599,22 +2617,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             $env = orange_backup_load_env_array($projectRootDiag);
             // Zero-mutation: private-engine preflight (no provision) + target resolve only.
             $resolved = orange_restore_shadow_resolve_target($env, $projectRootDiag, $jobId, $meta);
-            // Soft-bind missing identity hash onto meta when job-bound shadow_db already matches
-            // (zero-mutation for engine; metadata-only parity repair — no Step7 request).
-            if (($resolved['ok'] ?? false)
-                && trim((string) ($meta['shadow_db'] ?? '')) !== ''
-                && trim((string) ($meta['shadow_db_identity_hash'] ?? '')) === ''
-                && hash_equals(
-                    (string) ($resolved['shadow_db'] ?? ''),
-                    trim((string) ($meta['shadow_db'] ?? ''))
-                )) {
-                try {
-                    $meta = orange_restore_shadow_bind_resolved_target($meta, $resolved, $jobId);
-                    orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
-                } catch (Throwable) {
-                    // keep diagnostic read-only if bind fails
-                }
-            }
+            // Read-only diagnostic: never soft-bind / write meta during diagnostics.
             $enginePub = orange_restore_private_engine_public_readiness($projectRootDiag, $workRoot, $jobId);
             $ack = orange_restore_shadow_load_bootstrap_ack($workRoot, $jobId);
             $pub = orange_restore_fw_public_row($job);
@@ -2642,14 +2645,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
                     strtolower(trim((string) ($meta['shadow_db'] ?? '')))
                 )) {
                 $parentWorkerMatch = true;
-                if ($boundHash === '' && $identity !== '') {
-                    $meta['shadow_db_identity_hash'] = $identity;
-                    try {
-                        orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jobId), $meta);
-                    } catch (Throwable) {
-                        // ignore
-                    }
-                }
+                // Read-only: do not persist identity hash during diagnostics.
             }
             $targetOk = (bool) ($resolved['ok'] ?? false);
             $binaryOk = !empty($enginePub['binary_available'])

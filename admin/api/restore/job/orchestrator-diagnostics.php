@@ -5,12 +5,47 @@ declare(strict_types=1);
 /**
  * Restore Center orchestration diagnostics (safe operational view).
  * No absolute paths, secrets, or server internals beyond redacted log tails.
+ * Always returns structured JSON (never generic-only Owner message).
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
 require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orchestrator.php';
 
 restore_admin_api_require_get();
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_diagnostic_api_structured_failure(
+    string $safeCode,
+    string $safeMessageAr,
+    string $failureLayer,
+    string $jobId = '',
+    int $http = 422
+): void {
+    if (!defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
+        && is_file(dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php')) {
+        require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php';
+    }
+    json_response([
+        'success' => false,
+        'read_only' => true,
+        'job_id' => $jobId,
+        'stage' => 'shadow_restore',
+        'failure_layer' => $failureLayer,
+        'safe_code' => $safeCode,
+        'code' => $safeCode,
+        'safe_message_ar' => $safeMessageAr,
+        'message' => $safeMessageAr,
+        'retryable' => false,
+        'final_readiness' => 'NOT_READY',
+        'exact_not_ready_reason' => $safeCode,
+        'package_certificate_status' => 'unavailable',
+        'private_engine_trace_status' => 'unavailable',
+        'step7_action_enabled' => false,
+        'csrf_token' => orange_backup_admin_csrf_token(),
+    ], $http);
+}
 
 try {
     $admin = restore_admin_api_admin();
@@ -19,46 +54,179 @@ try {
 
     $jobId = trim((string) ($_GET['id'] ?? $_GET['job_id'] ?? ''));
     if ($jobId === '' || !preg_match('/^[a-zA-Z0-9._-]+$/', $jobId)) {
-        json_response([
-            'success' => false,
-            'code' => 'invalid_job_id',
-            'message' => 'Invalid restore job id.',
-        ], 422);
+        orange_restore_diagnostic_api_structured_failure(
+            'STEP7_DIAGNOSTIC_JOB_NOT_FOUND',
+            'معرّف مهمة الاسترداد غير صالح.',
+            'job_resolution',
+            '',
+            422
+        );
     }
 
     $projectRoot = restore_admin_api_project_root();
     $ctx = orange_restore_admin_context($projectRoot);
     $workRoot = (string) ($ctx['work_root'] ?? '');
     if ($workRoot === '') {
-        throw new RuntimeException('Restore work root unavailable.');
+        orange_restore_diagnostic_api_structured_failure(
+            'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE',
+            'تعذر تهيئة مسار عمل الاسترداد بأمان.',
+            'work_root',
+            $jobId,
+            422
+        );
     }
 
-    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
-    $job = orange_restore_fw_read($workRoot, $jobId);
+    try {
+        orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+        $job = orange_restore_fw_read($workRoot, $jobId);
+    } catch (Throwable) {
+        orange_restore_diagnostic_api_structured_failure(
+            'STEP7_DIAGNOSTIC_JOB_NOT_FOUND',
+            'تعذر العثور على مهمة الاسترداد أو غير مسموح بعرضها.',
+            'job_resolution',
+            $jobId,
+            404
+        );
+    }
+
     $type = (string) ($job['package_type'] ?? '');
-    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
-    if ($type !== 'full_disaster') {
-        throw new RuntimeException('country_production_restore_not_enabled');
-    }
-    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
-        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    try {
+        orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+        if ($type !== 'full_disaster') {
+            throw new RuntimeException('country_production_restore_not_enabled');
+        }
+        if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+            throw new RuntimeException('Operator lacks backup_restore_full permission.');
+        }
+    } catch (Throwable $e) {
+        $msg = trim($e->getMessage());
+        $code = ($msg === 'country_production_restore_not_enabled'
+            || str_contains($msg, 'permission')
+            || str_contains($msg, 'lacks'))
+            ? 'STEP7_DIAGNOSTIC_AUTHORIZATION_FAILED'
+            : 'STEP7_DIAGNOSTIC_AUTHORIZATION_FAILED';
+        orange_restore_diagnostic_api_structured_failure(
+            $code,
+            'لا تتوفر صلاحية عرض تشخيص هذه المهمة.',
+            'authorization',
+            $jobId,
+            403
+        );
     }
 
-    json_response([
+    try {
+        $diagnostics = orange_restore_center_diagnostics($workRoot, $jobId);
+    } catch (Throwable $e) {
+        $mapped = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
+        $raw = trim($e->getMessage());
+        if (str_contains($raw, 'STEP7_DIAGNOSTIC_')) {
+            $mapped = $raw;
+        } elseif (defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
+            && $raw === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT) {
+            $mapped = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
+        }
+        orange_restore_diagnostic_api_structured_failure(
+            $mapped,
+            'تعذر إكمال تشخيص التشغيل بأمان. الخطوة غير جاهزة.',
+            'diagnostics_builder',
+            $jobId,
+            422
+        );
+    }
+
+    $readiness = is_array($diagnostics['step7_shadow_target_readiness'] ?? null)
+        ? $diagnostics['step7_shadow_target_readiness']
+        : [];
+    $pre = is_array($readiness['retry_preflight'] ?? null) ? $readiness['retry_preflight'] : [];
+    $cert = is_array($pre['sql_package_compatibility'] ?? null) ? $pre['sql_package_compatibility'] : [];
+    $trace = is_array($diagnostics['private_engine_live_trace'] ?? null)
+        ? $diagnostics['private_engine_live_trace']
+        : [];
+    $certStatus = $cert === []
+        ? 'absent'
+        : (!empty($cert['package_scan_complete'])
+            ? (!empty($cert['compatible']) ? 'compatible' : 'incompatible_or_not_ready')
+            : ((string) ($cert['exact_not_ready_reason'] ?? '') === 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT'
+                ? 'resource_limit'
+                : 'incomplete'));
+    $traceStatus = $trace === []
+        ? 'absent'
+        : (string) ($trace['classification'] ?? 'present');
+
+    $payload = [
         'success' => true,
-        'diagnostics' => orange_restore_center_diagnostics($workRoot, $jobId),
+        'read_only' => true,
+        'job_id' => $jobId,
+        'stage' => 'shadow_restore',
+        'failure_layer' => '',
+        'safe_code' => 'ok',
+        'safe_message_ar' => '',
+        'retryable' => false,
+        'final_readiness' => (string) ($readiness['final_readiness']
+            ?? $pre['final_readiness']
+            ?? ($diagnostics['ready_token'] ?? 'NOT_READY')),
+        'exact_not_ready_reason' => (string) ($readiness['exact_not_ready_reason']
+            ?? $pre['exact_not_ready_reason']
+            ?? ''),
+        'package_certificate_status' => $certStatus,
+        'private_engine_trace_status' => $traceStatus,
+        'step7_action_enabled' => !empty($diagnostics['step7_action_enabled'])
+            || !empty($readiness['step7_action_enabled']),
+        'package_sql_certificate' => $cert,
+        'diagnostics' => $diagnostics,
         'csrf_token' => orange_backup_admin_csrf_token(),
-    ]);
+    ];
+
+    // Fail-closed: unreadable certificate ⇒ never enable Step 7 in this response.
+    if ($certStatus === 'absent' || $certStatus === 'incomplete' || $certStatus === 'resource_limit') {
+        $payload['step7_action_enabled'] = false;
+        if (($payload['final_readiness'] ?? '') !== 'NOT_READY'
+            && !str_starts_with((string) ($payload['final_readiness'] ?? ''), 'READY_')) {
+            $payload['final_readiness'] = 'NOT_READY';
+        }
+        if ($payload['exact_not_ready_reason'] === '' || $payload['exact_not_ready_reason'] === 'ok') {
+            $payload['exact_not_ready_reason'] = $certStatus === 'resource_limit'
+                ? 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT'
+                : 'STEP7_DIAGNOSTIC_SQL_SCAN_FAILED';
+        }
+        if (is_array($payload['diagnostics'])) {
+            $payload['diagnostics']['step7_action_enabled'] = false;
+        }
+    }
+
+    $jsonFlags = JSON_UNESCAPED_UNICODE;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+    $encoded = json_encode($payload, $jsonFlags);
+    if ($encoded === false) {
+        orange_restore_diagnostic_api_structured_failure(
+            'STEP7_DIAGNOSTIC_RESPONSE_SERIALIZATION_FAILED',
+            'تعذر تجهيز تقرير التشخيص للعرض بأمان.',
+            'json_serialization',
+            $jobId,
+            500
+        );
+    }
+
+    json_response($payload);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
-    $status = 422;
-    if ($code === 'country_production_restore_not_enabled') {
-        $status = 403;
+    $safe = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
+    $http = 422;
+    if ($code === 'country_production_restore_not_enabled'
+        || str_contains($code, 'permission')
+        || str_contains($code, 'lacks')) {
+        $safe = 'STEP7_DIAGNOSTIC_AUTHORIZATION_FAILED';
+        $http = 403;
+    } elseif (str_starts_with($code, 'STEP7_DIAGNOSTIC_')) {
+        $safe = $code;
     }
-    json_response([
-        'success' => false,
-        'code' => $code !== '' ? $code : 'orchestrator_diagnostics_failed',
-        'message' => orange_restore_admin_safe_message($e),
-        'csrf_token' => orange_backup_admin_csrf_token(),
-    ], $status);
+    orange_restore_diagnostic_api_structured_failure(
+        $safe,
+        'تعذر فتح تشخيص التشغيل بأمان.',
+        'api_catch',
+        '',
+        $http
+    );
 }

@@ -1,0 +1,40 @@
+ORANGE — Restore Center Step 7
+Diagnostic route + actual-package SQL certificate (read-only)
+=============================================================
+Date: 2026-08-14
+Baseline before: 770107a3
+Root cause: I — PACKAGE_SCAN_MEMORY_OR_TIMEOUT_FAILURE
+
+Symptom after 770107a3
+----------------------
+Owner Refresh + «تشخيص التشغيل» returned only:
+  حدث خطأ غير متوقع
+Modal/report did not open; package SQL certificate unreachable.
+
+Cause
+-----
+retry_preflight package certificate scan loaded the full gzip dump into one
+string (`$sql .= $chunk`) and OOM-fatal'd on real Full packages. Restore admin
+JSON shutdown / error boundary mapped that to the generic Arabic message.
+
+Repair (allowlisted)
+--------------------
+- Bounded streaming package scan (same SQL compat engine; no second parser)
+- Resource limit → STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT + NOT_READY
+- Diagnostic API always returns structured safe JSON
+- Soft-bind meta writes removed from diagnostic path (strict read-only)
+- Frontend: in-flight lock, structured failure modal, certificate + copy report
+
+تنفيذ
+-----
+- includes/backup/restore/restore_sql_compat_engine.php
+- includes/backup/restore/restore_center_orchestrator.php
+- admin/api/restore/job/orchestrator-diagnostics.php
+- admin/pages/restore_center.php
+- scripts/self_test_restore_center_step7_diagnostic_route_closure.php
+
+Owner next (read-only only)
+---------------------------
+Open job 2026-08-10_035058_0bd13c6d → Refresh once → تشخيص التشغيل only.
+Confirm report + private-engine trace + توافق ملف SQL للحزمة + copy.
+Do NOT press Step 7. Do NOT execute Step 8. Do NOT stop the live private engine.

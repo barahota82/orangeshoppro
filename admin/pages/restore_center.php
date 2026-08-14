@@ -1422,8 +1422,8 @@ body.rc-modal-open{overflow:hidden!important}
                 : (readiness || {});
             const actionEnabled = !!(readiness && readiness.step7_action_enabled)
                 || !!(pre.step7_action_enabled);
-            const finalReady = String(pre.final_readiness || tokenLabel || 'NOT_READY');
-            const exactReason = String(pre.exact_not_ready_reason || readiness.exact_not_ready_reason || '');
+            const finalReady = String(diag.api_final_readiness || pre.final_readiness || tokenLabel || 'NOT_READY');
+            const exactReason = String(diag.api_exact_not_ready_reason || pre.exact_not_ready_reason || readiness.exact_not_ready_reason || '');
             const yn = function (v) { return v ? 'نعم' : 'لا'; };
             html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
                 + '<li><strong>الجاهزية النهائية: ' + esc(finalReady) + '</strong></li>'
@@ -1461,6 +1461,34 @@ body.rc-modal-open{overflow:hidden!important}
                 + '<li>فئة مضيف قاعدة الإنتاج: ' + esc(hostCat) + '</li>'
                 + '</ul>';
         }
+        const cert = (diag.package_sql_certificate && typeof diag.package_sql_certificate === 'object')
+            ? diag.package_sql_certificate
+            : ((readiness && readiness.retry_preflight && readiness.retry_preflight.sql_package_compatibility
+                && typeof readiness.retry_preflight.sql_package_compatibility === 'object')
+                ? readiness.retry_preflight.sql_package_compatibility
+                : null);
+        html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">توافق ملف SQL للحزمة</h4>';
+        if (!cert) {
+            html += '<p style="margin:0 0 8px;line-height:1.55;">شهادة توافق الحزمة غير متاحة في هذا التشخيص. الخطوة تُعامل كـ NOT_READY.</p>';
+        } else {
+            const yn2 = function (v) { return v ? 'نعم' : 'لا'; };
+            html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">'
+                + '<li>اكتمل الفحص: ' + yn2(!!cert.package_scan_complete) + '</li>'
+                + '<li>متوافق: ' + yn2(!!cert.compatible || !!cert.ok) + '</li>'
+                + '<li>التصنيف: <code>' + esc(String(cert.final_compatibility_classification || '—')) + '</code></li>'
+                + '<li>سبب NOT_READY: <code>' + esc(String(cert.exact_not_ready_reason || '—')) + '</code></li>'
+                + '<li>إصدار سياسة المحلل: ' + esc(String(cert.parser_policy_version || cert.engine_version || '—')) + '</li>'
+                + '<li>وضع الفحص: ' + esc(String(cert.scan_mode || '—')) + '</li>'
+                + '<li>حد موارد: ' + yn2(!!cert.resource_limit_hit) + '</li>'
+                + '<li>عدد العبارات: ' + esc(String(cert.statement_count != null ? cert.statement_count : '—')) + '</li>'
+                + '<li>مراجع مؤهّلة: ' + esc(String(cert.real_qualified_reference_count != null ? cert.real_qualified_reference_count : '—')) + '</li>'
+                + '<li>نفس المصدر: ' + esc(String(cert.same_source_qualified_reference_count != null ? cert.same_source_qualified_reference_count : '—')) + '</li>'
+                + '<li>خارجي: ' + esc(String(cert.external_application_database_count != null ? cert.external_application_database_count : '—')) + '</li>'
+                + '<li>مخطط نظام: ' + esc(String(cert.system_schema_reference_count != null ? cert.system_schema_reference_count : '—')) + '</li>'
+                + '<li>تطبيع مطلوب: ' + yn2(!!cert.normalization_required) + '</li>'
+                + '<li>الملف الأصلي دون تغيير: ' + yn2(cert.original_dump_unchanged !== false) + '</li>'
+                + '</ul>';
+        }
         const trace = diag.private_engine_live_trace && typeof diag.private_engine_live_trace === 'object'
             ? diag.private_engine_live_trace
             : null;
@@ -1494,14 +1522,34 @@ body.rc-modal-open{overflow:hidden!important}
                 + '<li>قفل الخطوة 8: ' + fSafe('A_job_and_stage', 'step8_lock_state') + '</li>'
                 + '</ul>';
             const report = String(trace.arabic_report || '');
-            if (report) {
-                html += '<p style="margin:8px 0 4px;"><strong>تقرير عربي قابل للنسخ</strong></p>';
-                html += '<textarea id="rc_private_engine_trace_report" class="rc-pre" readonly '
-                    + 'style="width:100%;min-height:140px;max-height:220px;overflow:auto;white-space:pre-wrap;font-size:.8rem;direction:rtl;">'
-                    + esc(report) + '</textarea>';
-                html += '<p style="margin:6px 0 0;"><button type="button" class="btn-link rc-btn-ghost" id="rc_private_engine_trace_copy">'
-                    + 'نسخ التقرير</button></p>';
-            }
+            const certBlock = cert
+                ? ('\n\n—— توافق ملف SQL للحزمة ——\n'
+                    + 'اكتمل الفحص: ' + (!!cert.package_scan_complete ? 'نعم' : 'لا') + '\n'
+                    + 'متوافق: ' + ((!!cert.compatible || !!cert.ok) ? 'نعم' : 'لا') + '\n'
+                    + 'التصنيف: ' + String(cert.final_compatibility_classification || '—') + '\n'
+                    + 'سبب NOT_READY: ' + String(cert.exact_not_ready_reason || '—') + '\n'
+                    + 'إصدار السياسة: ' + String(cert.parser_policy_version || cert.engine_version || '—') + '\n'
+                    + 'وضع الفحص: ' + String(cert.scan_mode || '—') + '\n')
+                : '\n\n—— توافق ملف SQL للحزمة ——\nغير متاح\n';
+            const copyText = (report || 'تقرير تشخيص تشغيل الاسترداد') + certBlock;
+            html += '<p style="margin:8px 0 4px;"><strong>تقرير عربي قابل للنسخ</strong></p>';
+            html += '<textarea id="rc_private_engine_trace_report" class="rc-pre" readonly '
+                + 'style="width:100%;min-height:140px;max-height:220px;overflow:auto;white-space:pre-wrap;font-size:.8rem;direction:rtl;">'
+                + esc(copyText) + '</textarea>';
+            html += '<p style="margin:6px 0 0;"><button type="button" class="btn-link rc-btn-ghost" id="rc_private_engine_trace_copy">'
+                + 'نسخ التقرير</button></p>';
+        } else if (cert) {
+            const copyText = 'تقرير تشخيص تشغيل الاسترداد\n\n—— توافق ملف SQL للحزمة ——\n'
+                + 'اكتمل الفحص: ' + (!!cert.package_scan_complete ? 'نعم' : 'لا') + '\n'
+                + 'متوافق: ' + ((!!cert.compatible || !!cert.ok) ? 'نعم' : 'لا') + '\n'
+                + 'التصنيف: ' + String(cert.final_compatibility_classification || '—') + '\n'
+                + 'سبب NOT_READY: ' + String(cert.exact_not_ready_reason || '—') + '\n';
+            html += '<p style="margin:8px 0 4px;"><strong>تقرير عربي قابل للنسخ</strong></p>';
+            html += '<textarea id="rc_private_engine_trace_report" class="rc-pre" readonly '
+                + 'style="width:100%;min-height:100px;max-height:180px;overflow:auto;white-space:pre-wrap;font-size:.8rem;direction:rtl;">'
+                + esc(copyText) + '</textarea>';
+            html += '<p style="margin:6px 0 0;"><button type="button" class="btn-link rc-btn-ghost" id="rc_private_engine_trace_copy">'
+                + 'نسخ التقرير</button></p>';
         }
         const tails = Array.isArray(diag.log_tails) ? diag.log_tails : [];
         if (tails.length) {
@@ -1525,14 +1573,59 @@ body.rc-modal-open{overflow:hidden!important}
         return html;
     }
 
+    /** In-flight diagnostic (read-only) — prevent double-click / Enter duplicate. */
+    let rcDiagnosticInFlight = false;
+
     async function openOrchestratorDiagnostics(jobId) {
         if (!jobId) throw new Error('معرّف المهمة غير صالح');
+        if (rcDiagnosticInFlight) {
+            return;
+        }
+        rcDiagnosticInFlight = true;
+        document.querySelectorAll('.rc-orch-diag').forEach(function (btn) {
+            try { btn.disabled = true; } catch (eDis) { /* ignore */ }
+        });
         setBusy(true, 'جاري تحميل تشخيص التشغيل…');
+        clearRcJourneyInlineMessage();
         try {
-            const j = await apiGet('job/orchestrator-diagnostics.php?id=' + encodeURIComponent(jobId));
+            const r = await fetch(API_BASE + '/job/orchestrator-diagnostics.php?id=' + encodeURIComponent(jobId), {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const j = await parseApiJsonResponse(r);
             if (j.csrf_token) state.csrf = j.csrf_token;
+            if (!j.success) {
+                const safeCode = String(j.safe_code || j.code || 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE');
+                const safeMsg = String(j.safe_message_ar || j.message || 'تعذر فتح تشخيص التشغيل بأمان.');
+                el('rc_orch_diag_title').textContent = 'تشخيص تشغيل مراحل الاسترداد — ' + jobId;
+                el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnosticFailure({
+                    safe_code: safeCode,
+                    safe_message_ar: safeMsg,
+                    failure_layer: j.failure_layer || '',
+                    final_readiness: j.final_readiness || 'NOT_READY',
+                    exact_not_ready_reason: j.exact_not_ready_reason || safeCode,
+                    package_certificate_status: j.package_certificate_status || 'unavailable',
+                    private_engine_trace_status: j.private_engine_trace_status || 'unavailable'
+                });
+                openRcModal('rc_orch_diag_modal');
+                showRcJourneyInlineMessage(safeMsg + ' [' + safeCode + ']');
+                return;
+            }
+            const diag = j.diagnostics || {};
+            if (j.package_sql_certificate && typeof j.package_sql_certificate === 'object') {
+                diag.package_sql_certificate = j.package_sql_certificate;
+            }
+            if (j.package_certificate_status) {
+                diag.package_certificate_status = j.package_certificate_status;
+            }
+            if (j.final_readiness) {
+                diag.api_final_readiness = j.final_readiness;
+            }
+            if (j.exact_not_ready_reason) {
+                diag.api_exact_not_ready_reason = j.exact_not_ready_reason;
+            }
             el('rc_orch_diag_title').textContent = 'تشخيص تشغيل مراحل الاسترداد — ' + jobId;
-            el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnostics(j.diagnostics || {});
+            el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnostics(diag);
             const copyBtn = el('rc_private_engine_trace_copy');
             const reportBox = el('rc_private_engine_trace_report');
             if (copyBtn && reportBox) {
@@ -1557,9 +1650,53 @@ body.rc-modal-open{overflow:hidden!important}
                 };
             }
             openRcModal('rc_orch_diag_modal');
+        } catch (e) {
+            const raw = String((e && e.message) || '');
+            const code = String((e && e.code) || '');
+            const isGeneric = !raw || raw === 'حدث خطأ غير متوقع' || raw === 'تعذر تنفيذ العملية.';
+            const safeCode = code && code.indexOf('STEP7_') === 0
+                ? code
+                : 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
+            const safeMsg = isGeneric
+                ? ('تعذر فتح تشخيص التشغيل بأمان. [' + safeCode + ']')
+                : (raw + (code ? ' [' + code + ']' : ''));
+            el('rc_orch_diag_title').textContent = 'تشخيص تشغيل مراحل الاسترداد — ' + jobId;
+            el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnosticFailure({
+                safe_code: safeCode,
+                safe_message_ar: safeMsg,
+                failure_layer: 'frontend_or_transport',
+                final_readiness: 'NOT_READY',
+                exact_not_ready_reason: safeCode,
+                package_certificate_status: 'unavailable',
+                private_engine_trace_status: 'unavailable'
+            });
+            openRcModal('rc_orch_diag_modal');
+            showRcJourneyInlineMessage(safeMsg);
         } finally {
+            rcDiagnosticInFlight = false;
+            document.querySelectorAll('.rc-orch-diag').forEach(function (btn) {
+                try { btn.disabled = false; } catch (eEn) { /* ignore */ }
+            });
             setBusy(false);
         }
+    }
+
+    function formatOrchestratorDiagnosticFailure(info) {
+        info = info || {};
+        let html = '<div class="rc-status-strip">';
+        html += '<div><dt>النتيجة</dt><dd>فشل منظم (قراءة فقط)</dd></div>';
+        html += '<div><dt>الجاهزية</dt><dd>' + esc(String(info.final_readiness || 'NOT_READY')) + '</dd></div>';
+        html += '</div>';
+        html += '<ul style="margin:10px 0 0;padding-inline-start:1.2rem;line-height:1.55;">'
+            + '<li><strong>' + esc(String(info.safe_message_ar || 'تعذر فتح التشخيص')) + '</strong></li>'
+            + '<li>الرمز الآمن: <code>' + esc(String(info.safe_code || 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE')) + '</code></li>'
+            + '<li>طبقة الفشل: ' + esc(String(info.failure_layer || '—')) + '</li>'
+            + '<li>سبب NOT_READY: <code>' + esc(String(info.exact_not_ready_reason || info.safe_code || '—')) + '</code></li>'
+            + '<li>حالة شهادة الحزمة: ' + esc(String(info.package_certificate_status || 'unavailable')) + '</li>'
+            + '<li>حالة آثار المحرك الخاص: ' + esc(String(info.private_engine_trace_status || 'unavailable')) + '</li>'
+            + '<li>زر خطوة استعادة قاعدة الظل: معطّل</li>'
+            + '</ul>';
+        return html;
     }
 
     /** In-flight schedule keys (jobId::worker) — UI guard; server enforces atomic lock. */
