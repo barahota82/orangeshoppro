@@ -801,23 +801,36 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
         if ($type === 'country_recovery' && !$mayCountry) {
             continue;
         }
-        // Step7 button authority = same authoritative retry preflight as diagnostic/request.
+        // Step7 button authority on list/refresh: same readiness gates EXCEPT package SQL scan.
+        // Full-package dump scan belongs to تشخيص التشغيل only — never collapse status Refresh.
         if (!empty($row['shadow_restore_requestable']) || !empty($row['is_shadow_restore_failed'])) {
             $jobId = (string) ($row['job_id'] ?? '');
             try {
-                $pre = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId);
+                $pre = orange_restore_step7_retry_preflight($projectRoot, $workRoot, $jobId, [
+                    'include_sql_package_scan' => false,
+                ]);
                 $token = (string) ($pre['ready_token'] ?? '');
                 $engine = is_array($pre['engine'] ?? null) ? $pre['engine'] : [];
+                $sqlCert = is_array($pre['sql_package_compatibility'] ?? null)
+                    ? $pre['sql_package_compatibility']
+                    : [];
                 $row['step7_ready_token'] = $token;
                 $row['ready_for_private_shadow_provisioning'] = $token
                     === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
                 $row['ready_for_controlled_step7_attempt'] = $token
                     === 'READY_FOR_CONTROLLED_STEP7_ATTEMPT';
-                $row['step7_action_enabled'] = !empty($pre['step7_action_enabled']);
+                // Unreadable/deferred certificate ⇒ Step 7 stays disabled (gates not weakened).
+                $row['step7_action_enabled'] = false;
                 $row['exact_not_ready_reason'] = (string) ($pre['exact_not_ready_reason'] ?? '');
                 $row['final_readiness'] = (string) ($pre['final_readiness'] ?? 'NOT_READY');
                 $row['private_capability'] = (string) ($engine['private_capability'] ?? 'unavailable');
                 $row['step7_readiness_code'] = (string) ($pre['code'] ?? '');
+                $row['package_sql_certificate_status'] = 'deferred_to_diagnostic';
+                $row['package_sql_certificate_reason'] = (string) (
+                    $sqlCert['exact_not_ready_reason']
+                    ?? ORANGE_RESTORE_STEP7_SQL_PACKAGE_SCAN_DEFERRED_FROM_STATUS_REFRESH
+                );
+                $row['package_sql_certificate_scan_invoked'] = false;
             } catch (Throwable) {
                 $row['step7_ready_token'] = '';
                 $row['ready_for_private_shadow_provisioning'] = false;
@@ -827,6 +840,9 @@ function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool
                 $row['final_readiness'] = 'NOT_READY';
                 $row['private_capability'] = 'unavailable';
                 $row['step7_readiness_code'] = 'STEP7_PRIVATE_READINESS_UNKNOWN';
+                $row['package_sql_certificate_status'] = 'unavailable';
+                $row['package_sql_certificate_reason'] = 'STEP7_RETRY_PREFLIGHT_UNKNOWN';
+                $row['package_sql_certificate_scan_invoked'] = false;
             }
         }
         $rows[] = $row;

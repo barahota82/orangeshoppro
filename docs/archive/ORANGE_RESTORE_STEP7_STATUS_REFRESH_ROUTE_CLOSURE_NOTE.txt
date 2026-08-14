@@ -1,0 +1,35 @@
+ORANGE — Restore Center Step 7 — Status Refresh / hydration route closure
+=======================================================================
+Date: 2026-08-14
+Commit intent: Isolate Restore Center status refresh from diagnostic scan failures
+
+Root cause (proven)
+-------------------
+Refresh → GET admin/api/restore/list.php
+  → orange_restore_admin_fw_list_jobs()
+  → orange_restore_step7_retry_preflight()  (for shadow_restore_failed / requestable)
+  → orange_restore_sql_compat_scan_package() on Full package dump
+  → OOM / max_execution_time / proxy timeout (uncatchable fatal or non-JSON)
+  → restore_admin_api_json_shutdown_guard → «حدث خطأ غير متوقع»
+  → UI refreshErrorMessage → «تعذر تحديث حالة مركز الاسترداد. أعد المحاولة دون إلغاء المهمة.»
+
+47bc98de fixed diagnostic button scan OOM, but list/Refresh still invoked the same
+preflight-with-scan path. Diagnostic route fix was therefore not live-proven via Refresh.
+
+Repair
+------
+- retry_preflight accepts include_sql_package_scan (default true for diagnostic/mutation)
+- fw_list_jobs / status Refresh passes include_sql_package_scan=false
+- Deferred certificate: STEP7_SQL_PACKAGE_SCAN_DEFERRED_FROM_STATUS_REFRESH
+- Step 7 remains disabled until diagnostic completes a readable certificate
+- list.php returns status_hydration_subreports.package_sql_certificate structured field
+- No live Step 7 / Step 8 / production action from Refresh
+
+Owner next (read-only)
+----------------------
+1. Open job 2026-08-10_035058_0bd13c6d
+2. Refresh once — must NOT show generic collapse message
+3. Press تشخيص التشغيل
+4. Open آثار محرك قاعدة الظل الخاص → توافق ملف SQL للحزمة
+5. Copy complete report
+6. Do NOT press Step 7 / Step 8

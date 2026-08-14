@@ -62,10 +62,41 @@ try {
     }
 
     $fwJobs = [];
+    $statusHydrationSubreports = [
+        'package_sql_certificate' => [
+            'status' => 'not_applicable',
+            'reason' => '',
+            'scan_invoked_on_refresh' => false,
+            'message_ar' => '',
+        ],
+    ];
     try {
         $fwJobs = orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry);
+        foreach ($fwJobs as $fj) {
+            if (!is_array($fj)) {
+                continue;
+            }
+            if (!empty($fj['shadow_restore_requestable']) || !empty($fj['is_shadow_restore_failed'])) {
+                $statusHydrationSubreports['package_sql_certificate'] = [
+                    'status' => (string) ($fj['package_sql_certificate_status'] ?? 'deferred_to_diagnostic'),
+                    'reason' => (string) ($fj['package_sql_certificate_reason']
+                        ?? 'STEP7_SQL_PACKAGE_SCAN_DEFERRED_FROM_STATUS_REFRESH'),
+                    'scan_invoked_on_refresh' => !empty($fj['package_sql_certificate_scan_invoked']),
+                    'message_ar' => 'شهادة توافق ملف SQL مؤجّلة لتشخيص التشغيل؛ تحديث الحالة لا يفحص الحزمة.',
+                    'step7_action_enabled' => false,
+                ];
+                break;
+            }
+        }
     } catch (Throwable) {
         $fwJobs = [];
+        $statusHydrationSubreports['package_sql_certificate'] = [
+            'status' => 'unavailable',
+            'reason' => 'framework_jobs_unavailable',
+            'scan_invoked_on_refresh' => false,
+            'message_ar' => 'تعذر إرفاق شهادة توافق SQL مع قائمة المهام؛ حالة المهام الأساسية ما زالت للقراءة.',
+            'step7_action_enabled' => false,
+        ];
     }
 
     $currentJourney = null;
@@ -118,6 +149,7 @@ try {
         'current_journey_job' => $currentJourney,
         'legacy_engine_jobs' => $legacyJobs,
         'maintenance' => $maintenance,
+        'status_hydration_subreports' => $statusHydrationSubreports,
     ]);
 } catch (Throwable $e) {
     // Refresh must never surface generic unexpected / raw English codes.
