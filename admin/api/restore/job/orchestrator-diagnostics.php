@@ -119,8 +119,8 @@ try {
     } catch (Throwable $e) {
         $mapped = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
         $raw = trim($e->getMessage());
-        if (str_contains($raw, 'STEP7_DIAGNOSTIC_')) {
-            $mapped = $raw;
+        if (preg_match('/\bSTEP7_DIAGNOSTIC_[A-Z0-9_]+\b/', $raw, $m)) {
+            $mapped = (string) $m[0];
         } elseif (defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
             && $raw === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT) {
             $mapped = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
@@ -177,17 +177,21 @@ try {
         'csrf_token' => orange_backup_admin_csrf_token(),
     ];
 
-    // Fail-closed: unreadable certificate ⇒ never enable Step 7 in this response.
-    if ($certStatus === 'absent' || $certStatus === 'incomplete' || $certStatus === 'resource_limit') {
+    // Fail-closed: any non-compatible certificate must never leave a READY_* UI state.
+    if ($certStatus !== 'compatible') {
         $payload['step7_action_enabled'] = false;
-        if (($payload['final_readiness'] ?? '') !== 'NOT_READY'
-            && !str_starts_with((string) ($payload['final_readiness'] ?? ''), 'READY_')) {
-            $payload['final_readiness'] = 'NOT_READY';
-        }
+        $payload['final_readiness'] = 'NOT_READY';
         if ($payload['exact_not_ready_reason'] === '' || $payload['exact_not_ready_reason'] === 'ok') {
-            $payload['exact_not_ready_reason'] = $certStatus === 'resource_limit'
-                ? 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT'
-                : 'STEP7_DIAGNOSTIC_SQL_SCAN_FAILED';
+            if ($certStatus === 'resource_limit') {
+                $payload['exact_not_ready_reason'] = 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT';
+            } elseif ($certStatus === 'incompatible_or_not_ready') {
+                $payload['exact_not_ready_reason'] = (string) ($cert['exact_not_ready_reason'] ?? '');
+                if ($payload['exact_not_ready_reason'] === '' || $payload['exact_not_ready_reason'] === 'ok') {
+                    $payload['exact_not_ready_reason'] = 'STEP7_DIAGNOSTIC_SQL_SCAN_FAILED';
+                }
+            } else {
+                $payload['exact_not_ready_reason'] = 'STEP7_DIAGNOSTIC_SQL_SCAN_FAILED';
+            }
         }
         if (is_array($payload['diagnostics'])) {
             $payload['diagnostics']['step7_action_enabled'] = false;
