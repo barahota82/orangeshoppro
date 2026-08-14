@@ -171,6 +171,8 @@ try {
     s7diag_ok(str_contains($api, 'package_certificate_status'), 'API package_certificate_status');
     s7diag_ok(str_contains($api, 'STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
         || str_contains($api, 'resource_limit'), 'API resource limit handling');
+    s7diag_ok(str_contains($api, '$certStatus !== \'compatible\''), 'API fail-closes every non-compatible certificate');
+    s7diag_ok(!str_contains($api, 'str_starts_with((string) ($payload[\'final_readiness\']'), 'API does not preserve READY_* without certificate');
 
     // 6) Unbounded full-string append removed
     $engine = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_sql_compat_engine.php');
