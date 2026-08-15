@@ -788,11 +788,6 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
         return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
     }
 
-    // Do not confuse disabled/unavailable command execution (empty stdout) with process death.
-    if (function_exists('orange_backup_can_execute_commands') && !orange_backup_can_execute_commands()) {
-        return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
-    }
-
     if (!function_exists('exec') && !(function_exists('orange_backup_run_command_capture'))) {
         return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
     }
@@ -827,46 +822,12 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
         return $finish(ORANGE_RESTORE_PE_PID_ALIVE_MATCHING, true);
     }
 
-    // Parse image name from tasklist BEFORE PowerShell/CIM (single-PID row only).
-    $imageName = '';
-    foreach (preg_split("/\r\n|\n|\r/", $stdout) ?: [] as $tlLine) {
-        $tl = trim((string) $tlLine);
-        if ($tl === '' || !preg_match('/(?:^|\s)' . preg_quote((string) $pid, '/') . '(?:\s|$)/', $tl)) {
-            continue;
-        }
-        if (preg_match('/^(\S+)/', $tl, $tm) === 1) {
-            $imageName = (string) $tm[1];
-            break;
-        }
-    }
-
-    $nameMatched = ($nameRegex === '');
-    if ($nameRegex !== '') {
-        if ($imageName === '') {
-            // Image present in tasklist but unparseable — do not claim absence; fail closed.
-            return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
-        }
-        if (@preg_match('/' . $nameRegex . '/i', $imageName) !== 1) {
-            // Alive but wrong identity — conclusive without CIM (nonActiveProven path).
-            return $finish(ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH, true);
-        }
-        $nameMatched = true;
-    }
-
-    // PowerShell/CIM only when name matches AND cmdline needles are required.
-    if (!$nameMatched || $needles === []) {
-        return $finish(
-            $nameMatched ? ORANGE_RESTORE_PE_PID_ALIVE_MATCHING : ORANGE_RESTORE_PE_PID_UNKNOWN,
-            true
-        );
-    }
-
     $remainingMs = $budgetMs - (int) round((microtime(true) - $started) * 1000);
     if ($remainingMs < 250) {
         return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
     }
 
-    // Single-PID CIM cmdline identity (not unbounded process table scan / restore_lock tasklist).
+    // Single-PID CIM identity (not unbounded process table scan / restore_lock tasklist).
     $ps = 'try { $p = Get-CimInstance Win32_Process -Filter "ProcessId=' . (int) $pid
         . '" -ErrorAction Stop; if ($null -eq $p) { Write-Output "NONE"; exit 0 }; '
         . 'Write-Output ("NAME=" + [string]$p.Name); '
