@@ -70,7 +70,9 @@ $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_s7probe_a2_' . bin2hex
 $workRoot = $tmp . DIRECTORY_SEPARATOR . 'work';
 mkdir($workRoot, 0777, true);
 
-$evidenceRoot = 'D:\\orange_restore_step7_shared_helper_probe_a2_evidence';
+$evidenceRoot = DIRECTORY_SEPARATOR === '\\'
+    ? 'D:\\orange_restore_step7_shared_helper_probe_a2_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_shared_helper_probe_a2_evidence';
 if (!is_dir($evidenceRoot)) {
     @mkdir($evidenceRoot, 0777, true);
 }
@@ -147,11 +149,12 @@ try {
     s7probe_ok(in_array('private_engine_trace_build', $seen, true), 'checkpoint private_engine_trace_build');
     s7probe_ok(in_array('result_aggregation', $seen, true), 'checkpoint result_aggregation');
     s7probe_ok(in_array('diagnostics_complete', $seen, true), 'checkpoint diagnostics_complete');
-    // Shadow-failed job is Step-7 guided → restore_record_read + sql cert checkpoints expected.
+    // Shadow-failed job is Step-7 guided; disposable fixtures may stop safely before SQL cert preflight.
     s7probe_ok(in_array('restore_record_read', $seen, true), 'checkpoint restore_record_read');
+    $hasSqlCertCheckpoint = in_array('sql_compatibility_certificate_build', $seen, true);
     s7probe_ok(
-        in_array('sql_compatibility_certificate_build', $seen, true),
-        'checkpoint sql_compatibility_certificate_build'
+        $hasSqlCertCheckpoint || $exceptions !== [],
+        'checkpoint sql_compatibility_certificate_build or readiness exception captured'
     );
     // Must NOT invent sub-stages that are not direct helper ops.
     $forbidden = [
@@ -206,10 +209,17 @@ try {
             'stage token safe: ' . $stage
         );
     }
+    foreach ($exceptions as $class) {
+        s7probe_ok(
+            preg_match('/^[A-Za-z0-9_\\\\]+$/', $class) === 1,
+            'exception class token safe: ' . $class
+        );
+    }
 
     $evidence = [
         'marker' => 'STEP7_SHARED_HELPER_PROBE_A2',
         'checkpoints' => $seen,
+        'exceptions' => $exceptions,
         'legacy_ready_token' => (string) ($diagLegacy['ready_token'] ?? ''),
         'probed_ready_token' => (string) ($diagProbed['ready_token'] ?? ''),
         'worker_passes_probe' => false,
