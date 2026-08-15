@@ -738,6 +738,28 @@ function orange_restore_center_diagnostic_attempt_context_readonly(string $workR
                     ? ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
                     : ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
                 $claimBlocks = orange_restore_center_diagnostic_claim_busy_readonly($claim);
+            } elseif (function_exists('orange_restore_private_engine_bounded_pid_inspect')
+                && function_exists('orange_restore_private_engine_liveness_class_from_pid_inspect')) {
+                $phpInspect = orange_restore_private_engine_bounded_pid_inspect($pid, [
+                    'expect_name_regex' => '^(php)(\\.exe)?$',
+                    'expect_cmdline_substrings' => [strtolower($jobId)],
+                ]);
+                $phpClass = orange_restore_private_engine_liveness_class_from_pid_inspect(
+                    (string) ($phpInspect['status'] ?? ORANGE_RESTORE_PE_PID_UNKNOWN),
+                    false
+                );
+                if ($phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+                    $claimBlocks = true;
+                } elseif ($phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD
+                    || $phpClass === ORANGE_RESTORE_STEP7_PROC_PID_IDENTITY_MISMATCH) {
+                    $claimBlocks = false;
+                } else {
+                    // UNKNOWN / INSPECTION_UNAVAILABLE: fail closed (busy / not READY).
+                    $claimBlocks = true;
+                    if ($phpClass !== ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE) {
+                        $phpClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+                    }
+                }
             } else {
                 $live = orange_restore_center_diagnostic_pid_liveness($pid);
                 if ($live === 'alive') {
@@ -763,24 +785,50 @@ function orange_restore_center_diagnostic_attempt_context_readonly(string $workR
     $healthy = function_exists('orange_restore_private_engine_runtime_healthy')
         && orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
     if ($enginePid > 0) {
-        $live = orange_restore_center_diagnostic_pid_liveness($enginePid);
-        if ($live === 'alive') {
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
-        } elseif ($live === 'dead') {
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
-        } elseif ($healthy) {
-            // Port/PDO proves engine service without tasklist.
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+        if (function_exists('orange_restore_private_engine_bounded_pid_inspect')
+            && function_exists('orange_restore_private_engine_liveness_class_from_pid_inspect')) {
+            $dbInspect = orange_restore_private_engine_bounded_pid_inspect($enginePid, [
+                'expect_name_regex' => '^(mysqld|mariadbd)(\\.exe)?$',
+                'expect_cmdline_substrings' => [
+                    strtolower($jobId),
+                    defined('ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME')
+                        ? strtolower((string) ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME)
+                        : 'private_shadow_engine',
+                ],
+            ]);
+            $dbClass = orange_restore_private_engine_liveness_class_from_pid_inspect(
+                (string) ($dbInspect['status'] ?? ORANGE_RESTORE_PE_PID_UNKNOWN),
+                $healthy
+            );
+            if ($dbClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE && $healthy) {
+                // Port/PDO proves engine service without unbounded tasklist.
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+            }
         } else {
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+            $live = orange_restore_center_diagnostic_pid_liveness($enginePid);
+            if ($live === 'alive') {
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+            } elseif ($live === 'dead') {
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+            } elseif ($healthy) {
+                // Port/PDO proves engine service without tasklist.
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+            } else {
+                $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+            }
         }
     } elseif (is_array($state) && !empty($state['ready']) && $healthy) {
         $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
-    } elseif (!$claimPresent && !$inflight) {
-        // No claim / no engine pid metadata: absence without spawn probes.
-        $phpClass = $phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY
-            ? ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND
-            : $phpClass;
+    }
+
+    // Claim absent + terminal/non-inflight: PHP worker absence is job-scoped (no spawn required).
+    if (!$claimPresent && !$inflight
+        && $phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+        $phpClass = ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND;
+    }
+    if (!$claimPresent && !$inflight
+        && $enginePid <= 0
+        && $dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
         $dbClass = ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND;
     }
 
@@ -853,7 +901,9 @@ function orange_restore_center_diagnostic_attempt_context_readonly(string $workR
         'process_absence_conclusion' => $absenceConclusion,
         'engine_service_state' => $engineServiceState,
         'engine_ready_idle' => $engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE,
-        'process_inspection_available' => function_exists('posix_kill'),
+        'process_inspection_available' => function_exists('posix_kill')
+            || function_exists('orange_restore_private_engine_bounded_pid_inspect')
+            || (PHP_OS_FAMILY === 'Windows' && (function_exists('exec') || function_exists('proc_open'))),
         'claim_present' => $claimPresent,
         'claim_blocks' => $claimBlocks,
         'diagnostic_skip_process_spawn' => true,

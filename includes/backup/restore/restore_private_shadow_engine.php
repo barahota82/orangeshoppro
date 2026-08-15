@@ -683,11 +683,229 @@ function orange_restore_private_engine_init_ledger_write(string $workRoot, strin
     }
 }
 
+/** Bounded private-engine PID inspect statuses (Pattern B — never map UNKNOWN/UNAVAILABLE → absent). */
+const ORANGE_RESTORE_PE_PID_ALIVE_MATCHING = 'ALIVE_MATCHING_ENGINE';
+const ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN = 'NOT_ALIVE_PROVEN';
+const ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH = 'ALIVE_IDENTITY_MISMATCH';
+const ORANGE_RESTORE_PE_PID_METADATA_INVALID = 'METADATA_INVALID';
+const ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE = 'INSPECTION_UNAVAILABLE';
+const ORANGE_RESTORE_PE_PID_UNKNOWN = 'UNKNOWN';
+
 /**
- * Classify job-private datadir ownership/completeness (no path exposure).
+ * Bounded read-only OS inspect for a single PID (≤2000ms).
+ * Never kill/start/stop/mutate PID, datadir, lock, job, or audit.
+ * Never maps UNKNOWN or INSPECTION_UNAVAILABLE to process absence.
  *
- * @return array{state:string,owned:bool,writable:bool,has_mysql_system:bool,entry_count:int}
+ * @param array{
+ *   expect_name_regex?:string,
+ *   expect_cmdline_substrings?:list<string>
+ * } $expect
+ * @return array{status:string,inspection_available:bool,elapsed_ms:int}
  */
+function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expect = []): array
+{
+    $started = microtime(true);
+    $budgetMs = 2000;
+    $finish = static function (string $status, bool $available) use ($started): array {
+        return [
+            'status' => $status,
+            'inspection_available' => $available,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+        ];
+    };
+
+    if (isset($GLOBALS['orange_restore_private_engine_bounded_pid_inspect_override'])) {
+        $override = $GLOBALS['orange_restore_private_engine_bounded_pid_inspect_override'];
+        if (is_callable($override)) {
+            $override = $override($pid, $expect);
+        }
+        if (is_string($override)) {
+            return $finish($override, true);
+        }
+        if (is_array($override) && isset($override['status'])) {
+            return [
+                'status' => (string) $override['status'],
+                'inspection_available' => array_key_exists('inspection_available', $override)
+                    ? (bool) $override['inspection_available']
+                    : true,
+                'elapsed_ms' => (int) ($override['elapsed_ms']
+                    ?? (int) round((microtime(true) - $started) * 1000)),
+            ];
+        }
+    }
+
+    if ($pid <= 0) {
+        return $finish(ORANGE_RESTORE_PE_PID_METADATA_INVALID, true);
+    }
+
+    $nameRegex = trim((string) ($expect['expect_name_regex'] ?? ''));
+    /** @var list<string> $needles */
+    $needles = [];
+    foreach ((array) ($expect['expect_cmdline_substrings'] ?? []) as $needle) {
+        $n = strtolower(trim((string) $needle));
+        if ($n !== '') {
+            $needles[] = $n;
+        }
+    }
+
+    $identityFromCmdline = static function (string $cmdline, string $procName) use ($nameRegex, $needles): string {
+        $cl = strtolower($cmdline);
+        $nm = strtolower($procName);
+        if ($nameRegex !== '') {
+            $hay = trim($nm . ' ' . $cl);
+            if ($hay === '' || @preg_match('/' . $nameRegex . '/i', $hay) !== 1) {
+                return ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH;
+            }
+        }
+        foreach ($needles as $n) {
+            if ($cl === '' || !str_contains($cl, $n)) {
+                return ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH;
+            }
+        }
+
+        return ORANGE_RESTORE_PE_PID_ALIVE_MATCHING;
+    };
+
+    if (function_exists('posix_kill')) {
+        $alive = @posix_kill($pid, 0);
+        if (!$alive) {
+            return $finish(ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN, true);
+        }
+        if ($nameRegex === '' && $needles === []) {
+            return $finish(ORANGE_RESTORE_PE_PID_ALIVE_MATCHING, true);
+        }
+        $cmdFile = '/proc/' . $pid . '/cmdline';
+        $raw = is_file($cmdFile) ? (string) @file_get_contents($cmdFile) : '';
+        $cl = str_replace("\0", ' ', $raw);
+        $comm = is_file('/proc/' . $pid . '/comm')
+            ? trim((string) @file_get_contents('/proc/' . $pid . '/comm'))
+            : '';
+
+        return $finish($identityFromCmdline($cl, $comm), true);
+    }
+
+    if (PHP_OS_FAMILY !== 'Windows') {
+        return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
+    }
+
+    if (!function_exists('exec') && !(function_exists('orange_backup_run_command_capture'))) {
+        return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
+    }
+
+    $stdout = '';
+    if (function_exists('orange_backup_run_command_capture')) {
+        $cap = orange_backup_run_command_capture(['tasklist', '/FI', 'PID eq ' . $pid, '/NH'], 2);
+        $stdout = (string) ($cap['stdout'] ?? '');
+        $stderr = strtolower((string) ($cap['stderr'] ?? ''));
+        if (str_contains($stderr, 'timed out')) {
+            return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+        }
+    } elseif (function_exists('exec')) {
+        $out = [];
+        $code = 1;
+        @exec('tasklist /FI "PID eq ' . (int) $pid . '" /NH 2>NUL', $out, $code);
+        $stdout = implode("\n", $out);
+    } else {
+        return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
+    }
+
+    if (((microtime(true) - $started) * 1000) > $budgetMs) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+
+    $lower = strtolower($stdout);
+    if (!str_contains($lower, (string) $pid) || str_contains($lower, 'no tasks')) {
+        return $finish(ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN, true);
+    }
+
+    if ($nameRegex === '' && $needles === []) {
+        return $finish(ORANGE_RESTORE_PE_PID_ALIVE_MATCHING, true);
+    }
+
+    $remainingMs = $budgetMs - (int) round((microtime(true) - $started) * 1000);
+    if ($remainingMs < 250) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+
+    // Single-PID CIM identity (not unbounded process table scan / restore_lock tasklist).
+    $ps = 'try { $p = Get-CimInstance Win32_Process -Filter "ProcessId=' . (int) $pid
+        . '" -ErrorAction Stop; if ($null -eq $p) { Write-Output "NONE"; exit 0 }; '
+        . 'Write-Output ("NAME=" + [string]$p.Name); '
+        . 'Write-Output ("CL=" + [string]$p.CommandLine); exit 0 } '
+        . 'catch { Write-Output "FAIL"; exit 2 }';
+    $psFile = rtrim(sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR
+        . 'orange_pe_pid_' . bin2hex(random_bytes(4)) . '.ps1';
+    if (@file_put_contents($psFile, $ps) === false) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+    $idOut = [];
+    $idCode = 1;
+    try {
+        if (function_exists('orange_backup_run_command_capture')) {
+            $timeoutSec = max(1, (int) floor($remainingMs / 1000));
+            $cap2 = orange_backup_run_command_capture(
+                ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $psFile],
+                $timeoutSec
+            );
+            $idOut = preg_split("/\r\n|\n|\r/", (string) ($cap2['stdout'] ?? '')) ?: [];
+            $idCode = (int) ($cap2['exit_code'] ?? 1);
+            if (str_contains(strtolower((string) ($cap2['stderr'] ?? '')), 'timed out')) {
+                return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+            }
+        } else {
+            @exec(
+                'powershell -NoProfile -ExecutionPolicy Bypass -File ' . escapeshellarg($psFile),
+                $idOut,
+                $idCode
+            );
+        }
+    } finally {
+        @unlink($psFile);
+    }
+
+    if (((microtime(true) - $started) * 1000) > $budgetMs) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+    if ($idCode === 2 || in_array('FAIL', $idOut, true)) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+    if (in_array('NONE', $idOut, true)) {
+        return $finish(ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN, true);
+    }
+
+    $procName = '';
+    $cmdline = '';
+    foreach ($idOut as $line) {
+        $t = trim((string) $line);
+        if (str_starts_with($t, 'NAME=')) {
+            $procName = substr($t, 5);
+        } elseif (str_starts_with($t, 'CL=')) {
+            $cmdline = substr($t, 3);
+        }
+    }
+
+    return $finish($identityFromCmdline($cmdline, $procName), true);
+}
+
+/**
+ * Map bounded PID inspect status → Step-7 process liveness class (no absence coercion).
+ */
+function orange_restore_private_engine_liveness_class_from_pid_inspect(
+    string $inspectStatus,
+    bool $runtimeHealthyFallback
+): string {
+    return match ($inspectStatus) {
+        ORANGE_RESTORE_PE_PID_ALIVE_MATCHING => ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE,
+        ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN => ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD,
+        ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH => ORANGE_RESTORE_STEP7_PROC_PID_IDENTITY_MISMATCH,
+        ORANGE_RESTORE_PE_PID_METADATA_INVALID => ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY,
+        ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE => ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE,
+        default => $runtimeHealthyFallback
+            ? ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE
+            : ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE,
+    };
+}
+
 /**
  * Whether read-only OS process inspection is available (no mutation).
  */
@@ -833,15 +1051,32 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
             $state = (string) ($claim['state'] ?? '');
             if ($state === 'released' || $pid <= 0) {
                 $phpClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
-            } elseif (!function_exists('orange_restore_center_process_alive')) {
-                $phpClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
-            } elseif (orange_restore_center_process_alive($pid)) {
-                $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
-                $claimBlocks = function_exists('orange_restore_center_claim_blocks_schedule')
-                    ? orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')
-                    : true;
             } else {
-                $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+                $phpInspect = orange_restore_private_engine_bounded_pid_inspect($pid, [
+                    'expect_name_regex' => '^(php)(\\.exe)?$',
+                    'expect_cmdline_substrings' => [strtolower($jobId)],
+                ]);
+                $phpClass = orange_restore_private_engine_liveness_class_from_pid_inspect(
+                    (string) ($phpInspect['status'] ?? ORANGE_RESTORE_PE_PID_UNKNOWN),
+                    false
+                );
+                if ($phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE) {
+                    $claimBlocks = function_exists('orange_restore_center_claim_blocks_schedule')
+                        ? orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')
+                        : true;
+                } elseif ($phpClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+                    && function_exists('orange_restore_center_process_alive')
+                    && empty($GLOBALS['orange_restore_diagnostic_forbid_process_spawn'])) {
+                    // Fallback only when bounded inspect unavailable and diagnostics do not forbid spawn.
+                    if (orange_restore_center_process_alive($pid)) {
+                        $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+                        $claimBlocks = function_exists('orange_restore_center_claim_blocks_schedule')
+                            ? orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')
+                            : true;
+                    } else {
+                        $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+                    }
+                }
             }
         }
     }
@@ -849,15 +1084,24 @@ function orange_restore_private_engine_attempt_context(string $workRoot, string 
     $dbClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
     $state = orange_restore_private_engine_load_state($workRoot, $jobId);
     $enginePid = is_array($state) ? (int) ($state['engine_pid'] ?? 0) : 0;
+    $engineHealthy = orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
     if ($enginePid > 0) {
-        if (!function_exists('orange_restore_center_process_alive')) {
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
-        } elseif (orange_restore_center_process_alive($enginePid)) {
+        $dbInspect = orange_restore_private_engine_bounded_pid_inspect($enginePid, [
+            'expect_name_regex' => '^(mysqld|mariadbd)(\\.exe)?$',
+            'expect_cmdline_substrings' => [
+                strtolower($jobId),
+                strtolower(ORANGE_RESTORE_PRIVATE_ENGINE_DIRNAME),
+            ],
+        ]);
+        $dbClass = orange_restore_private_engine_liveness_class_from_pid_inspect(
+            (string) ($dbInspect['status'] ?? ORANGE_RESTORE_PE_PID_UNKNOWN),
+            $engineHealthy
+        );
+        if ($dbClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+            && $engineHealthy) {
             $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
-        } else {
-            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
         }
-    } elseif (is_array($state) && !empty($state['ready']) && orange_restore_private_engine_runtime_healthy($workRoot, $jobId)) {
+    } elseif (is_array($state) && !empty($state['ready']) && $engineHealthy) {
         $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
     }
 
