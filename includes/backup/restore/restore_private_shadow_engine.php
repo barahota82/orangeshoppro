@@ -750,15 +750,25 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
 
     $identityFromCmdline = static function (string $cmdline, string $procName) use ($nameRegex, $needles): string {
         $cl = strtolower($cmdline);
-        $nm = strtolower($procName);
+        $nm = trim($procName);
+        if ($nm === '' && trim($cmdline) !== '') {
+            $parts = preg_split('/\s+/', trim($cmdline));
+            $first = is_array($parts) ? (string) ($parts[0] ?? '') : '';
+            $nm = basename(str_replace('\\', '/', $first));
+        }
         if ($nameRegex !== '') {
-            $hay = trim($nm . ' ' . $cl);
-            if ($hay === '' || @preg_match('/' . $nameRegex . '/i', $hay) !== 1) {
+            if ($nm === '') {
+                return ORANGE_RESTORE_PE_PID_UNKNOWN;
+            }
+            if (@preg_match('/' . $nameRegex . '/i', $nm) !== 1) {
                 return ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH;
             }
         }
         foreach ($needles as $n) {
-            if ($cl === '' || !str_contains($cl, $n)) {
+            if ($cl === '') {
+                return ORANGE_RESTORE_PE_PID_UNKNOWN;
+            }
+            if (!str_contains($cl, $n)) {
                 return ORANGE_RESTORE_PE_PID_ALIVE_IDENTITY_MISMATCH;
             }
         }
