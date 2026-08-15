@@ -44,6 +44,15 @@ function orange_restore_diagnostic_api_emit(array $payload, int $http = 200): vo
     json_response(orange_restore_diagnostic_api_with_deploy_sentinel($payload), $http);
 }
 
+function orange_restore_diagnostic_api_safe_code_from_message(string $message): string
+{
+    if (preg_match('/\b(STEP7_DIAGNOSTIC_[A-Z0-9_]+)\b/', $message, $m) === 1) {
+        return (string) $m[1];
+    }
+
+    return 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
+}
+
 /**
  * @return array<string, mixed>
  */
@@ -148,11 +157,10 @@ try {
     try {
         $diagnostics = orange_restore_center_diagnostics($workRoot, $jobId);
     } catch (Throwable $e) {
-        $mapped = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
         $raw = trim($e->getMessage());
-        if (str_contains($raw, 'STEP7_DIAGNOSTIC_')) {
-            $mapped = $raw;
-        } elseif (defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
+        $mapped = orange_restore_diagnostic_api_safe_code_from_message($raw);
+        if ($mapped === 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE'
+            && defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
             && $raw === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT) {
             $mapped = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
         }
@@ -250,8 +258,8 @@ try {
         || str_contains($code, 'lacks')) {
         $safe = 'STEP7_DIAGNOSTIC_AUTHORIZATION_FAILED';
         $http = 403;
-    } elseif (str_starts_with($code, 'STEP7_DIAGNOSTIC_')) {
-        $safe = $code;
+    } else {
+        $safe = orange_restore_diagnostic_api_safe_code_from_message($code);
     }
     orange_restore_diagnostic_api_structured_failure(
         $safe,
