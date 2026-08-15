@@ -145,24 +145,62 @@ try {
         );
     }
 
+    // Gate B: endpoint-local exception origin only (no shared helper / no instrumentation callback).
+    // Single genuine diagnostic construction — helper invoked exactly once.
     try {
         $diagnostics = orange_restore_center_diagnostics($workRoot, $jobId);
     } catch (Throwable $e) {
-        $mapped = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
-        $raw = trim($e->getMessage());
-        if (str_contains($raw, 'STEP7_DIAGNOSTIC_')) {
-            $mapped = $raw;
-        } elseif (defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
-            && $raw === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT) {
-            $mapped = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
+        $probe = 'STEP7_ENDPOINT_EXCEPTION_ORIGIN_B1';
+        $traceId = bin2hex(random_bytes(8));
+        $originFile = basename(str_replace('\\', '/', (string) $e->getFile()));
+        if ($originFile === '' || $originFile === '.' || $originFile === '..') {
+            $originFile = 'unknown';
         }
-        orange_restore_diagnostic_api_structured_failure(
-            $mapped,
-            'تعذر إكمال تشخيص التشغيل بأمان. الخطوة غير جاهزة.',
-            'diagnostics_builder',
-            $jobId,
-            422
-        );
+        $originLine = (int) $e->getLine();
+        if ($originLine < 0) {
+            $originLine = 0;
+        }
+        $classRaw = $e::class;
+        $classBase = str_contains($classRaw, '\\')
+            ? substr($classRaw, (int) strrpos($classRaw, '\\') + 1)
+            : $classRaw;
+        $classBase = (string) preg_replace('/[^A-Za-z0-9_]/', '', $classBase);
+        if ($classBase === '') {
+            $classBase = 'Throwable';
+        }
+        $safeOriginFile = (string) preg_replace('/[^A-Za-z0-9._-]/', '', $originFile);
+        if ($safeOriginFile === '') {
+            $safeOriginFile = 'unknown';
+        }
+        $notReadyReason = 'exception_origin_' . $classBase . '_' . $safeOriginFile . '_L' . $originLine;
+        $safeMsg = 'تعذر التشخيص بسبب استثناء داخلي آمن'
+            . ' [probe: ' . $probe . ']'
+            . ' [trace: ' . $traceId . ']'
+            . ' [origin: ' . $safeOriginFile . ':' . $originLine . ']'
+            . ' [class: ' . $classBase . ']';
+        orange_restore_diagnostic_api_emit([
+            'success' => false,
+            'read_only' => true,
+            'job_id' => $jobId,
+            'stage' => 'shadow_restore',
+            'failure_layer' => 'exception_origin',
+            'safe_code' => 'step7_diagnostic_exception_origin',
+            'code' => 'step7_diagnostic_exception_origin',
+            'safe_message_ar' => $safeMsg,
+            'message' => $safeMsg,
+            'retryable' => false,
+            'final_readiness' => 'NOT_READY',
+            'exact_not_ready_reason' => $notReadyReason,
+            'package_certificate_status' => 'unavailable',
+            'private_engine_trace_status' => 'unavailable',
+            'step7_action_enabled' => false,
+            'diagnostic_probe' => $probe,
+            'diagnostic_trace_id' => $traceId,
+            'diagnostic_exception_class' => $classBase,
+            'diagnostic_origin_file' => $safeOriginFile,
+            'diagnostic_origin_line' => $originLine,
+            'csrf_token' => orange_backup_admin_csrf_token(),
+        ], 422);
     }
 
     $readiness = is_array($diagnostics['step7_shadow_target_readiness'] ?? null)
