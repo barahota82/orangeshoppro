@@ -616,6 +616,19 @@ function orange_restore_center_process_alive(int $pid): bool
     if ($pid <= 0) {
         return false;
     }
+    // Step-7 diagnostics must never reach restore_lock.php:147 unbounded tasklist.
+    if (!empty($GLOBALS['orange_restore_diagnostic_forbid_process_spawn'])) {
+        $live = orange_restore_center_diagnostic_pid_liveness($pid);
+        if ($live === 'alive') {
+            return true;
+        }
+        if ($live === 'dead') {
+            return false;
+        }
+
+        // unknown (Windows without spawn): conservative busy/alive — never invent READY.
+        return true;
+    }
     if (function_exists('orange_restore_lock_process_alive')) {
         return orange_restore_lock_process_alive($pid);
     }
@@ -638,6 +651,213 @@ function orange_restore_center_can_probe_process_liveness(): bool
     }
 
     return false;
+}
+
+/**
+ * Step-7 diagnostic-only PID probe — never shell_exec/tasklist (restore_lock.php:147 hang).
+ * posix_kill(0) only when available; otherwise unknown (fail closed upstream).
+ *
+ * @return 'alive'|'dead'|'unknown'
+ */
+function orange_restore_center_diagnostic_pid_liveness(int $pid): string
+{
+    if ($pid <= 0) {
+        return 'unknown';
+    }
+    if (function_exists('posix_kill')) {
+        return @posix_kill($pid, 0) ? 'alive' : 'dead';
+    }
+
+    // Windows / no posix: never spawn tasklist from diagnostics (Owner P0 restore_lock L147).
+    return 'unknown';
+}
+
+/**
+ * Read-only claim busy check for diagnostics — no process_alive / no claim clear.
+ *
+ * @param array<string, mixed>|null $claim
+ */
+function orange_restore_center_diagnostic_claim_busy_readonly(?array $claim): bool
+{
+    if ($claim === null) {
+        return false;
+    }
+    if ((string) ($claim['state'] ?? 'running') === 'released') {
+        return false;
+    }
+    $pid = (int) ($claim['pid'] ?? 0);
+    if ($pid <= 0) {
+        // Metadata present without PID: treat as busy (never invent READY).
+        return true;
+    }
+    $live = orange_restore_center_diagnostic_pid_liveness($pid);
+    if ($live === 'dead') {
+        return false;
+    }
+
+    // alive OR unknown (Windows without spawn): busy / not READY.
+    return true;
+}
+
+/**
+ * Diagnostic-only attempt context — never calls orange_restore_lock_process_alive / tasklist
+ * and never runs job-scoped PowerShell process enumeration.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_center_diagnostic_attempt_context_readonly(string $workRoot, string $jobId): array
+{
+    $job = [];
+    try {
+        $job = orange_restore_fw_read($workRoot, $jobId);
+    } catch (Throwable) {
+        $job = [];
+    }
+    $status = (string) ($job['status'] ?? '');
+    $inflight = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
+    ], true);
+    $terminalFailed = $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED;
+    $terminalReady = $status === ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY;
+
+    $claimBlocks = false;
+    $phpClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
+    $claimPresent = false;
+    if (function_exists('orange_restore_center_worker_run_claim_path')
+        && function_exists('orange_restore_center_read_run_claim')) {
+        $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
+        $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
+        if (is_array($claim)) {
+            $claimPresent = true;
+            $pid = (int) ($claim['pid'] ?? 0);
+            $state = (string) ($claim['state'] ?? '');
+            if ($state === 'released' || $pid <= 0) {
+                $phpClass = $pid <= 0 && $state !== 'released'
+                    ? ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+                    : ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
+                $claimBlocks = orange_restore_center_diagnostic_claim_busy_readonly($claim);
+            } else {
+                $live = orange_restore_center_diagnostic_pid_liveness($pid);
+                if ($live === 'alive') {
+                    $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+                    $claimBlocks = true;
+                } elseif ($live === 'dead') {
+                    $phpClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+                    $claimBlocks = false;
+                } else {
+                    // Windows: unknown without tasklist — lock-busy / not READY (never spawn).
+                    $phpClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+                    $claimBlocks = true;
+                }
+            }
+        }
+    }
+
+    $dbClass = ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY;
+    $state = function_exists('orange_restore_private_engine_load_state')
+        ? orange_restore_private_engine_load_state($workRoot, $jobId)
+        : null;
+    $enginePid = is_array($state) ? (int) ($state['engine_pid'] ?? 0) : 0;
+    $healthy = function_exists('orange_restore_private_engine_runtime_healthy')
+        && orange_restore_private_engine_runtime_healthy($workRoot, $jobId);
+    if ($enginePid > 0) {
+        $live = orange_restore_center_diagnostic_pid_liveness($enginePid);
+        if ($live === 'alive') {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+        } elseif ($live === 'dead') {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD;
+        } elseif ($healthy) {
+            // Port/PDO proves engine service without tasklist.
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+        } else {
+            $dbClass = ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE;
+        }
+    } elseif (is_array($state) && !empty($state['ready']) && $healthy) {
+        $dbClass = ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    } elseif (!$claimPresent && !$inflight) {
+        // No claim / no engine pid metadata: absence without spawn probes.
+        $phpClass = $phpClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY
+            ? ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND
+            : $phpClass;
+        $dbClass = ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND;
+    }
+
+    $nonActiveProven = [
+        ORANGE_RESTORE_STEP7_PROC_NO_JOB_SCOPED_FOUND,
+        ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD,
+        ORANGE_RESTORE_STEP7_PROC_PID_IDENTITY_MISMATCH,
+        ORANGE_RESTORE_STEP7_PROC_PID_REUSED,
+        ORANGE_RESTORE_STEP7_PROC_EXISTS_OTHER_JOB,
+    ];
+    $phpActive = $phpClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    $dbActive = $dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_ACTIVE;
+    $activeAttempt = $claimBlocks || ($inflight && $phpActive) || $phpActive;
+
+    $phpAbsenceProven = !$phpActive && !$activeAttempt
+        && in_array($phpClass, $nonActiveProven, true)
+        && ($terminalFailed || $terminalReady || !$claimPresent || !$claimBlocks);
+    $processAbsenceProven = $phpAbsenceProven
+        && !$dbActive
+        && in_array($dbClass, $nonActiveProven, true);
+
+    $engineHealthyOwned = $dbActive
+        && ($terminalFailed || $terminalReady || !$inflight)
+        && !$phpActive
+        && !$claimBlocks
+        && (is_array($state) && (!empty($state['ready']) || !empty($state['datadir_job_owned'])));
+    $engineServiceState = ORANGE_RESTORE_ENGINE_ABSENT;
+    if ($activeAttempt && $dbActive) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_IN_USE_BY_ACTIVE_ATTEMPT;
+    } elseif ($engineHealthyOwned) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_READY_IDLE;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_MATCHED_TERMINAL_OR_DEAD
+        && is_array($state) && !empty($state['datadir_job_owned'])) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_STOPPED_OWNED;
+    } elseif ($dbClass === ORANGE_RESTORE_STEP7_PROC_INSPECTION_UNAVAILABLE
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_EVIDENCE_CONTRADICTORY
+        || $dbClass === ORANGE_RESTORE_STEP7_PROC_METADATA_ABSENT_LEGACY) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_OWNERSHIP_UNKNOWN;
+    } elseif ($dbActive && $inflight) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_STARTING;
+    } elseif (is_array($state) && !empty($state['terminal_failure'])) {
+        $engineServiceState = ORANGE_RESTORE_ENGINE_FAILED;
+    }
+
+    if ($phpActive || $activeAttempt) {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_ACTIVE;
+    } elseif ($engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE && $phpAbsenceProven) {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_PROVEN;
+    } elseif ($processAbsenceProven) {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_PROVEN;
+    } else {
+        $absenceConclusion = ORANGE_RESTORE_STEP7_ABSENCE_NOT_PROVABLE;
+    }
+
+    $phpCompat = $phpActive ? 'alive'
+        : (in_array($phpClass, $nonActiveProven, true) ? 'inactive' : 'unknown');
+    $dbCompat = $dbActive ? 'alive'
+        : (in_array($dbClass, $nonActiveProven, true) ? 'inactive' : 'unknown');
+
+    return [
+        'active_attempt' => $activeAttempt,
+        'latest_attempt_terminal' => $terminalFailed || $terminalReady,
+        'php_worker_liveness' => $phpCompat,
+        'private_db_liveness' => $dbCompat,
+        'php_worker_liveness_class' => $phpClass,
+        'private_db_liveness_class' => $dbClass,
+        'php_worker_absence_proven' => $phpAbsenceProven,
+        'process_absence_proven' => $processAbsenceProven
+            || ($engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE && $phpAbsenceProven),
+        'process_absence_conclusion' => $absenceConclusion,
+        'engine_service_state' => $engineServiceState,
+        'engine_ready_idle' => $engineServiceState === ORANGE_RESTORE_ENGINE_READY_IDLE,
+        'process_inspection_available' => function_exists('posix_kill'),
+        'claim_present' => $claimPresent,
+        'claim_blocks' => $claimBlocks,
+        'diagnostic_skip_process_spawn' => true,
+    ];
 }
 
 /**
@@ -1478,6 +1698,7 @@ function orange_restore_step7_retry_preflight(
     $includeSqlPackageScan = array_key_exists('include_sql_package_scan', $options)
         ? (bool) $options['include_sql_package_scan']
         : true;
+    $diagnosticSkipProcessSpawn = !empty($options['diagnostic_skip_process_spawn']);
     if (!function_exists('orange_restore_private_engine_public_readiness')) {
         require_once __DIR__ . '/restore_private_shadow_engine.php';
     }
@@ -1489,11 +1710,23 @@ function orange_restore_step7_retry_preflight(
     // Read-only active check — do NOT call reconcile/clear (write-nothing contract).
     $active = ['active' => false, 'class' => '', 'attempt_id' => '', 'claim' => null];
     if (function_exists('orange_restore_center_worker_run_claim_path')
-        && function_exists('orange_restore_center_read_run_claim')
-        && function_exists('orange_restore_center_claim_blocks_schedule')) {
+        && function_exists('orange_restore_center_read_run_claim')) {
         $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, 'shadow_db');
         $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
-        if (is_array($claim) && orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')) {
+        if ($diagnosticSkipProcessSpawn) {
+            if (is_array($claim) && orange_restore_center_diagnostic_claim_busy_readonly($claim)) {
+                $active = [
+                    'active' => true,
+                    'class' => defined('ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS')
+                        ? ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS
+                        : 'CLAIM_BLOCKS',
+                    'attempt_id' => trim((string) ($claim['attempt_id'] ?? '')),
+                    'claim' => $claim,
+                ];
+            }
+        } elseif (function_exists('orange_restore_center_claim_blocks_schedule')
+            && is_array($claim)
+            && orange_restore_center_claim_blocks_schedule($claim, $job, 'shadow_db')) {
             $active = [
                 'active' => true,
                 'class' => defined('ORANGE_RESTORE_STEP7_ACTIVE_CLASS_CLAIM_BLOCKS')
@@ -1508,9 +1741,13 @@ function orange_restore_step7_retry_preflight(
     $env = orange_backup_load_env_array($projectRoot);
     $resolved = orange_restore_shadow_resolve_target($env, $projectRoot, $jobId, $meta);
     $engine = orange_restore_private_engine_public_readiness($projectRoot, $workRoot, $jobId);
-    $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
-        ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
-        : [];
+    if ($diagnosticSkipProcessSpawn) {
+        $attemptCtx = orange_restore_center_diagnostic_attempt_context_readonly($workRoot, $jobId);
+    } else {
+        $attemptCtx = function_exists('orange_restore_private_engine_attempt_context')
+            ? orange_restore_private_engine_attempt_context($workRoot, $jobId)
+            : [];
+    }
     $identity = (string) ($resolved['identity_hash'] ?? '');
     $boundHash = trim((string) ($meta['shadow_db_identity_hash'] ?? ''));
     $match = $identity !== '' && $boundHash !== '' && hash_equals($identity, $boundHash);
@@ -2338,9 +2575,28 @@ function orange_restore_center_attach_verified_schedule(
  */
 function orange_restore_center_diagnostics(string $workRoot, string $jobId): array
 {
-    // Refresh-only public-state reconcile (no new Step-7 attempt).
-    $reconciled = orange_restore_center_reconcile_stale_shadow_restore_public_state($workRoot, $jobId);
-    $job = is_array($reconciled) ? $reconciled : orange_restore_fw_read($workRoot, $jobId);
+    // Diagnostic is read-only: never reconcile/clear claims or mutate public state.
+    // Forbid unbounded tasklist (restore_lock.php:147) for this request — including nested
+    // live_trace / any accidental process_alive callers.
+    $prevForbid = $GLOBALS['orange_restore_diagnostic_forbid_process_spawn'] ?? null;
+    $GLOBALS['orange_restore_diagnostic_forbid_process_spawn'] = true;
+    try {
+        return orange_restore_center_diagnostics_body($workRoot, $jobId);
+    } finally {
+        if ($prevForbid === null) {
+            unset($GLOBALS['orange_restore_diagnostic_forbid_process_spawn']);
+        } else {
+            $GLOBALS['orange_restore_diagnostic_forbid_process_spawn'] = $prevForbid;
+        }
+    }
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_center_diagnostics_body(string $workRoot, string $jobId): array
+{
+    $job = orange_restore_fw_read($workRoot, $jobId);
     $status = (string) ($job['status'] ?? '');
     $guidedWorker = orange_restore_center_guided_worker_key_from_status($status);
     $familyMap = orange_restore_center_stage_audit_event_family_map();
@@ -2350,7 +2606,8 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
 
     $workers = [];
     foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
-        $claim = orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, $job);
+        $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, $workerKey);
+        $claim = is_file($claimPath) ? orange_restore_center_read_run_claim($claimPath) : null;
         $schedulable = false;
         try {
             orange_restore_center_assert_worker_stage_allowed($job, $workerKey);
@@ -2358,7 +2615,7 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
         } catch (Throwable $e) {
             $schedulable = false;
         }
-        $blocking = $claim !== null && orange_restore_center_claim_blocks_schedule($claim, $job, $workerKey);
+        $blocking = orange_restore_center_diagnostic_claim_busy_readonly($claim);
         $workers[] = [
             'worker' => $workerKey,
             'schedulable_now' => $schedulable && !$blocking,
@@ -2759,7 +3016,10 @@ function orange_restore_center_diagnostics(string $workRoot, string $jobId): arr
             }
 
             // Authoritative retry preflight overrides ad-hoc green/button (parity with request endpoint).
-            $retryPre = orange_restore_step7_retry_preflight($projectRootDiag, $workRoot, $jobId);
+            // diagnostic_skip_process_spawn: never hit restore_lock.php:147 tasklist from Step 7 diagnostics.
+            $retryPre = orange_restore_step7_retry_preflight($projectRootDiag, $workRoot, $jobId, [
+                'diagnostic_skip_process_spawn' => true,
+            ]);
             $readyToken = (string) ($retryPre['ready_token'] ?? '');
             $failCode = (string) ($retryPre['code'] ?? $failCode);
             $provisionGreen = $readyToken === ORANGE_RESTORE_STEP7_READY_FOR_PRIVATE_SHADOW_PROVISIONING;
