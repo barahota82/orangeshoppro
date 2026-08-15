@@ -44,9 +44,7 @@ function orange_restore_diagnostic_api_emit(array $payload, int $http = 200): vo
     json_response(orange_restore_diagnostic_api_with_deploy_sentinel($payload), $http);
 }
 
-/**
- * @return array<string, mixed>
- */
+/** Emit a safe structured diagnostic failure response and exit. */
 function orange_restore_diagnostic_api_structured_failure(
     string $safeCode,
     string $safeMessageAr,
