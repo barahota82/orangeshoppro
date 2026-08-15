@@ -7,13 +7,13 @@ declare(strict_types=1);
  * Contained fixtures only. No Backup/Verify/DRV/Restore execution. No Production BackupRoot.
  */
 
-$projectRoot = 'D:/orange';
-$phpBin = 'C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/php.exe';
+$projectRoot = realpath(dirname(__DIR__)) ?: dirname(__DIR__);
 $admin = $projectRoot . '/includes/backup/backup_admin.php';
 $list = $projectRoot . '/admin/api/backup/list.php';
 $ui = $projectRoot . '/admin/pages/backup_center.php';
 $config = $projectRoot . '/config.php';
 $bootstrap = $projectRoot . '/admin/api/backup/_bootstrap.php';
+$isWindows = DIRECTORY_SEPARATOR === '\\';
 
 $pass = 0;
 $fail = 0;
@@ -167,7 +167,7 @@ $ok(($a['r']['storage_source'] ?? '') === 'cache', 'A3 source cache');
 $ok(($a['r']['total_bytes'] ?? null) === 666, 'A4 exact total_bytes');
 $ok(($a['r']['total_human'] ?? '') === '666 B', 'A5 exact total_human');
 $ok($a['ms'] <= 250, 'A6 hit <=250ms got=' . $a['ms']);
-$ok(!is_file($hitRoot . DIRECTORY_SEPARATOR . 'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json') || true, 'A7 cache file still present');
+$ok(is_file($hitRoot . DIRECTORY_SEPARATOR . 'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json'), 'A7 cache file still present');
 $mtime1 = filemtime($hitRoot . DIRECTORY_SEPARATOR . 'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json');
 usleep(20000);
 $a2 = orange_backup_admin_collect_storage_totals($hitRoot, $inventory);
@@ -239,14 +239,22 @@ $unSig = $sigFor($unRoot, $inv());
 $writeCache($unRoot, $unSig, $completeStorage);
 $cacheFile = $unRoot . DIRECTORY_SEPARATOR . 'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json';
 $user = getenv('USERNAME') ?: 'Everyone';
-@exec('icacls ' . escapeshellarg($cacheFile) . ' /deny ' . escapeshellarg($user) . ':(R) >NUL 2>&1');
+if ($isWindows) {
+    @exec('icacls ' . escapeshellarg($cacheFile) . ' /deny ' . escapeshellarg($user) . ':(R) >NUL 2>&1');
+} else {
+    @chmod($cacheFile, 0000);
+}
 $e = orange_backup_admin_collect_storage_totals($unRoot, $inv());
 $ok(
     in_array(($e['storage_reason'] ?? ''), ['cache_unreadable', 'cache_malformed', 'cache_incomplete', 'unavailable'], true)
     || (($e['storage_is_complete'] ?? true) === false),
     'E1 unreadable yields non-complete safe status reason=' . ($e['storage_reason'] ?? '')
 );
-@exec('icacls ' . escapeshellarg($cacheFile) . ' /reset >NUL 2>&1');
+if ($isWindows) {
+    @exec('icacls ' . escapeshellarg($cacheFile) . ' /reset >NUL 2>&1');
+} else {
+    @chmod($cacheFile, 0644);
+}
 
 // F. Unwritable locks (file named locks) — no write / no scan
 $wf = $base . DIRECTORY_SEPARATOR . 'writefail';
@@ -266,7 +274,11 @@ $locked = $trap . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'loc
 $mkTree($locked, 10);
 mkdir($trap . DIRECTORY_SEPARATOR . 'country_packages', 0777, true);
 mkdir($trap . DIRECTORY_SEPARATOR . 'logs', 0777, true);
-@exec('icacls ' . escapeshellarg($locked) . ' /deny ' . escapeshellarg($user) . ':(OI)(CI)(R) >NUL 2>&1');
+if ($isWindows) {
+    @exec('icacls ' . escapeshellarg($locked) . ' /deny ' . escapeshellarg($user) . ':(OI)(CI)(R) >NUL 2>&1');
+} else {
+    @chmod($locked, 0000);
+}
 $threw = false;
 try {
     $g = $timeMs(static fn () => orange_backup_admin_collect_storage_totals($trap, $inv()));
@@ -317,6 +329,18 @@ $ok(
 // K. No mutation markers in collect
 $ok(!preg_match('/run_full_backup|export_all_recoverable|recovery-check|drv/i', $collectFn), 'K1 no backup engines in collect');
 
+// L. Explicit refresh path (outside list startup) writes the cache.
+$refreshRoot = $base . DIRECTORY_SEPARATOR . 'refresh';
+$mkTree($refreshRoot . DIRECTORY_SEPARATOR . 'snapshots', 6);
+$mkTree($refreshRoot . DIRECTORY_SEPARATOR . 'country_packages', 4);
+$mkTree($refreshRoot . DIRECTORY_SEPARATOR . 'logs', 2);
+$refresh = orange_backup_admin_refresh_storage_totals_cache($refreshRoot, $inv());
+$ok(is_array($refresh) && ($refresh['storage_is_complete'] ?? false) === true, 'L1 refresh writes complete payload');
+$ok(is_file($refreshRoot . DIRECTORY_SEPARATOR . 'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json'), 'L2 refresh cache file exists');
+$refreshRead = orange_backup_admin_collect_storage_totals($refreshRoot, $inv());
+$ok(($refreshRead['storage_source'] ?? '') === 'cache', 'L3 collect reads refreshed cache');
+$ok(($refreshRead['total_bytes'] ?? null) === ($refresh['total_bytes'] ?? -1), 'L4 refreshed bytes round-trip');
+
 // Timing route budget on function (list route full HTTP needs env; assert function budgets already)
 $ok($a['ms'] <= 250 && $b['ms'] <= 250 && $c['ms'] <= 250, 'PERF function budgets');
 
@@ -339,7 +363,11 @@ $cleanup = static function (string $path) use (&$cleanup): void {
     }
     @rmdir($path);
 };
-@exec('icacls ' . escapeshellarg($locked) . ' /reset >NUL 2>&1');
+if ($isWindows) {
+    @exec('icacls ' . escapeshellarg($locked) . ' /reset >NUL 2>&1');
+} else {
+    @chmod($locked, 0777);
+}
 $cleanup($base);
 
 echo "SUMMARY pass=$pass fail=$fail\n";
