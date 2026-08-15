@@ -126,11 +126,12 @@ function orange_restore_final_approval_precheck(
         return ['ok' => false, 'code' => 'execution_plan_missing', 'message' => 'execution_plan.json missing.'];
     }
 
-    $lock = orange_restore_exec_lock_status($workRoot);
-    $heldJob = (string) (($lock['payload'] ?? [])['job_id'] ?? '');
-    if (!$lock['held'] || $lock['stale'] || $heldJob !== $jobId) {
-        return ['ok' => false, 'code' => 'execution_lock_not_held', 'message' => 'Execution orchestrator lock not held by this job.'];
-    }
+    // Final approval is a pre-execution metadata transition. It must not require a live
+    // non-stale execution orchestrator lock left by Step-4 prepare across HTTP requests
+    // (Windows PID-stale after the prepare request ends). Serialization uses
+    // .approval_transition.lock; worker/execution locks remain for later stages.
+    // Active-worker safety is enforced by status === awaiting_final_approval plus
+    // execution_started === false (workers are not schedulable in this status).
 
     $packageType = (string) ($job['package_type'] ?? '');
     $packageId = (string) ($job['package_id'] ?? '');
