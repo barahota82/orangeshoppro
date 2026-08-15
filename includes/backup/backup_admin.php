@@ -650,19 +650,76 @@ function orange_backup_admin_list_finalized_dirs_cached(string $containerDir): a
 }
 
 /**
- * Storage byte totals with mtime/count signature cache under BackupRoot/locks.
- * Values match recursive orange_backup_admin_dir_size_bytes() when cache misses.
+ * Neutral storage totals for Backup Center list startup when no complete cache is available.
+ * Human fields use '' so existing UI (`value || '—'`) renders an em dash without claiming 0 B.
+ * Byte fields use null (no production consumer arithmetics on these keys).
  *
- * @param array{countries_with_packages?:int,stored_country_packages_total?:int,full_snapshots_total?:int}|null $inventory
  * @return array{
- *   snapshots_bytes:int,
- *   country_packages_bytes:int,
- *   logs_bytes:int,
- *   total_bytes:int,
+ *   snapshots_bytes:null,
+ *   country_packages_bytes:null,
+ *   logs_bytes:null,
+ *   total_bytes:null,
  *   snapshots_human:string,
  *   country_packages_human:string,
  *   logs_human:string,
- *   total_human:string
+ *   total_human:string,
+ *   storage_status:string,
+ *   storage_is_complete:bool,
+ *   storage_source:string,
+ *   storage_reason:string
+ * }
+ */
+function orange_backup_admin_storage_totals_neutral(string $status, string $reason, string $source = 'none'): array
+{
+    $safeStatus = (string) preg_replace('/[^a-z_]/', '', strtolower($status));
+    $safeReason = (string) preg_replace('/[^a-z_]/', '', strtolower($reason));
+    $safeSource = (string) preg_replace('/[^a-z_]/', '', strtolower($source));
+    if ($safeStatus === '') {
+        $safeStatus = 'unavailable';
+    }
+    if ($safeReason === '') {
+        $safeReason = 'cache_missing';
+    }
+    if ($safeSource === '') {
+        $safeSource = 'none';
+    }
+
+    return [
+        'snapshots_bytes' => null,
+        'country_packages_bytes' => null,
+        'logs_bytes' => null,
+        'total_bytes' => null,
+        'snapshots_human' => '',
+        'country_packages_human' => '',
+        'logs_human' => '',
+        'total_human' => '',
+        'storage_status' => $safeStatus,
+        'storage_is_complete' => false,
+        'storage_source' => $safeSource,
+        'storage_reason' => $safeReason,
+    ];
+}
+
+/**
+ * Storage byte totals — cache-first for Backup list/startup (Option 1).
+ * Valid complete cache hit returns exact cached totals.
+ * Missing/stale/malformed/unreadable cache returns a neutral payload.
+ * Ordinary list startup never recursively scans or writes the cache.
+ *
+ * @param array{countries_with_packages?:int,stored_country_packages_total?:int,full_snapshots_total?:int}|null $inventory
+ * @return array{
+ *   snapshots_bytes:int|null,
+ *   country_packages_bytes:int|null,
+ *   logs_bytes:int|null,
+ *   total_bytes:int|null,
+ *   snapshots_human:string,
+ *   country_packages_human:string,
+ *   logs_human:string,
+ *   total_human:string,
+ *   storage_status:string,
+ *   storage_is_complete:bool,
+ *   storage_source:string,
+ *   storage_reason?:string
  * }
  */
 function orange_backup_admin_collect_storage_totals(string $backupRoot, ?array $inventory = null): array
@@ -685,67 +742,64 @@ function orange_backup_admin_collect_storage_totals(string $backupRoot, ?array $
         $backupRoot,
         'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json'
     );
-    if (is_file($cachePath) && is_readable($cachePath)) {
-        $raw = file_get_contents($cachePath);
-        $cached = is_string($raw) ? json_decode($raw, true) : null;
-        if (
-            is_array($cached)
-            && isset($cached['signature'], $cached['storage'])
-            && is_array($cached['signature'])
-            && is_array($cached['storage'])
-            && $cached['signature'] === $signature
-        ) {
-            /** @var array<string, mixed> $storage */
-            $storage = $cached['storage'];
 
-            return [
-                'snapshots_bytes' => (int) ($storage['snapshots_bytes'] ?? 0),
-                'country_packages_bytes' => (int) ($storage['country_packages_bytes'] ?? 0),
-                'logs_bytes' => (int) ($storage['logs_bytes'] ?? 0),
-                'total_bytes' => (int) ($storage['total_bytes'] ?? 0),
-                'snapshots_human' => (string) ($storage['snapshots_human'] ?? '0 B'),
-                'country_packages_human' => (string) ($storage['country_packages_human'] ?? '0 B'),
-                'logs_human' => (string) ($storage['logs_human'] ?? '0 B'),
-                'total_human' => (string) ($storage['total_human'] ?? '0 B'),
-            ];
+    if (!is_file($cachePath)) {
+        return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_missing', 'none');
+    }
+    if (!is_readable($cachePath)) {
+        return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_unreadable', 'none');
+    }
+
+    $raw = @file_get_contents($cachePath);
+    if (!is_string($raw)) {
+        return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_unreadable', 'none');
+    }
+
+    $cached = json_decode($raw, true);
+    if (!is_array($cached)) {
+        return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_malformed', 'none');
+    }
+    if (
+        !isset($cached['signature'], $cached['storage'])
+        || !is_array($cached['signature'])
+        || !is_array($cached['storage'])
+    ) {
+        return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_incomplete', 'none');
+    }
+
+    if ($cached['signature'] !== $signature) {
+        // Valid JSON shape but not current — never present stale numbers as complete (UI frozen).
+        return orange_backup_admin_storage_totals_neutral('stale', 'signature_mismatch', 'cache');
+    }
+
+    /** @var array<string, mixed> $storage */
+    $storage = $cached['storage'];
+    $byteKeys = ['snapshots_bytes', 'country_packages_bytes', 'logs_bytes', 'total_bytes'];
+    $humanKeys = ['snapshots_human', 'country_packages_human', 'logs_human', 'total_human'];
+    foreach ($byteKeys as $key) {
+        if (!array_key_exists($key, $storage) || !is_numeric($storage[$key])) {
+            return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_incomplete', 'cache');
+        }
+    }
+    foreach ($humanKeys as $key) {
+        if (!array_key_exists($key, $storage) || !is_string($storage[$key]) || $storage[$key] === '') {
+            return orange_backup_admin_storage_totals_neutral('unavailable', 'cache_incomplete', 'cache');
         }
     }
 
-    $snapshotsBytes = orange_backup_admin_dir_size_bytes($snapshotsDir);
-    $countryBytes = orange_backup_admin_dir_size_bytes($countryRoot);
-    $logsBytes = orange_backup_admin_dir_size_bytes($logsDir);
-    $totalBytes = $snapshotsBytes + $countryBytes + $logsBytes;
-    $storage = [
-        'snapshots_bytes' => $snapshotsBytes,
-        'country_packages_bytes' => $countryBytes,
-        'logs_bytes' => $logsBytes,
-        'total_bytes' => $totalBytes,
-        'snapshots_human' => orange_backup_admin_format_bytes($snapshotsBytes),
-        'country_packages_human' => orange_backup_admin_format_bytes($countryBytes),
-        'logs_human' => orange_backup_admin_format_bytes($logsBytes),
-        'total_human' => orange_backup_admin_format_bytes($totalBytes),
+    return [
+        'snapshots_bytes' => (int) $storage['snapshots_bytes'],
+        'country_packages_bytes' => (int) $storage['country_packages_bytes'],
+        'logs_bytes' => (int) $storage['logs_bytes'],
+        'total_bytes' => (int) $storage['total_bytes'],
+        'snapshots_human' => (string) $storage['snapshots_human'],
+        'country_packages_human' => (string) $storage['country_packages_human'],
+        'logs_human' => (string) $storage['logs_human'],
+        'total_human' => (string) $storage['total_human'],
+        'storage_status' => 'complete',
+        'storage_is_complete' => true,
+        'storage_source' => 'cache',
     ];
-
-    $locksDir = dirname($cachePath);
-    if (!is_dir($locksDir)) {
-        @mkdir($locksDir, 0775, true);
-    }
-    if (is_dir($locksDir) && is_writable($locksDir)) {
-        $payload = json_encode(
-            [
-                'version' => 1,
-                'signature' => $signature,
-                'storage' => $storage,
-                'cached_at' => gmdate('c'),
-            ],
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        );
-        if (is_string($payload)) {
-            @file_put_contents($cachePath, $payload . "\n", LOCK_EX);
-        }
-    }
-
-    return $storage;
 }
 
 /**
