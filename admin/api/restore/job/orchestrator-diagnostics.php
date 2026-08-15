@@ -8,6 +8,165 @@ declare(strict_types=1);
  * Always returns structured JSON (never generic-only Owner message).
  */
 
+// C2 — endpoint-local fatal/timeout origin capture (register BEFORE config / global boundary).
+// Marker: STEP7_ENDPOINT_LOCAL_FATAL_ORIGIN_C2 — no root-cause fix; auth-gated; inert until authorized.
+$GLOBALS['orange_step7_diag_c2_t0'] = microtime(true);
+$GLOBALS['orange_step7_diag_c2_authorized'] = false;
+$GLOBALS['orange_step7_diag_c2_completed'] = false;
+$GLOBALS['orange_step7_diag_c2_job_id'] = '';
+
+if (!function_exists('orange_step7_diag_c2_shutdown')) {
+    /**
+     * Runs first among shutdown callbacks registered from this request (before config.php global).
+     * Intercepts only post-auth unfinished fatals for this exact script; else inert.
+     */
+    function orange_step7_diag_c2_shutdown(): void
+    {
+        $script = basename(str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? '')));
+        if ($script === '' || $script === '.' || $script === '..') {
+            $script = basename(str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+        }
+        if ($script !== 'orchestrator-diagnostics.php') {
+            return;
+        }
+        if (empty($GLOBALS['orange_step7_diag_c2_authorized'])
+            || !empty($GLOBALS['orange_step7_diag_c2_completed'])) {
+            return;
+        }
+
+        $err = error_get_last();
+        if ($err === null) {
+            return;
+        }
+        $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+        $type = (int) ($err['type'] ?? 0);
+        if (!in_array($type, $fatalTypes, true)) {
+            return;
+        }
+
+        $rawMsg = (string) ($err['message'] ?? '');
+        $category = 'php_fatal';
+        if (stripos($rawMsg, 'Maximum execution time') !== false
+            || stripos($rawMsg, 'max_execution_time') !== false) {
+            $category = 'php_timeout';
+        } elseif (stripos($rawMsg, 'Allowed memory size') !== false
+            || stripos($rawMsg, 'Out of memory') !== false
+            || stripos($rawMsg, 'memory exhausted') !== false) {
+            $category = 'php_memory';
+        }
+
+        $typeMap = [
+            E_ERROR => 'E_ERROR',
+            E_PARSE => 'E_PARSE',
+            E_CORE_ERROR => 'E_CORE_ERROR',
+            E_COMPILE_ERROR => 'E_COMPILE_ERROR',
+            E_USER_ERROR => 'E_USER_ERROR',
+        ];
+        $typeName = $typeMap[$type] ?? 'E_ERROR';
+
+        $originFile = basename(str_replace('\\', '/', (string) ($err['file'] ?? '')));
+        if ($originFile === '' || $originFile === '.' || $originFile === '..') {
+            $originFile = 'unknown';
+        }
+        $safeOriginFile = (string) preg_replace('/[^A-Za-z0-9._-]/', '', $originFile);
+        if ($safeOriginFile === '') {
+            $safeOriginFile = 'unknown';
+        }
+        $originLine = (int) ($err['line'] ?? 0);
+        if ($originLine < 0) {
+            $originLine = 0;
+        }
+
+        $t0 = (float) ($GLOBALS['orange_step7_diag_c2_t0'] ?? microtime(true));
+        $elapsedMs = (int) max(0, (int) round((microtime(true) - $t0) * 1000));
+
+        $probe = 'STEP7_ENDPOINT_LOCAL_FATAL_ORIGIN_C2';
+        try {
+            $traceId = bin2hex(random_bytes(8));
+        } catch (Throwable) {
+            $traceId = substr(str_replace('.', '', uniqid('', true)), 0, 16);
+        }
+
+        $jobId = (string) ($GLOBALS['orange_step7_diag_c2_job_id'] ?? '');
+        $notReadyReason = 'endpoint_fatal_origin_' . $category . '_' . $safeOriginFile . '_L' . $originLine;
+        $safeMsg = 'تعذر التشخيص بسبب إيقاف فادح داخلي آمن'
+            . ' [probe: ' . $probe . ']'
+            . ' [trace: ' . $traceId . ']'
+            . ' [category: ' . $category . ']'
+            . ' [type: ' . $typeName . ']'
+            . ' [origin: ' . $safeOriginFile . ':' . $originLine . ']'
+            . ' [elapsed_ms: ' . $elapsedMs . ']';
+
+        $csrf = '';
+        if (function_exists('orange_backup_admin_csrf_token')) {
+            try {
+                $csrf = (string) orange_backup_admin_csrf_token();
+            } catch (Throwable) {
+                $csrf = '';
+            }
+        }
+
+        $sentinel = 'ORANGE_STEP7_DIAG_SENTINEL_94D_CHAIN_A1';
+        if (defined('ORANGE_STEP7_DIAG_DEPLOY_SENTINEL')) {
+            $sentinel = (string) ORANGE_STEP7_DIAG_DEPLOY_SENTINEL;
+        }
+
+        $payload = [
+            'success' => false,
+            'read_only' => true,
+            'job_id' => $jobId,
+            'stage' => 'shadow_restore',
+            'failure_layer' => 'endpoint_fatal_origin',
+            'safe_code' => 'step7_diagnostic_endpoint_fatal_origin',
+            'code' => 'step7_diagnostic_endpoint_fatal_origin',
+            'safe_message_ar' => $safeMsg,
+            'message' => $safeMsg,
+            'retryable' => false,
+            'final_readiness' => 'NOT_READY',
+            'exact_not_ready_reason' => $notReadyReason,
+            'package_certificate_status' => 'unavailable',
+            'private_engine_trace_status' => 'unavailable',
+            'step7_action_enabled' => false,
+            'diagnostic_probe' => $probe,
+            'diagnostic_trace_id' => $traceId,
+            'diagnostic_shutdown_category' => $category,
+            'diagnostic_php_error_type' => $typeName,
+            'diagnostic_origin_file' => $safeOriginFile,
+            'diagnostic_origin_line' => $originLine,
+            'diagnostic_elapsed_ms' => $elapsedMs,
+            'csrf_token' => $csrf,
+            'deploy_sentinel' => $sentinel,
+        ];
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        if (!defined('ORANGE_ERROR_BOUNDARY_CLIENT_SENT')) {
+            define('ORANGE_ERROR_BOUNDARY_CLIENT_SENT', true);
+        }
+        if (!defined('ORANGE_JSON_RESPONSE_EMITTED')) {
+            define('ORANGE_JSON_RESPONSE_EMITTED', true);
+        }
+        if (!headers_sent()) {
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            header('X-Orange-Step7-Diagnostic-Sentinel: ' . $sentinel);
+        }
+        $flags = JSON_UNESCAPED_UNICODE;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+        echo json_encode($payload, $flags);
+        // Suppress later global / restore JSON shutdown handlers.
+        exit;
+    }
+}
+
+register_shutdown_function('orange_step7_diag_c2_shutdown');
+if (ob_get_level() === 0) {
+    ob_start();
+}
+
 require_once __DIR__ . '/../_bootstrap.php';
 require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_center_orchestrator.php';
 
@@ -38,6 +197,8 @@ function orange_restore_diagnostic_api_with_deploy_sentinel(array $payload): arr
  */
 function orange_restore_diagnostic_api_emit(array $payload, int $http = 200): void
 {
+    // Intentional response complete — keep C2 shutdown inert.
+    $GLOBALS['orange_step7_diag_c2_completed'] = true;
     if (!headers_sent()) {
         header('X-Orange-Step7-Diagnostic-Sentinel: ' . ORANGE_STEP7_DIAG_DEPLOY_SENTINEL);
     }
@@ -144,6 +305,10 @@ try {
             403
         );
     }
+
+    // C2: auth + restore permission + job-access + request/job ID validation succeeded.
+    $GLOBALS['orange_step7_diag_c2_authorized'] = true;
+    $GLOBALS['orange_step7_diag_c2_job_id'] = $jobId;
 
     // Gate B: endpoint-local exception origin only (no shared helper / no instrumentation callback).
     // Single genuine diagnostic construction — helper invoked exactly once.
