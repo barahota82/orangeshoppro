@@ -8,14 +8,22 @@ declare(strict_types=1);
  * No live job / package / worker / Step 7/8 execution.
  */
 
-$projectRoot = 'D:/orange';
-$php = 'C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/php.exe';
+$projectRoot = dirname(__DIR__);
+$php = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+if (DIRECTORY_SEPARATOR === '\\') {
+    $laragonPhp = 'C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/php.exe';
+    if (is_file($laragonPhp)) {
+        $php = $laragonPhp;
+    }
+}
 $endpoint = $projectRoot . '/admin/api/restore/job/orchestrator-diagnostics.php';
 $fixture = $projectRoot . '/scripts/self_test_restore_center_step7_endpoint_local_fatal_origin_c2_shutdown_fixture.php';
 $orch = $projectRoot . '/includes/backup/restore/restore_center_orchestrator.php';
 $config = $projectRoot . '/config.php';
 $ui = $projectRoot . '/admin/pages/restore_center.php';
-$ev = 'D:/orange_restore_step7_endpoint_local_fatal_origin_c2_evidence';
+$ev = DIRECTORY_SEPARATOR === '\\'
+    ? 'D:/orange_restore_step7_endpoint_local_fatal_origin_c2_evidence'
+    : sys_get_temp_dir() . '/orange_restore_step7_endpoint_local_fatal_origin_c2_evidence';
 
 $pass = 0;
 $fail = 0;
