@@ -769,7 +769,11 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
     if (function_exists('posix_kill')) {
         $alive = @posix_kill($pid, 0);
         if (!$alive) {
-            return $finish(ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN, true);
+            $errno = function_exists('posix_get_last_error') ? (int) posix_get_last_error() : 0;
+            $eperm = defined('POSIX_EPERM') ? (int) constant('POSIX_EPERM') : 1;
+            if ($errno !== $eperm) {
+                return $finish(ORANGE_RESTORE_PE_PID_NOT_ALIVE_PROVEN, true);
+            }
         }
         if ($nameRegex === '' && $needles === []) {
             return $finish(ORANGE_RESTORE_PE_PID_ALIVE_MATCHING, true);
@@ -780,6 +784,12 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
         $comm = is_file('/proc/' . $pid . '/comm')
             ? trim((string) @file_get_contents('/proc/' . $pid . '/comm'))
             : '';
+        if ($needles !== [] && trim($cl) === '') {
+            return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+        }
+        if ($nameRegex !== '' && trim($cl) === '' && $comm === '') {
+            return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+        }
 
         return $finish($identityFromCmdline($cl, $comm), true);
     }
