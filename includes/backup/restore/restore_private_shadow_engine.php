@@ -798,11 +798,14 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
     }
 
     $stdout = '';
+    $stderr = '';
+    $tasklistExitCode = 0;
     if (function_exists('orange_backup_run_command_capture')) {
         $cap = orange_backup_run_command_capture(['tasklist', '/FI', 'PID eq ' . $pid, '/NH'], 2);
         $stdout = (string) ($cap['stdout'] ?? '');
-        $stderr = strtolower((string) ($cap['stderr'] ?? ''));
-        if (str_contains($stderr, 'timed out')) {
+        $stderr = (string) ($cap['stderr'] ?? '');
+        $tasklistExitCode = (int) ($cap['exit_code'] ?? 1);
+        if (str_contains(strtolower($stderr), 'timed out')) {
             return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
         }
     } elseif (function_exists('exec')) {
@@ -810,11 +813,23 @@ function orange_restore_private_engine_bounded_pid_inspect(int $pid, array $expe
         $code = 1;
         @exec('tasklist /FI "PID eq ' . (int) $pid . '" /NH 2>NUL', $out, $code);
         $stdout = implode("\n", $out);
+        $tasklistExitCode = (int) $code;
     } else {
         return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
     }
 
     if (((microtime(true) - $started) * 1000) > $budgetMs) {
+        return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
+    }
+
+    $tasklistCombined = strtolower(trim($stdout . "\n" . $stderr));
+    if (str_contains($tasklistCombined, 'not recognized')
+        || str_contains($tasklistCombined, 'not found')
+        || str_contains($tasklistCombined, 'no command execution functions available')
+        || str_contains($tasklistCombined, 'proc_open failed')) {
+        return $finish(ORANGE_RESTORE_PE_PID_INSPECTION_UNAVAILABLE, false);
+    }
+    if ($tasklistExitCode !== 0 && !str_contains($tasklistCombined, 'no tasks')) {
         return $finish(ORANGE_RESTORE_PE_PID_UNKNOWN, true);
     }
 
