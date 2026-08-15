@@ -2334,43 +2334,11 @@ function orange_restore_center_attach_verified_schedule(
  * Safe diagnostics for Restore Center (no absolute paths, no secrets).
  * Current-stage authority: latest attempt of the guided stage only.
  *
- * Optional trailing $diagnosticProbe is request-local instrumentation only (authenticated
- * diagnostics endpoint). Worker / existing callers omit it (null) → identical control flow.
- * Probe must never throw into / alter readiness, return contract, or exception propagation.
- *
- * @param callable|null $diagnosticProbe function(array):void — event checkpoint|exception only
  * @return array<string, mixed>
  */
-function orange_restore_center_diagnostics(
-    string $workRoot,
-    string $jobId,
-    ?callable $diagnosticProbe = null
-): array {
-    $probeStartedAt = microtime(true);
-    $probeEmit = static function (string $event, string $stage = '', string $safeClass = '') use ($diagnosticProbe, $probeStartedAt): void {
-        if ($diagnosticProbe === null) {
-            return;
-        }
-        try {
-            $payload = [
-                'event' => $event,
-                'elapsed_ms' => (int) max(0, (int) round((microtime(true) - $probeStartedAt) * 1000)),
-            ];
-            if ($stage !== '') {
-                $payload['stage'] = $stage;
-            }
-            if ($safeClass !== '') {
-                $payload['class'] = $safeClass;
-            }
-            $diagnosticProbe($payload);
-        } catch (Throwable) {
-            // Probe must never alter helper path.
-        }
-    };
-    $probeEmit('checkpoint', 'diagnostics_entry');
-
+function orange_restore_center_diagnostics(string $workRoot, string $jobId): array
+{
     // Refresh-only public-state reconcile (no new Step-7 attempt).
-    $probeEmit('checkpoint', 'job_read');
     $reconciled = orange_restore_center_reconcile_stale_shadow_restore_public_state($workRoot, $jobId);
     $job = is_array($reconciled) ? $reconciled : orange_restore_fw_read($workRoot, $jobId);
     $status = (string) ($job['status'] ?? '');
@@ -2691,7 +2659,6 @@ function orange_restore_center_diagnostics(
                 require_once __DIR__ . '/restore_shadow_db.php';
             }
             $projectRootDiag = dirname(__DIR__, 3);
-            $probeEmit('checkpoint', 'restore_record_read');
             $meta = orange_restore_shadow_load_meta($workRoot, $jobId) ?? [];
             $env = orange_backup_load_env_array($projectRootDiag);
             // Zero-mutation: private-engine preflight (no provision) + target resolve only.
@@ -2792,8 +2759,6 @@ function orange_restore_center_diagnostics(
             }
 
             // Authoritative retry preflight overrides ad-hoc green/button (parity with request endpoint).
-            // Nested package/SQL certificate stages live inside retry_preflight (not duplicated here).
-            $probeEmit('checkpoint', 'sql_compatibility_certificate_build');
             $retryPre = orange_restore_step7_retry_preflight($projectRootDiag, $workRoot, $jobId);
             $readyToken = (string) ($retryPre['ready_token'] ?? '');
             $failCode = (string) ($retryPre['code'] ?? $failCode);
@@ -2859,8 +2824,7 @@ function orange_restore_center_diagnostics(
                 'retry_preflight' => $retryPre,
                 'read_only' => true,
             ];
-        } catch (Throwable $probeCaught) {
-            $probeEmit('exception', '', $probeCaught::class);
+        } catch (Throwable) {
             $shadowReadiness = [
                 'ok' => false,
                 'code' => ORANGE_RESTORE_STEP7_PRIVATE_READINESS_UNKNOWN,
@@ -2907,44 +2871,7 @@ function orange_restore_center_diagnostics(
         $dedupedRecent[] = $evRow;
     }
 
-    $probeEmit('checkpoint', 'private_engine_trace_build');
-    $privateEngineLiveTrace = (static function () use ($workRoot, $jobId, $shadowReadiness): array {
-        try {
-            $projectRootDiag = dirname(__DIR__, 3);
-            $precomputed = is_array($shadowReadiness['retry_preflight'] ?? null)
-                ? $shadowReadiness['retry_preflight']
-                : [];
-
-            return orange_restore_private_engine_trace_snapshot(
-                $projectRootDiag,
-                $workRoot,
-                $jobId,
-                ['retry_preflight' => $precomputed]
-            );
-        } catch (Throwable $e) {
-            return [
-                'trace_version' => defined('ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION')
-                    ? ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION
-                    : 'step7-private-engine-trace-v1',
-                'read_only' => true,
-                'immutable_snapshot' => true,
-                'classification' => 'TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
-                'missing_artifact_categories' => ['trace_snapshot_exception'],
-                'mutation_counters' => [
-                    'LIVE_JOB_MUTATION_COUNT' => 0,
-                ],
-                'arabic_report' => "تقرير آثار محرك قاعدة الظل الخاص (قراءة فقط)\n"
-                    . "تعذر إكمال لقطة الآثار بأمان.\n"
-                    . 'التصنيف: TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
-                'notes_ar' => [
-                    'لقطة الآثار قراءة فقط — فُحصت بأمان دون تغيير حالة المهمة.',
-                ],
-            ];
-        }
-    })();
-
-    $probeEmit('checkpoint', 'result_aggregation');
-    $diagnosticsResult = [
+    return [
         'job_id' => $jobId,
         'job_status' => $status,
         'shadow_restore_status' => (string) ($job['shadow_restore_status'] ?? ''),
@@ -2964,7 +2891,40 @@ function orange_restore_center_diagnostics(
         'step7_action_enabled' => is_array($shadowReadiness)
             && !empty($shadowReadiness['step7_action_enabled']),
         'log_tails' => $logSnippets,
-        'private_engine_live_trace' => $privateEngineLiveTrace,
+        'private_engine_live_trace' => (static function () use ($workRoot, $jobId, $shadowReadiness): array {
+            try {
+                $projectRootDiag = dirname(__DIR__, 3);
+                $precomputed = is_array($shadowReadiness['retry_preflight'] ?? null)
+                    ? $shadowReadiness['retry_preflight']
+                    : [];
+
+                return orange_restore_private_engine_trace_snapshot(
+                    $projectRootDiag,
+                    $workRoot,
+                    $jobId,
+                    ['retry_preflight' => $precomputed]
+                );
+            } catch (Throwable $e) {
+                return [
+                    'trace_version' => defined('ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION')
+                        ? ORANGE_RESTORE_PRIVATE_ENGINE_TRACE_VERSION
+                        : 'step7-private-engine-trace-v1',
+                    'read_only' => true,
+                    'immutable_snapshot' => true,
+                    'classification' => 'TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
+                    'missing_artifact_categories' => ['trace_snapshot_exception'],
+                    'mutation_counters' => [
+                        'LIVE_JOB_MUTATION_COUNT' => 0,
+                    ],
+                    'arabic_report' => "تقرير آثار محرك قاعدة الظل الخاص (قراءة فقط)\n"
+                        . "تعذر إكمال لقطة الآثار بأمان.\n"
+                        . 'التصنيف: TRACE_INCOMPLETE_MISSING_REQUIRED_ARTIFACTS',
+                    'notes_ar' => [
+                        'لقطة الآثار قراءة فقط — فُحصت بأمان دون تغيير حالة المهمة.',
+                    ],
+                ];
+            }
+        })(),
         'notes_ar' => [
             'تشخيص تشغيل مراحل الاسترداد — عرض تشغيلي آمن من مركز الاسترداد فقط.',
             'لا تُعرض مسارات الخادم المطلقة ولا الأسرار ولا أسماء قواعد البيانات ولا مفاتيح البيئة.',
@@ -2979,9 +2939,6 @@ function orange_restore_center_diagnostics(
             'قسم آثار محرك قاعدة الظل الخاص قراءة فقط ويعرض تصنيفاً آمناً حتى عند نقص الآثار.',
         ],
     ];
-    $probeEmit('checkpoint', 'diagnostics_complete');
-
-    return $diagnosticsResult;
 }
 
 /**

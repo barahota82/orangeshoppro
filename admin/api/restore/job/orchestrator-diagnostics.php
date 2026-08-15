@@ -18,11 +18,6 @@ if (!defined('ORANGE_STEP7_DIAG_DEPLOY_SENTINEL')) {
     define('ORANGE_STEP7_DIAG_DEPLOY_SENTINEL', 'ORANGE_STEP7_DIAG_SENTINEL_94D_CHAIN_A1');
 }
 
-/** Visible shared-helper probe marker (instrumentation only; no execution change). */
-if (!defined('ORANGE_STEP7_SHARED_HELPER_PROBE_A2')) {
-    define('ORANGE_STEP7_SHARED_HELPER_PROBE_A2', 'STEP7_SHARED_HELPER_PROBE_A2');
-}
-
 /**
  * Attach deploy sentinel to an already-built diagnostic payload (no recalculation).
  *
@@ -47,23 +42,6 @@ function orange_restore_diagnostic_api_emit(array $payload, int $http = 200): vo
         header('X-Orange-Step7-Diagnostic-Sentinel: ' . ORANGE_STEP7_DIAG_DEPLOY_SENTINEL);
     }
     json_response(orange_restore_diagnostic_api_with_deploy_sentinel($payload), $http);
-}
-
-/**
- * Stage-specific NOT_READY reason for probe failure reports (safe codes only).
- */
-function orange_restore_diagnostic_probe_stage_reason(string $stage): string
-{
-    return match ($stage) {
-        'diagnostics_entry' => 'step7_diagnostic_entry_failed',
-        'job_read' => 'step7_diagnostic_job_read_failed',
-        'restore_record_read' => 'step7_diagnostic_restore_record_read_failed',
-        'sql_compatibility_certificate_build' => 'step7_diagnostic_sql_certificate_build_failed',
-        'private_engine_trace_build' => 'step7_diagnostic_private_engine_trace_build_failed',
-        'result_aggregation' => 'step7_diagnostic_result_aggregation_failed',
-        'diagnostics_complete' => 'step7_diagnostic_complete_failed',
-        default => 'step7_diagnostic_stage_failure',
-    };
 }
 
 /**
@@ -167,81 +145,24 @@ try {
         );
     }
 
-    // Request-local probe collector (memory only; never persisted / global / session).
-    $probeTraceId = bin2hex(random_bytes(8));
-    $probeState = [
-        'last_stage' => '',
-        'checkpoints' => [],
-        'exception_class' => '',
-        'trace_id' => $probeTraceId,
-    ];
-    $diagnosticProbe = static function (array $event) use (&$probeState): void {
-        $ev = (string) ($event['event'] ?? '');
-        if ($ev === 'checkpoint') {
-            $stage = trim((string) ($event['stage'] ?? ''));
-            if ($stage === '') {
-                return;
-            }
-            $probeState['last_stage'] = $stage;
-            $probeState['checkpoints'][] = [
-                'stage' => $stage,
-                'elapsed_ms' => (int) ($event['elapsed_ms'] ?? 0),
-            ];
-
-            return;
-        }
-        if ($ev === 'exception') {
-            $cls = trim((string) ($event['class'] ?? ''));
-            if ($cls !== '' && preg_match('/^[A-Za-z0-9_\\\\]+$/', $cls) === 1) {
-                $probeState['exception_class'] = $cls;
-            }
-        }
-    };
-
     try {
-        // DIAGNOSTIC_HELPER_CALL_COUNT=1 — single helper invocation with probe.
-        $diagnostics = orange_restore_center_diagnostics($workRoot, $jobId, $diagnosticProbe);
+        $diagnostics = orange_restore_center_diagnostics($workRoot, $jobId);
     } catch (Throwable $e) {
-        $lastStage = trim((string) ($probeState['last_stage'] ?? ''));
-        if ($lastStage === '') {
-            $lastStage = 'diagnostics_entry';
+        $mapped = 'STEP7_DIAGNOSTIC_UNKNOWN_SAFE_FAILURE';
+        $raw = trim($e->getMessage());
+        if (str_contains($raw, 'STEP7_DIAGNOSTIC_')) {
+            $mapped = $raw;
+        } elseif (defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
+            && $raw === ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT) {
+            $mapped = ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT;
         }
-        $safeClass = $probeState['exception_class'] !== ''
-            ? $probeState['exception_class']
-            : $e::class;
-        if (preg_match('/^[A-Za-z0-9_\\\\]+$/', $safeClass) !== 1) {
-            $safeClass = 'Throwable';
-        }
-        $stageReason = orange_restore_diagnostic_probe_stage_reason($lastStage);
-        $safeMsg = '[probe: ' . ORANGE_STEP7_SHARED_HELPER_PROBE_A2 . ']'
-            . ' تعذر إكمال تشخيص التشغيل بأمان. الخطوة غير جاهزة.'
-            . ' طبقة=' . $lastStage
-            . ' استثناء=' . $safeClass
-            . ' أثر=' . $probeTraceId
-            . ' سبب=' . $stageReason;
-        // Map into existing visible fields; remain NOT_READY; do not fix the exception.
-        if (!defined('ORANGE_RESTORE_STEP7_DIAGNOSTIC_SQL_SCAN_RESOURCE_LIMIT')
-            && is_file(dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php')) {
-            require_once dirname(__DIR__, 4) . '/includes/backup/restore/restore_sql_compat_engine.php';
-        }
-        orange_restore_diagnostic_api_emit([
-            'success' => false,
-            'read_only' => true,
-            'job_id' => $jobId,
-            'stage' => 'shadow_restore',
-            'failure_layer' => $lastStage,
-            'safe_code' => 'step7_diagnostic_stage_failure',
-            'code' => 'step7_diagnostic_stage_failure',
-            'safe_message_ar' => $safeMsg,
-            'message' => $safeMsg,
-            'retryable' => false,
-            'final_readiness' => 'NOT_READY',
-            'exact_not_ready_reason' => $stageReason,
-            'package_certificate_status' => 'unavailable',
-            'private_engine_trace_status' => 'unavailable',
-            'step7_action_enabled' => false,
-            'csrf_token' => orange_backup_admin_csrf_token(),
-        ], 422);
+        orange_restore_diagnostic_api_structured_failure(
+            $mapped,
+            'تعذر إكمال تشخيص التشغيل بأمان. الخطوة غير جاهزة.',
+            'diagnostics_builder',
+            $jobId,
+            422
+        );
     }
 
     $readiness = is_array($diagnostics['step7_shadow_target_readiness'] ?? null)
