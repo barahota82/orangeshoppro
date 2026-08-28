@@ -86,6 +86,23 @@ try {
     self_test(true, 'web root BackupRoot rejected');
 }
 
+// Relative fallback paths must be absolutized before web-root safety checks.
+$cwdBeforeRelativePathTest = getcwd();
+if ($cwdBeforeRelativePathTest !== false) {
+    chdir($projectRoot);
+}
+try {
+    $relativeUploadsRoot = orange_backup_absolute_directory_path('uploads' . DIRECTORY_SEPARATOR . 'backup-root');
+    orange_backup_assert_outside_web_root($relativeUploadsRoot);
+    self_test(false, 'relative uploads BackupRoot should fail after absolutizing');
+} catch (Throwable) {
+    self_test(true, 'relative uploads BackupRoot rejected after absolutizing');
+} finally {
+    if ($cwdBeforeRelativePathTest !== false) {
+        chdir($cwdBeforeRelativePathTest);
+    }
+}
+
 // Public httpdocs path rejection
 try {
     orange_backup_resolve_root([], 'D:\\httpdocs\\orange_backups');
