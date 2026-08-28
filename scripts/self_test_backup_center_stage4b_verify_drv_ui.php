@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
+require_once $projectRoot . '/scripts/lib/backup_stage4b_evidence_lib.php';
 require_once $projectRoot . '/includes/backup/backup_qualification.php';
 
 $passes = 0;
@@ -294,7 +295,7 @@ try {
     s4b_ok(str_contains($statusApi, 'str_contains($packageId, \'..\')') || str_contains($statusApi, "str_contains(\$packageId, '..')"), 'status: rejects traversal id');
 
     // Evidence dir: do not clobber Owner runtime event log from evidence_runtime.php
-    $evidenceDir = 'D:\\orange_stage4b_evidence';
+    $evidenceDir = s4b_ev_evidence_dir('orange_stage4b_evidence');
     if (!is_dir($evidenceDir)) {
         @mkdir($evidenceDir, 0770, true);
     }
@@ -332,7 +333,8 @@ try {
 }
 
 /* --- Scenario coverage map 1–84 (Owner Stage 4B §18) --- */
-$evidenceEvent = 'D:\\orange_stage4b_evidence\\stage4b_event_log.json';
+$evidenceDir = s4b_ev_evidence_dir('orange_stage4b_evidence');
+$evidenceEvent = $evidenceDir . DIRECTORY_SEPARATOR . 'stage4b_event_log.json';
 $ev = is_file($evidenceEvent) ? json_decode((string) file_get_contents($evidenceEvent), true) : null;
 $evOk = is_array($ev);
 s4b_ok($evOk, 'coverage: event log present for runtime-backed scenarios');
@@ -514,7 +516,7 @@ foreach ($scenarioDefs as $num => $def) {
     ];
 }
 
-$covPath = 'D:\\orange_stage4b_evidence\\stage4b_scenario_coverage_1_84.json';
+$covPath = $evidenceDir . DIRECTORY_SEPARATOR . 'stage4b_scenario_coverage_1_84.json';
 $covDoc = [
     'scenario_rows' => count($coverageRows),
     'uncovered_scenarios' => 0,
@@ -524,7 +526,7 @@ $covDoc = [
     'unknown_mapping' => $unknown,
     'rows' => $coverageRows,
 ];
-if (is_dir('D:\\orange_stage4b_evidence')) {
+if (is_dir($evidenceDir)) {
     file_put_contents($covPath, json_encode($covDoc, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 s4b_ok(count($coverageRows) === 84, 'coverage: scenario rows = 84');
