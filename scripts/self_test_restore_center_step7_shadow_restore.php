@@ -13,7 +13,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_shadow_restore_evidence';
+$ev = s7_evidence_dir();
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }
@@ -38,6 +38,15 @@ function s7_ok(bool $c, string $l): void
     global $pass, $fail;
     echo ($c ? 'PASS ' : 'FAIL ') . $l . "\n";
     $c ? $pass++ : $fail++;
+}
+
+function s7_evidence_dir(): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:\\orange_restore_step7_shadow_restore_evidence';
+    }
+
+    return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_shadow_restore_evidence';
 }
 
 function s7_seed_pkg(string $pkgDir, string $pkgId): void
@@ -119,6 +128,17 @@ mkdir($backupRoot . DIRECTORY_SEPARATOR . 'snapshots', 0777, true);
 mkdir($workRoot, 0777, true);
 
 try {
+    $firstLock = orange_restore_shadow_acquire_lock($workRoot, 'same_job_lock_s7', 'first');
+    $secondLock = orange_restore_shadow_acquire_lock($workRoot, 'same_job_lock_s7', 'second');
+    s7_ok(($firstLock['ok'] ?? false) === true, 'shadow lock first acquire');
+    s7_ok(
+        ($secondLock['ok'] ?? true) === false
+        && (string) ($secondLock['message'] ?? '') === 'shadow_restore_lock_active',
+        'SAME_JOB_SHADOW_LOCK_DUPLICATE_BLOCKED'
+    );
+    orange_restore_shadow_release_lock($workRoot, 'same_job_lock_s7');
+    $markers['SAME_JOB_SHADOW_LOCK_DUPLICATE_BLOCKED'] = 1;
+
     s7_seed_pkg($backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $pkgSource, $pkgSource);
     s7_seed_pkg($backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $pkgRollback, $pkgRollback);
 

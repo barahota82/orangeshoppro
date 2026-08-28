@@ -836,6 +836,13 @@ function orange_restore_shadow_lock_status(string $workRoot): array
     $pidAlive = null;
     if ($pid > 0 && function_exists('posix_kill')) {
         $pidAlive = @posix_kill($pid, 0);
+        if ($pidAlive === false && function_exists('posix_get_last_error')) {
+            $err = posix_get_last_error();
+            $eperm = defined('POSIX_EPERM') ? (int) constant('POSIX_EPERM') : 1;
+            if ($err === $eperm) {
+                $pidAlive = true;
+            }
+        }
     }
     $stale = $age > ORANGE_RESTORE_SHADOW_LOCK_STALE_SECONDS && $pidAlive !== true;
 
@@ -854,11 +861,6 @@ function orange_restore_shadow_acquire_lock(string $workRoot, string $jobId, str
         $status = orange_restore_shadow_lock_status($workRoot);
     }
     if ($status['held'] && !$status['stale']) {
-        $held = (string) (($status['payload'] ?? [])['job_id'] ?? '');
-        if ($held === $jobId) {
-            return ['ok' => true, 'message' => 'lock_already_held'];
-        }
-
         return ['ok' => false, 'message' => 'shadow_restore_lock_active'];
     }
     $payload = json_encode([
