@@ -97,7 +97,11 @@ function orange_storefront_customer_error_from_message(string $raw): ?array
 
     if (str_starts_with($raw, 'code:')) {
         $code = substr($raw, 5);
-        if ($code !== '' && preg_match('/^[a-z0-9_]+$/', $code)) {
+        if (
+            $code !== ''
+            && preg_match('/^[a-z0-9_]+$/', $code)
+            && in_array($code, orange_storefront_customer_error_codes(), true)
+        ) {
             return orange_storefront_customer_error_payload($code, 422);
         }
 
