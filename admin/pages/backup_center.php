@@ -916,9 +916,6 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (stableMessage && status === 'PASS' && forceStatus) {
             status = crpNormalizeStatus(forceStatus) || 'INCOMPLETE';
         }
-        const tone = status === 'PASS' ? 'pass'
-            : (status === 'FAIL' ? 'fail'
-                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const cc = String((data && data.country_code) || pkgMeta.countryCode || '').toUpperCase();
         const countryName = String(pkgMeta.countryName || '');
         const countryLabel = countryName
@@ -939,6 +936,12 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             && (!data.country_code
                 || String(data.country_code).toUpperCase() === String(pkgMeta.countryCode || '').toUpperCase()));
         const binding = data ? (bindingOk ? 'PASS' : 'FAIL') : '—';
+        if (data && !bindingOk && status === 'PASS') {
+            status = 'FAIL';
+        }
+        const tone = status === 'PASS' ? 'pass'
+            : (status === 'FAIL' ? 'fail'
+                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const inventory = data && data.dependency_completeness_valid != null
             ? crpBoolLabel(data.dependency_completeness_valid)
             : '—';

@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * Usage: php scripts/self_test_backup_center_stage6_report_controls.php
  *
- * Evidence (outside Git): D:\orange_stage6_evidence\
+ * Evidence (outside Git): D:\orange_stage6_evidence\ on Windows, system temp elsewhere.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -46,6 +46,15 @@ function s6_extract_function(string $src, string $name): string
     }
 
     return $body;
+}
+
+function s6_evidence_dir(): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\orange_stage6_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_stage6_evidence';
 }
 
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
@@ -171,7 +180,8 @@ s6_ok(
 s6_ok(
     (str_contains($buildFn, 'Never fabricate PASS') || str_contains($buildFn, "status === 'PASS'"))
     && str_contains($clickRegion, "forceStatus: 'FAIL'")
-    && str_contains($clickRegion, "forceStatus: 'INCOMPLETE'"),
+    && str_contains($clickRegion, "forceStatus: 'INCOMPLETE'")
+    && str_contains($buildFn, "!bindingOk && status === 'PASS'"),
     '20. no false PASS (forceStatus on error paths)'
 );
 
@@ -278,7 +288,7 @@ s6_ok(
 );
 
 /* --- Runtime harness --- */
-$evidenceDir = 'D:\\orange_stage6_evidence';
+$evidenceDir = s6_evidence_dir();
 $runtimeDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 $shotsDir = $evidenceDir . DIRECTORY_SEPARATOR . 'shots';
 @mkdir($runtimeDir, 0775, true);
@@ -508,6 +518,15 @@ JS;
   });
   ok(st === 'FAIL', 'mismatch rejected');
   ok((el('bc_view_summary').querySelector('.bc-report-status') || {}).textContent === 'FAIL', 'mismatch not PASS');
+
+  st = showCrpReportView({
+    title: title, data: Object.assign({}, passData, { package_id: '' }),
+    packageId: '2026-08-06_111111', countryCode: 'KW', countryName: 'Kuwait',
+    rawText: JSON.stringify(sanitizeCrpDisplayData(Object.assign({}, passData, { package_id: '' })), null, 2),
+    sourceBtn: crpBtn
+  });
+  ok(st === 'FAIL', 'missing binding identity not PASS');
+  ok((el('bc_view_summary').querySelector('.bc-report-status') || {}).textContent === 'FAIL', 'missing binding badge FAIL');
 
   // Long FAIL body scroll
   const longFail = Object.assign({}, failData, {
