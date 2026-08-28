@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/storefront_api_errors.php';
+require_once __DIR__ . '/../../includes/loyalty.php';
 
 try {
     $pdo = db();
