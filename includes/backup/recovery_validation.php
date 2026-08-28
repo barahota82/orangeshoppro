@@ -110,6 +110,292 @@ function orange_recovery_sql_strip_comments(string $sqlText): string
 }
 
 /**
+ * @return array<string, mixed>
+ */
+function orange_recovery_sql_scan_state_init(): array
+{
+    return [
+        'in_single' => false,
+        'in_double' => false,
+        'single_escape' => false,
+        'single_quote_pending' => false,
+        'double_quote_pending' => false,
+        'in_line_comment' => false,
+        'in_block_comment' => false,
+        'block_star_pending' => false,
+        'block_executable' => false,
+        'block_executable_pending' => false,
+        'pending_dash' => false,
+        'pending_slash' => false,
+        'remainder_non_ws' => false,
+        'remainder_has_keyword' => false,
+        'keyword_window' => '',
+    ];
+}
+
+/**
+ * @param array<string, mixed> $state
+ */
+function orange_recovery_sql_scan_append_executable(array &$state, string $c): void
+{
+    if (!ctype_space($c)) {
+        $state['remainder_non_ws'] = true;
+    }
+
+    $state['keyword_window'] = substr((string) $state['keyword_window'] . $c, -80);
+    if (preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP|SET|USE)\b/i', (string) $state['keyword_window']) === 1) {
+        $state['remainder_has_keyword'] = true;
+    }
+}
+
+/**
+ * @param array<string, mixed> $state
+ */
+function orange_recovery_sql_scan_reset_statement(array &$state): void
+{
+    $state['remainder_non_ws'] = false;
+    $state['remainder_has_keyword'] = false;
+    $state['keyword_window'] = '';
+}
+
+/**
+ * @param array<string, mixed> $state
+ */
+function orange_recovery_sql_scan_process_char(array &$state, string $c): void
+{
+    $reprocess = true;
+    while ($reprocess) {
+        $reprocess = false;
+
+        if ((bool) $state['in_line_comment']) {
+            if ($c === "\n" || $c === "\r") {
+                $state['in_line_comment'] = false;
+                orange_recovery_sql_scan_append_executable($state, $c);
+            }
+            return;
+        }
+
+        if ((bool) $state['in_block_comment']) {
+            if ((bool) $state['block_executable_pending']) {
+                $state['block_executable_pending'] = false;
+                if ($c === '!') {
+                    $state['block_executable'] = true;
+                    orange_recovery_sql_scan_append_executable($state, '/*!');
+                    return;
+                }
+            }
+
+            if ((bool) $state['block_executable']) {
+                orange_recovery_sql_scan_append_executable($state, $c);
+            }
+
+            if ((bool) $state['block_star_pending'] && $c === '/') {
+                $state['in_block_comment'] = false;
+                $state['block_star_pending'] = false;
+                $state['block_executable'] = false;
+                return;
+            }
+
+            $state['block_star_pending'] = $c === '*';
+            return;
+        }
+
+        if ((bool) $state['in_single']) {
+            if ((bool) $state['single_quote_pending']) {
+                if ($c === "'") {
+                    $state['single_quote_pending'] = false;
+                    orange_recovery_sql_scan_append_executable($state, $c);
+                    return;
+                }
+                $state['single_quote_pending'] = false;
+                $state['in_single'] = false;
+                $reprocess = true;
+                continue;
+            }
+
+            orange_recovery_sql_scan_append_executable($state, $c);
+            if ((bool) $state['single_escape']) {
+                $state['single_escape'] = false;
+                return;
+            }
+            if ($c === '\\') {
+                $state['single_escape'] = true;
+                return;
+            }
+            if ($c === "'") {
+                $state['single_quote_pending'] = true;
+            }
+            return;
+        }
+
+        if ((bool) $state['in_double']) {
+            if ((bool) $state['double_quote_pending']) {
+                if ($c === '"') {
+                    $state['double_quote_pending'] = false;
+                    orange_recovery_sql_scan_append_executable($state, $c);
+                    return;
+                }
+                $state['double_quote_pending'] = false;
+                $state['in_double'] = false;
+                $reprocess = true;
+                continue;
+            }
+
+            orange_recovery_sql_scan_append_executable($state, $c);
+            if ($c === '"') {
+                $state['double_quote_pending'] = true;
+            }
+            return;
+        }
+
+        if ((bool) $state['pending_dash']) {
+            $state['pending_dash'] = false;
+            if ($c === '-') {
+                $state['in_line_comment'] = true;
+                return;
+            }
+            orange_recovery_sql_scan_append_executable($state, '-');
+            $reprocess = true;
+            continue;
+        }
+
+        if ((bool) $state['pending_slash']) {
+            $state['pending_slash'] = false;
+            if ($c === '*') {
+                $state['in_block_comment'] = true;
+                $state['block_star_pending'] = false;
+                $state['block_executable'] = false;
+                $state['block_executable_pending'] = true;
+                return;
+            }
+            orange_recovery_sql_scan_append_executable($state, '/');
+            $reprocess = true;
+            continue;
+        }
+
+        if ($c === '-') {
+            $state['pending_dash'] = true;
+            return;
+        }
+        if ($c === '/') {
+            $state['pending_slash'] = true;
+            return;
+        }
+        if ($c === "'") {
+            $state['in_single'] = true;
+            $state['single_escape'] = false;
+            $state['single_quote_pending'] = false;
+            orange_recovery_sql_scan_append_executable($state, $c);
+            return;
+        }
+        if ($c === '"') {
+            $state['in_double'] = true;
+            $state['double_quote_pending'] = false;
+            orange_recovery_sql_scan_append_executable($state, $c);
+            return;
+        }
+        if ($c === ';') {
+            orange_recovery_sql_scan_reset_statement($state);
+            return;
+        }
+
+        orange_recovery_sql_scan_append_executable($state, $c);
+    }
+}
+
+/**
+ * @param array<string, mixed> $state
+ */
+function orange_recovery_sql_scan_feed(array &$state, string $sqlText): void
+{
+    $len = strlen($sqlText);
+    for ($i = 0; $i < $len; $i++) {
+        orange_recovery_sql_scan_process_char($state, $sqlText[$i]);
+    }
+}
+
+/**
+ * @param array<string, mixed> $state
+ */
+function orange_recovery_sql_scan_finish(array &$state): ?string
+{
+    if ((bool) $state['pending_dash']) {
+        $state['pending_dash'] = false;
+        orange_recovery_sql_scan_append_executable($state, '-');
+    }
+    if ((bool) $state['pending_slash']) {
+        $state['pending_slash'] = false;
+        orange_recovery_sql_scan_append_executable($state, '/');
+    }
+    if ((bool) $state['single_quote_pending']) {
+        $state['single_quote_pending'] = false;
+        $state['in_single'] = false;
+    }
+    if ((bool) $state['double_quote_pending']) {
+        $state['double_quote_pending'] = false;
+        $state['in_double'] = false;
+    }
+
+    if ((bool) $state['in_single'] || (bool) $state['in_double']) {
+        return 'SQL appears truncated (unclosed string literal)';
+    }
+    if ((bool) $state['in_block_comment']) {
+        return 'SQL appears truncated (unclosed block comment)';
+    }
+
+    if ((bool) $state['remainder_non_ws'] && (bool) $state['remainder_has_keyword']) {
+        return 'SQL appears truncated (incomplete final statement)';
+    }
+
+    return null;
+}
+
+function orange_recovery_utf8_trim_leading_partial(string $bytes): string
+{
+    while ($bytes !== '') {
+        $b = ord($bytes[0]);
+        if ($b < 0x80 || $b > 0xBF) {
+            break;
+        }
+        $bytes = substr($bytes, 1);
+    }
+
+    return $bytes;
+}
+
+function orange_recovery_utf8_trim_trailing_partial(string $bytes): string
+{
+    $len = strlen($bytes);
+    if ($len === 0) {
+        return $bytes;
+    }
+
+    $start = $len - 1;
+    while ($start >= 0) {
+        $b = ord($bytes[$start]);
+        if ($b < 0x80 || $b > 0xBF) {
+            break;
+        }
+        $start--;
+    }
+    if ($start < 0) {
+        return '';
+    }
+
+    $lead = ord($bytes[$start]);
+    $expected = 1;
+    if ($lead >= 0xC2 && $lead <= 0xDF) {
+        $expected = 2;
+    } elseif ($lead >= 0xE0 && $lead <= 0xEF) {
+        $expected = 3;
+    } elseif ($lead >= 0xF0 && $lead <= 0xF4) {
+        $expected = 4;
+    }
+
+    return ($len - $start) < $expected ? substr($bytes, 0, $start) : $bytes;
+}
+
+/**
  * Strip CRP table-chunk metadata written by orange_country_export_table().
  *
  * Contract: header "-- Orange CRP export table=..." then zero or more INSERT chunks
@@ -137,103 +423,10 @@ function orange_recovery_sql_detect_incomplete_statement(string $sqlText): ?stri
         return null;
     }
 
-    $len = strlen($sql);
-    $inSingle = false;
-    $inDouble = false;
-    $inLineComment = false;
-    $inBlockComment = false;
-    $buffer = '';
+    $state = orange_recovery_sql_scan_state_init();
+    orange_recovery_sql_scan_feed($state, $sql);
 
-    for ($i = 0; $i < $len; $i++) {
-        $c = $sql[$i];
-        $next = $i + 1 < $len ? $sql[$i + 1] : '';
-
-        if ($inLineComment) {
-            if ($c === "\n" || $c === "\r") {
-                $inLineComment = false;
-                $buffer .= $c;
-            }
-            continue;
-        }
-
-        if ($inBlockComment) {
-            if ($c === '*' && $next === '/') {
-                $inBlockComment = false;
-                $i++;
-            }
-            continue;
-        }
-
-        if (!$inSingle && !$inDouble) {
-            if ($c === '-' && $next === '-') {
-                $inLineComment = true;
-                continue;
-            }
-            if ($c === '/' && $next === '*') {
-                $inBlockComment = true;
-                $i++;
-                continue;
-            }
-        }
-
-        if (!$inDouble && $c === "'") {
-            if ($inSingle && $next === "'") {
-                $buffer .= "''";
-                $i++;
-                continue;
-            }
-            $inSingle = !$inSingle;
-            $buffer .= $c;
-            continue;
-        }
-
-        if (!$inSingle && $c === '"') {
-            if ($inDouble && $next === '"') {
-                $buffer .= '""';
-                $i++;
-                continue;
-            }
-            $inDouble = !$inDouble;
-            $buffer .= $c;
-            continue;
-        }
-
-        if ($inSingle && $c === '\\' && $next !== '') {
-            $buffer .= $c . $next;
-            $i++;
-            continue;
-        }
-
-        if (!$inSingle && !$inDouble && $c === ';') {
-            $buffer = '';
-            continue;
-        }
-
-        $buffer .= $c;
-    }
-
-    if ($inSingle || $inDouble) {
-        return 'SQL appears truncated (unclosed string literal)';
-    }
-    if ($inBlockComment) {
-        return 'SQL appears truncated (unclosed block comment)';
-    }
-
-    $remainder = trim($buffer);
-    if ($remainder === '') {
-        return null;
-    }
-
-    $executableRemainder = trim(orange_recovery_sql_strip_comments($remainder));
-    if ($executableRemainder === '') {
-        return null;
-    }
-
-    if (preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP|SET|USE)\b/i', $executableRemainder) === 1) {
-        return 'SQL appears truncated (incomplete final statement)';
-    }
-
-    return null;
+    return orange_recovery_sql_scan_finish($state);
 }
 
 function orange_recovery_sql_basename_from_label(string $label): string
@@ -347,6 +540,7 @@ function orange_recovery_validate_gzip_sql_file(string $path, string $label, ?fl
     $totalBytes = 0;
     $errors = [];
     $warnings = [];
+    $sqlScan = orange_recovery_sql_scan_state_init();
 
     while (!gzeof($handle)) {
         $timeoutError = orange_recovery_validation_timeout_error($deadline, $label . ' gzip stream');
@@ -374,6 +568,7 @@ function orange_recovery_validate_gzip_sql_file(string $path, string $label, ?fl
 
         $chunkLen = strlen($chunk);
         $totalBytes += $chunkLen;
+        orange_recovery_sql_scan_feed($sqlScan, $chunk);
         $createCount += preg_match_all('/^\s*CREATE\s+TABLE\b/im', $chunk) ?: 0;
         $insertCount += preg_match_all('/^\s*INSERT\s+INTO\b/im', $chunk) ?: 0;
 
@@ -393,7 +588,12 @@ function orange_recovery_validate_gzip_sql_file(string $path, string $label, ?fl
         return ['ok' => true, 'errors' => [], 'warnings' => $warnings, 'create_table_count' => 0, 'insert_count' => 0, 'decompressed_bytes' => 0];
     }
 
-    if (!mb_check_encoding($head, 'UTF-8') || !mb_check_encoding($tail, 'UTF-8')) {
+    $headForUtf8 = orange_recovery_utf8_trim_trailing_partial($head);
+    $tailForUtf8 = orange_recovery_utf8_trim_leading_partial($tail);
+    if (
+        ($headForUtf8 !== '' && !mb_check_encoding($headForUtf8, 'UTF-8'))
+        || ($tailForUtf8 !== '' && !mb_check_encoding($tailForUtf8, 'UTF-8'))
+    ) {
         $errors[] = $label . ': SQL is not valid UTF-8';
     }
 
@@ -404,14 +604,9 @@ function orange_recovery_validate_gzip_sql_file(string $path, string $label, ?fl
         $warnings[] = $label . ': SQL head missing expected export markers';
     }
 
-    $completenessError = null;
-    if (str_contains($tail, ORANGE_RECOVERY_VALIDATION_FULL_DUMP_POSTAMBLE)) {
-        $completenessError = orange_recovery_validate_sql_completeness($tail, $label);
-    } else {
-        $completenessError = orange_recovery_validate_sql_completeness($tail, $label);
-        if ($completenessError === null) {
-            $warnings[] = $label . ': SQL tail missing PDO export postamble marker';
-        }
+    $completenessError = orange_recovery_sql_scan_finish($sqlScan);
+    if (!str_contains($tail, ORANGE_RECOVERY_VALIDATION_FULL_DUMP_POSTAMBLE) && $completenessError === null) {
+        $warnings[] = $label . ': SQL tail missing PDO export postamble marker';
     }
     if ($completenessError !== null) {
         $errors[] = $label . ': ' . $completenessError;
