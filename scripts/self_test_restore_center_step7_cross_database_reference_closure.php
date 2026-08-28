@@ -134,6 +134,24 @@ $classSys = orange_restore_private_sql_classify_dump($sys, $trusted);
 s7xref_ok(empty($classSys['ok']), 'information_schema object ref rejected');
 s7xref_ok(($classSys['classification'] ?? '') === ORANGE_RESTORE_SQL_CLASS_CROSS_DB, 'system schema => CROSS_DB');
 
+// Object contexts beyond INSERT/FROM must still fail closed for foreign schemas.
+$foreignObjectContextCases = [
+    'CREATE INDEX foreign ON' => 'CREATE INDEX ix_demo_prices ON other_db.demo_prices (`id`);',
+    'CREATE VIEW foreign target' => 'CREATE VIEW other_db.v_demo_prices AS SELECT 1;',
+    'ALTER VIEW foreign target' => 'ALTER VIEW other_db.v_demo_prices AS SELECT 1;',
+    'DROP VIEW foreign target' => 'DROP VIEW other_db.v_demo_prices;',
+    'ANALYZE TABLE foreign target' => 'ANALYZE TABLE other_db.demo_prices;',
+    'CALL foreign routine' => 'CALL other_db.rebuild_demo_prices();',
+];
+foreach ($foreignObjectContextCases as $label => $sql) {
+    $classForeign = orange_restore_private_sql_classify_dump($sql . "\n", $trusted);
+    s7xref_ok(empty($classForeign['ok']), $label . ' rejected');
+    s7xref_ok(
+        ($classForeign['classification'] ?? '') === ORANGE_RESTORE_SQL_CLASS_CROSS_DB,
+        $label . ' => CROSS_DB'
+    );
+}
+
 // Alias.column / non-object context must not reject.
 $alias = "SELECT p.amount FROM demo_prices p WHERE p.id = 1;\n";
 $classAlias = orange_restore_private_sql_classify_dump($alias, $trusted);
