@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * Usage: php scripts/self_test_backup_center_full_drv_report_parity.php
  *
- * Evidence (outside Git): D:\orange_full_drv_report_parity_evidence\
+ * Evidence: D:\orange_full_drv_report_parity_evidence\ on Windows; system temp on Linux/macOS.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -46,6 +46,15 @@ function fdrv_extract(string $src, string $name): string
     }
 
     return $body;
+}
+
+function fdrv_evidence_dir(): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\orange_full_drv_report_parity_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_full_drv_report_parity_evidence';
 }
 
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
@@ -121,8 +130,9 @@ fdrv_ok(
     '5. Full summary has Full fields only (no Country CRP fields)'
 );
 fdrv_ok(
-    str_contains($buildFull, 'Never fabricate PASS')
-    || (str_contains($buildFull, "status === 'PASS'") && str_contains($buildFull, 'INCOMPLETE')),
+    (str_contains($buildFull, "status === 'PASS'") && str_contains($buildFull, 'INCOMPLETE'))
+    && str_contains($buildFull, '!bindingOk')
+    && str_contains($buildFull, "status = 'FAIL'"),
     '10. FULL_DRV_REPORT_FALSE_PASS_COUNT guarded'
 );
 fdrv_ok(
@@ -141,7 +151,7 @@ fdrv_ok(
 );
 
 /* Runtime DOM */
-$evidenceDir = 'D:\\orange_full_drv_report_parity_evidence';
+$evidenceDir = fdrv_evidence_dir();
 $runtimeDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 $shotsDir = $evidenceDir . DIRECTORY_SEPARATOR . 'shots';
 @mkdir($runtimeDir, 0775, true);
@@ -314,6 +324,15 @@ JS;
   });
   ok(st === 'PASS', 'valid PASS');
   ok((el('bc_view_pre').style.display !== 'none') && (el('bc_view_pre').textContent || '').includes('overall_result'), 'optional Raw JSON for valid report');
+
+  const unboundPass = Object.assign({}, passData);
+  delete unboundPass.package_id;
+  st = showFullDrvReportView({
+    title: 'DRV Report — Full Backup', data: unboundPass, packageId: '2026-08-06_101010',
+    rawText: JSON.stringify(sanitizeCrpDisplayData(unboundPass), null, 2), sourceBtn: drvBtn
+  });
+  ok(st === 'FAIL', 'binding-missing PASS downgraded to FAIL');
+  ok((el('bc_view_summary').textContent || '').includes('Package identity'), 'binding failure reason visible');
 
   // CRP unchanged smoke
   const countryItem = document.querySelector('#bc_country_list .bc-acc-item');

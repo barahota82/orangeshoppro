@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * Usage: php scripts/self_test_backup_center_top_alert_elimination.php
  *
- * Evidence (outside Git): D:\orange_top_alert_elimination_evidence\
+ * Evidence: D:\orange_top_alert_elimination_evidence\ on Windows; system temp on Linux/macOS.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -45,9 +45,22 @@ function ta_extract(string $src, string $name): string
     return $body;
 }
 
+function ta_evidence_dir(): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\orange_top_alert_elimination_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_top_alert_elimination_evidence';
+}
+
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
 $src = is_file($pagePath) ? (string) file_get_contents($pagePath) : '';
 ta_ok($src !== '', 'source readable');
+$clickRegion = '';
+if (preg_match("/classList\.contains\('bc-view-file'\)[\s\S]*?classList\.contains\('bc-log-tail'\)/s", $src, $m)) {
+    $clickRegion = $m[0];
+}
 
 /* Inventory callers — Production must have zero top-alert surfaces */
 ta_ok(!str_contains($src, 'id="bc_alert"'), '19/28. TOP_PAGE_ALERT_VISIBLE_COUNT source = 0 (element removed)');
@@ -88,8 +101,9 @@ ta_ok(
     '25. report errors → centered report dialog helpers'
 );
 ta_ok(
-    str_contains($src, 'showFullDrvReportView')
-    && !preg_match('/recovery_validation\.json[\s\S]{0,1200}showSystemDialog\(/', $src),
+    $clickRegion !== ''
+    && str_contains($clickRegion, 'showFullDrvReportView')
+    && !preg_match('/recovery_validation\.json[\s\S]{0,1200}showSystemDialog\(/', $clickRegion),
     '25b. Full DRV report errors stay in report dialog'
 );
 ta_ok(
@@ -122,7 +136,7 @@ $inventory = [
     ],
 ];
 
-$evidenceDir = 'D:\\orange_top_alert_elimination_evidence';
+$evidenceDir = ta_evidence_dir();
 @mkdir($evidenceDir, 0775, true);
 @mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'shots', 0775, true);
 @mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'runtime', 0775, true);
