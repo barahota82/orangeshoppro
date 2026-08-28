@@ -16,7 +16,6 @@
 
   PUBLIC paths intentionally NOT blocked (storefront / print must keep working):
     uploads/products/
-    uploads/channels/
     uploads/company/
 
   SENSITIVE paths blocked by this fragment:

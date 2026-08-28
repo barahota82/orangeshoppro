@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
-require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
@@ -35,8 +34,6 @@ foreach ($channels as $c) {
         break;
     }
 }
-$pubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-$initialLogo = $editRow ? trim((string) ($editRow['logo'] ?? '')) : '';
 $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
 $editIsCountryDefault = $editRow ? (int) ($editRow['is_country_default'] ?? 0) : 0;
 $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
@@ -176,66 +173,6 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
 </div>
 
 <script>
-(function () {
-    var PUB = <?php echo json_encode($pubBase, JSON_UNESCAPED_UNICODE); ?>;
-
-    function setLogoPreview(filename) {
-        var wrap = document.getElementById('channel_logo_preview_wrap');
-        var img = document.getElementById('channel_logo_preview');
-        if (!wrap || !img) return;
-        if (!filename) {
-            wrap.style.display = 'none';
-            img.removeAttribute('src');
-            return;
-        }
-        wrap.style.display = '';
-        img.src = (PUB || '') + '/uploads/channels/' + encodeURIComponent(filename);
-    }
-
-    window.setLogoPreview = setLogoPreview;
-
-    var logoFile = document.getElementById('channel_logo_file');
-    if (logoFile) {
-        logoFile.addEventListener('change', async function () {
-            var f = logoFile.files && logoFile.files[0];
-            if (!f) return;
-            var fd = new FormData();
-            fd.append('image', f);
-            var r;
-            try {
-                r = await fetch('/admin/api/channels/upload-logo.php', { method: 'POST', body: fd, credentials: 'same-origin' });
-            } catch (e) {
-                alert('تعذر الاتصال بالسيرفر');
-                logoFile.value = '';
-                return;
-            }
-            var text = await r.text();
-            var data;
-            try {
-                data = JSON.parse(text);
-            } catch (e2) {
-                alert('رد السيرفر غير صالح');
-                logoFile.value = '';
-                return;
-            }
-            if (!data.success) {
-                alert(data.message || 'فشل الرفع');
-                logoFile.value = '';
-                return;
-            }
-            var fn = data.filename || '';
-            document.getElementById('channel_logo').value = fn;
-            setLogoPreview(fn);
-            logoFile.value = '';
-        });
-    }
-
-    var initLogo = <?php echo json_encode($initialLogo, JSON_UNESCAPED_UNICODE); ?>;
-    if (initLogo) {
-        setLogoPreview(initLogo);
-    }
-})();
-
 async function toggleChannelActive(id, currentlyActive) {
     var next = currentlyActive ? 0 : 1;
     var res = await postJSON('/admin/api/channels/toggle-active.php', { id: id, is_active: next });
