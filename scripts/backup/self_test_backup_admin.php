@@ -476,13 +476,18 @@ backup_admin_self_test(defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') && ORANGE_C
 $strictResolveSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_paths.php');
 backup_admin_self_test(str_contains($strictResolveSource, 'is_writable($resolved)') || str_contains($strictResolveSource, 'is_writable($candidate)'), 'engine: strict orange_backup_resolve_root still checks writable');
 
-$viewCtxWritable = orange_backup_admin_context_for_view($projectRoot);
-backup_admin_self_test(($viewCtxWritable['root_health']['readable'] ?? false) === true, 'view: context succeeds when BackupRoot is readable');
-
 $fakeProjectRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'fake_project';
 if (!is_dir($fakeProjectRoot)) {
     mkdir($fakeProjectRoot, 0775, true);
 }
+file_put_contents(
+    $fakeProjectRoot . DIRECTORY_SEPARATOR . '.env.php',
+    "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($backupRoot, true) . "];\n"
+);
+
+$viewCtxWritable = orange_backup_admin_context_for_view($fakeProjectRoot);
+backup_admin_self_test(($viewCtxWritable['root_health']['readable'] ?? false) === true, 'view: context succeeds when BackupRoot is readable');
+
 $readonlyBackupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'readonly_backups';
 if (is_dir($readonlyBackupRoot)) {
     backup_admin_test_remove_tree($readonlyBackupRoot);
