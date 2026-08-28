@@ -655,7 +655,7 @@ function orange_restore_center_can_probe_process_liveness(): bool
 
 /**
  * Step-7 diagnostic-only PID probe — never shell_exec/tasklist (restore_lock.php:147 hang).
- * posix_kill(0) only when available; otherwise unknown (fail closed upstream).
+ * posix_kill(0) only when available; EPERM still proves the process exists.
  *
  * @return 'alive'|'dead'|'unknown'
  */
@@ -665,7 +665,18 @@ function orange_restore_center_diagnostic_pid_liveness(int $pid): string
         return 'unknown';
     }
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0) ? 'alive' : 'dead';
+        if (@posix_kill($pid, 0)) {
+            return 'alive';
+        }
+        $errno = function_exists('posix_get_last_error') ? posix_get_last_error() : 0;
+        if ($errno === 1) { // EPERM: process exists but this user cannot signal it.
+            return 'alive';
+        }
+        if ($errno === 3) { // ESRCH: no such process.
+            return 'dead';
+        }
+
+        return 'unknown';
     }
 
     // Windows / no posix: never spawn tasklist from diagnostics (Owner P0 restore_lock L147).
