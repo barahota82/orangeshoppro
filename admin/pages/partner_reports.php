@@ -225,7 +225,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
             </tbody>
         </table>
     </div>
-    <?php elseif ($years === []): ?>
+    <?php else: ?>
     <p class="muted" style="margin-top:14px;">لا توجد سنة مالية أو السندات غير مفعّلة — عرّف سنة من «السنوات المالية».</p>
     <?php endif; ?>
 </div>
