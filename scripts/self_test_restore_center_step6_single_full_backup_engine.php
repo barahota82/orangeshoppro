@@ -68,7 +68,9 @@ function eng_rm_rf(string $dir): void
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_step6_single_engine_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_step6_single_engine_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step6_single_engine_evidence';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
@@ -297,7 +299,10 @@ $jobFile['status'] = ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING;
 orange_restore_fw_write($workRoot, $jobFile);
 $lock = orange_restore_pre_backup_acquire_lock($workRoot, $jobDup, 'holder');
 eng_ok(!empty($lock['ok']), 'lock acquired for duplicate test');
-$GLOBALS['orange_pre_restore_backup_engine_override'] = static function (): array {
+$dupEngineCalls = 0;
+$GLOBALS['orange_pre_restore_backup_engine_override'] = static function () use (&$dupEngineCalls): array {
+    $dupEngineCalls++;
+
     return ['ok' => true, 'snapshot' => '2026-08-10_999999', 'backend' => 'php_pdo', 'message' => 'x', 'exit_code' => 0];
 };
 $GLOBALS['orange_pre_restore_backup_verify_override'] = static function (): array {
@@ -309,11 +314,12 @@ try {
 } catch (Throwable) {
 }
 try {
-    $dup = orange_restore_pre_backup_execute($projectRoot, $workRoot, $backupRoot, $jobDup, 'other');
-    eng_ok(empty($dup['ok']) || true, 'duplicate same-job blocked or serialized');
+    orange_restore_pre_backup_execute($projectRoot, $workRoot, $backupRoot, $jobDup, 'other');
+    eng_ok(false, 'duplicate same-job live lock blocks execution');
 } catch (Throwable $e) {
-    eng_ok(str_contains($e->getMessage(), 'lock') || $e->getMessage() !== '', 'duplicate blocked by lock: ' . $e->getMessage());
+    eng_ok($e->getMessage() === 'pre_restore_backup_lock_active', 'duplicate same-job live lock blocks execution');
 }
+eng_ok($dupEngineCalls === 0, 'duplicate same-job lock does not call shared engine');
 orange_restore_pre_backup_release_lock($workRoot, $jobDup);
 
 /* Cancelled / completed rejection via admin adapter surface (source contract) */

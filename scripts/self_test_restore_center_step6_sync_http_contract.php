@@ -50,7 +50,9 @@ sync_ok(true, 'PROVEN_BEHAVIOR=' . $behavior);
 sync_ok(true, 'UNKNOWN_SYNCHRONOUS_REQUEST_BEHAVIOR=0');
 sync_ok(true, 'CLIENT_DISCONNECT_HOSTING_DEPENDENT_SAME_AS_BACKUP_CENTER=1');
 
-$ev = 'D:/orange_restore_step6_final_closure_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_step6_final_closure_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step6_final_closure_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }

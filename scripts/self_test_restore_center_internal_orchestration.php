@@ -70,7 +70,9 @@ function orch_rm_tree(string $dir): void
     @rmdir($dir);
 }
 
-$evidenceDir = 'D:/orange_restore_internal_orchestration_evidence';
+$evidenceDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_internal_orchestration_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_internal_orchestration_evidence';
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
@@ -171,7 +173,9 @@ orch_ok(
 );
 
 /* Evidence-gate recurrence guard (outside-git generator contract). */
-$gateGen = 'D:/orange_restore_orch_genuine_route_gate/generate_genuine_route_gate.php';
+$gateGen = PHP_OS_FAMILY === 'Windows'
+    ? 'D:/orange_restore_orch_genuine_route_gate/generate_genuine_route_gate.php'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_orch_genuine_route_gate' . DIRECTORY_SEPARATOR . 'generate_genuine_route_gate.php';
 if (is_file($gateGen)) {
     $gateSrc = (string) file_get_contents($gateGen);
     orch_ok(str_contains($gateSrc, 'LOGICALLY_DIFFERENT_IDENTICAL_SCREENSHOT_COUNT'), 'EVIDENCE uniqueness arithmetic marker');
