@@ -807,6 +807,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var nameEl = document.getElementById('sv2_customer_name');
         var balEl = document.getElementById('sv2_customer_balance');
         var idEl = document.getElementById('sv2_customer_id');
+        var phoneEl = document.getElementById('sv2_phone');
         if (!row) {
             currentCustomerId = 0;
             if (codeEl) codeEl.value = '';
@@ -822,6 +823,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (nameEl && !opts.keepName) nameEl.value = row.name || '';
         if (balEl) balEl.value = fmt3(row.balance || 0);
         if (idEl) idEl.value = String(currentCustomerId);
+        if (phoneEl && row.phone && !phoneEl.value.trim()) phoneEl.value = row.phone;
         applyCustomerDeliveryFields(row, opts);
         applyCustomerPhoneFields(row, opts);
         if (typeof sv2ScheduleOfferDetect === 'function') sv2ScheduleOfferDetect();
