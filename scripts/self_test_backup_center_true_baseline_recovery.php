@@ -37,9 +37,12 @@ $pageSrc = (string) file_get_contents($projectRoot . '/admin/pages/backup_center
 $rcPage = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
 
 /* §11 Plesk-like local matrix (constructability / contracts — no Production spawn) */
-putenv('PATH=');
-$_ENV['PATH'] = '';
-$_SERVER['PATH'] = '';
+$oldPath = getenv('PATH');
+if (PHP_OS_FAMILY === 'Windows') {
+    putenv('PATH=');
+    $_ENV['PATH'] = '';
+    $_SERVER['PATH'] = '';
+}
 $GLOBALS['orange_backup_test_php_binary'] = 'C:\\Plesk\\php-cgi.exe'; // non-existent cgi name
 $GLOBALS['orange_backup_test_env_override'] = [];
 $resolved = orange_backup_admin_resolve_cli_php_binary($projectRoot);
@@ -61,6 +64,14 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 @unlink($fakePhp);
 @rmdir($spaceDir);
+if ($oldPath !== false) {
+    putenv('PATH=' . $oldPath);
+    $_ENV['PATH'] = $oldPath;
+    $_SERVER['PATH'] = $oldPath;
+} else {
+    putenv('PATH');
+    unset($_ENV['PATH'], $_SERVER['PATH']);
+}
 unset($GLOBALS['orange_backup_test_php_binary'], $GLOBALS['orange_backup_test_env_override']);
 
 tb_ok(function_exists('orange_backup_run_command_capture'), '11e. process capture function present');
