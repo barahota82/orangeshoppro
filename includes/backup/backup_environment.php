@@ -97,6 +97,11 @@ function orange_backup_can_execute_commands(): bool
     return orange_backup_can_proc_open() || orange_backup_can_shell_exec();
 }
 
+function orange_backup_is_windows(): bool
+{
+    return DIRECTORY_SEPARATOR === '\\';
+}
+
 function orange_backup_normalize_tool_path(string $path): string
 {
     $path = trim($path);
@@ -347,7 +352,7 @@ function orange_backup_detect_mysqldump(array $env): array
         ];
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (orange_backup_is_windows() && orange_backup_can_execute_commands()) {
         $which = orange_backup_run_command_capture(['where.exe', 'mysqldump'], 15);
         if ($which['exit_code'] === 0) {
             $lines = preg_split('/\R/', str_replace("\r", '', (string) ($which['stdout'] ?? ''))) ?: [];
@@ -499,7 +504,7 @@ function orange_backup_detect_powershell(array $env): array
         }
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (orange_backup_is_windows() && orange_backup_can_execute_commands()) {
         foreach (['powershell.exe', 'pwsh.exe'] as $binary) {
             $which = orange_backup_run_command_capture(['where.exe', $binary], 15);
             if ($which['exit_code'] !== 0) {
@@ -756,7 +761,7 @@ function orange_backup_process_alive(int $pid): bool
     if ($pid <= 0) {
         return false;
     }
-    if (DIRECTORY_SEPARATOR === '\\') {
+    if (orange_backup_is_windows()) {
         if (!orange_backup_can_execute_commands()) {
             return true;
         }
@@ -902,8 +907,8 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if ($pdoFallbackWarnings !== []) {
         $warnings = array_merge($warnings, $pdoFallbackWarnings);
     }
-    if (!$gzipSupported || !$ziparchiveSupported) {
-        $blockers[] = 'PHP gzip and ZipArchive extensions are required for full backup packaging.';
+    if ($selectedBackend !== 'powershell' && (!$gzipSupported || !$ziparchiveSupported)) {
+        $blockers[] = 'PHP gzip and ZipArchive extensions are required for the PHP mysqldump backup backend.';
     }
 
     $blockers = array_values(array_unique($blockers));
