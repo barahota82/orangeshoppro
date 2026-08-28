@@ -75,10 +75,10 @@ try {
 
         $dbRevision = 0;
         try {
-            $stmt = $pdo->query('SELECT schema_revision FROM orange_schema_meta ORDER BY id DESC LIMIT 1');
+            $stmt = $pdo->query('SELECT version FROM orange_schema_meta WHERE id = 1 LIMIT 1');
             if ($stmt !== false) {
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                $dbRevision = (int) ($row['schema_revision'] ?? 0);
+                $dbRevision = (int) ($row['version'] ?? 0);
             }
         } catch (Throwable) {
             $dbRevision = 0;
