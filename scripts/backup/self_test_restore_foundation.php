@@ -137,6 +137,12 @@ restore_foundation_test(
     in_array('backup_restore_country', orange_admin_restore_permission_keys(), true),
     'permissions: backup_restore_country defined'
 );
+$legacyGroupKeys = array_values(array_diff(array_keys(orange_admin_resource_labels()), orange_admin_restore_permission_keys()));
+restore_foundation_test(
+    !in_array('backup_restore_full', $legacyGroupKeys, true)
+        && !in_array('backup_restore_country', $legacyGroupKeys, true),
+    'permissions: restore keys excluded from legacy group migration'
+);
 
 $fakeSuper = ['id' => 1, 'is_superuser' => 1, 'username' => 'super'];
 restore_foundation_test(
