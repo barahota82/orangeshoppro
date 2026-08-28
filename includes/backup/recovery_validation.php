@@ -170,6 +170,10 @@ function orange_recovery_sql_detect_incomplete_statement(string $sqlText): ?stri
                 continue;
             }
             if ($c === '/' && $next === '*') {
+                if (($sql[$i + 2] ?? '') === '!') {
+                    // MySQL version comments (/*!40101 SET ... */;) are executable statements.
+                    $buffer .= 'SET';
+                }
                 $inBlockComment = true;
                 $i++;
                 continue;
