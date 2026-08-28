@@ -52,6 +52,14 @@ try {
 
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);
+    if (!$ok && is_string($executionId) && $executionId !== '' && $backupRoot !== '') {
+        $errorSummary = trim((string) ($result['stderr'] ?? $result['message'] ?? 'country_batch_failed'));
+        orange_backup_provenance_finish_execution($backupRoot, $executionId, [
+            'overall_status' => 'failed',
+            'completed_at_utc' => $finishedAt,
+            'error_summary' => substr($errorSummary, 0, 240),
+        ]);
+    }
 
     orange_backup_admin_audit(
         'run_country_batch',
