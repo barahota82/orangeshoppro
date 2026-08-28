@@ -107,6 +107,19 @@ function s4b_ev_extract_const_arrow(string $src, string $name): string
     return '';
 }
 
+function s4b_ev_evidence_dir(string $folderName): string
+{
+    $safeName = trim(str_replace(['/', '\\'], '_', $folderName));
+    if ($safeName === '') {
+        $safeName = 'orange_stage4b_evidence';
+    }
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\' . $safeName;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $safeName;
+}
+
 function s4b_ev_chrome_path(): string
 {
     $candidates = [
@@ -403,7 +416,8 @@ PS;
                 . ' -W ' . (int) $w
                 . ' -H ' . (int) $h
                 . ' -Port ' . (int) $port
-                . ' -EvalJs ' . escapeshellarg($evalJs);
+                . ' -EvalJs ' . escapeshellarg($evalJs)
+                . ' -WaitSeconds ' . (int) $waitSeconds;
             usleep(400000);
             continue;
         }
