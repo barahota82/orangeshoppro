@@ -45,7 +45,6 @@ try {
     }
 
     $pdo = db();
-    orange_catalog_ensure_schema($pdo);
     $meta = orange_backup_collect_safe_metadata($pdo, $projectRoot, $env);
     $meta['backup_root_resolved'] = $backupRootDefault;
     $meta['code_schema_revision'] = ORANGE_CATALOG_SCHEMA_PHP_REVISION;
