@@ -12,7 +12,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$ev = 'D:\\orange_restore_step7_env_gate_fix_evidence';
+$ev = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_env_gate_fix_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_env_gate_fix_evidence';
 if (!is_dir($ev)) {
     mkdir($ev, 0777, true);
 }
@@ -136,7 +138,7 @@ $meta = [
     'attempt_id' => 's7_test_bind',
 ];
 orange_restore_shadow_write_json(orange_restore_shadow_meta_path($workRoot, $jid), $meta);
-unset($GLOBALS['orange_shadow_production_db_override']);
+$GLOBALS['orange_shadow_production_db_override'] = 'orange_prod_mock_s7e_bind';
 $env = orange_backup_load_env_array($projectRoot);
 unset(
     $env[ORANGE_RESTORE_ENV_STAGING_DB],
@@ -167,6 +169,19 @@ s7e_ok(
 );
 unset($GLOBALS['orange_shadow_readiness_override']);
 
+$GLOBALS['orange_shadow_readiness_override'] = static function () {
+    return [
+        'ok' => true,
+        'code' => 'ok',
+        'source' => 'forced_cap_ok',
+        'credential_mode' => 'trusted_app',
+        'can_create' => true,
+        'can_use' => true,
+        'schema_exists' => false,
+        'database_capability' => 'available',
+        'privilege_classes' => ['CREATE_ON_GLOBAL'],
+    ];
+};
 $preOk = orange_restore_center_shadow_pre_spawn_readiness($projectRoot, $workRoot, $jid);
 s7e_ok(($preOk['ok'] ?? false) === true, 'pre-spawn success after capability available');
 $boundMeta = orange_restore_shadow_load_meta($workRoot, $jid) ?? [];
@@ -180,10 +195,11 @@ $markers['PARENT_WORKER_TARGET_IDENTITY_MATCH'] = 1;
 $markers['FAILURE_THEN_SUCCESS'] = (($preFail['ok'] ?? true) === false && ($preOk['ok'] ?? false) === true) ? 1 : 0;
 s7e_ok($markers['FAILURE_THEN_SUCCESS'] === 1, 'Admin failure-then-success');
 
-// Honest probe fields
+// Honest probe fields (mocked capability to keep this self-test independent of server-only .env.php).
 $probe = orange_restore_shadow_probe_target_readiness($projectRoot, $env, $jid, $boundMeta);
 s7e_ok(($probe['database_capability'] ?? '') === 'available', 'database_capability=available');
 s7e_ok(!empty($probe['privilege_classes']), 'privilege classes present (redacted classes)');
+unset($GLOBALS['orange_shadow_readiness_override'], $GLOBALS['orange_shadow_production_db_override']);
 
 // Mutation: capability unavailable must not schedule
 s7e_ok(
