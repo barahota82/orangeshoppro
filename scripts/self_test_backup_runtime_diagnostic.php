@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Permanent focused suite — read-only Backup runtime diagnostic (36 items + mutations).
+ * Permanent focused suite — read-only Backup runtime diagnostic (contracts + mutations).
  *
  * Usage:
  *   php scripts/self_test_backup_runtime_diagnostic.php
  *
- * Evidence (outside Git): D:\orange_backup_runtime_diagnostic_evidence\
+ * Evidence (outside Git): D:\orange_backup_runtime_diagnostic_evidence\ on Windows;
+ * sys_get_temp_dir()/orange_backup_runtime_diagnostic_evidence elsewhere.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -20,17 +21,22 @@ $projectRoot = dirname(__DIR__);
 require_once $projectRoot . '/scripts/lib/backup_stage4b_evidence_lib.php';
 require_once $projectRoot . '/includes/backup/backup_runtime_diagnostic.php';
 
-$evidenceDir = 'D:\\orange_backup_runtime_diagnostic_evidence';
-@mkdir($evidenceDir, 0775, true);
-@mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'shots', 0775, true);
-@mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'runtime', 0775, true);
-
 $pass = 0;
 $fail = 0;
 $skip = 0;
 $coreSkip = 0;
 $rawFail = 0;
 $assertionWeakened = 0;
+
+function rd_evidence_dir(): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:\\orange_backup_runtime_diagnostic_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR . 'orange_backup_runtime_diagnostic_evidence';
+}
 
 function rd_ok(bool $cond, string $label): void
 {
@@ -63,6 +69,15 @@ function rd_rm_tree(string $dir): void
     @rmdir($dir);
 }
 
+$evidenceDir = rd_evidence_dir();
+@mkdir($evidenceDir, 0775, true);
+@mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'shots', 0775, true);
+@mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'runtime', 0775, true);
+rd_ok(
+    PHP_OS_FAMILY === 'Windows' || str_starts_with($evidenceDir, rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)),
+    'evidence path portable off Windows'
+);
+
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
 $apiPath = $projectRoot . '/admin/api/backup/runtime-diagnostic.php';
 $helperPath = $projectRoot . '/includes/backup/backup_runtime_diagnostic.php';
@@ -82,6 +97,10 @@ rd_ok(
     '2. unauthorized without admin/view rejected (bootstrap + require_view)'
 );
 rd_ok(str_contains($apiSrc, "require_once __DIR__ . '/_bootstrap.php'"), '3. public request rejected (admin bootstrap gate)');
+rd_ok(
+    str_contains($helperSrc, 'POSIX_EPERM') && str_contains($helperSrc, '// A different OS user owns the process'),
+    '3b. posix EPERM liveness treated as alive'
+);
 
 /* --- No mutation in diagnostic helper/API --- */
 $forbiddenCalls = [
