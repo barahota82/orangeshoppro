@@ -56,7 +56,9 @@ return [
     // عند true: فشل البوابة يعرّف ORANGE_SCHEMA_DEGRADED بدلاً من إيقاف الطلب (سياسة المالك).
     // 'ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE' => true,
     // ثوانٍ APCu لتخطي بوابة الترحيل بعد نجاح (0 أو عدم التعيين = معطّل). متغير بيئة السيرفر ORANGE_SCHEMA_APCU_GATE_SECONDS
-    // علم ملف اختياري: المسار في متغير بيئة ORANGE_SCHEMA_OK_FLAG_PATH؛ السطر الأول = رقم ORANGE_SCHEMA_CODE_VERSION بعد نشر ناجح.
+    // علم ملف اختياري: السطر الأول = رقم ORANGE_SCHEMA_CODE_VERSION بعد نشر ناجح.
+    // يمكن ضبطه هنا في .env.php أو كمتغير بيئة سيرفر ORANGE_SCHEMA_OK_FLAG_PATH.
+    // 'ORANGE_SCHEMA_OK_FLAG_PATH' => 'D:\\orange_schema_ok.txt',
 
     // اختياري: Phase 1A — Full Disaster Backup (إلزامي على Plesk production).
     // أنشئ المجلد خارج httpdocs/مجلد الموقع. مثال Plesk:
