@@ -400,7 +400,7 @@ if ($rollout === 'db-id-renumber') {
         require_once __DIR__ . '/includes/schema_migrations.php';
         $pdoRollout = db();
         orange_catalog_migrate_db_id_renumber_phases($pdoRollout);
-        orange_run_migrations($pdoRollout);
+        orange_catalog_ensure_schema($pdoRollout);
         $st = $pdoRollout->query(
             "SELECT filename FROM orange_schema_migrations WHERE filename LIKE 'php_db_id_renumber_phase%' ORDER BY filename"
         );
