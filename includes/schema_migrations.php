@@ -433,7 +433,6 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
     if (isset($cache[$pdo])) {
         return;
     }
-    $cache[$pdo] = true;
 
     $dir = orange_schema_migrations_dir();
     if (!is_dir($dir)) {
@@ -474,7 +473,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
                     'warn'
                 );
             }
-            continue;
+            throw new RuntimeException('Numbered SQL migration is in failure cooldown: ' . $base);
         }
 
         $raw = @file_get_contents($fullPath);
@@ -489,7 +488,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
                 orange_schema_migration_statement_diagnostic($base, 1, '', $readError)
             );
 
-            continue;
+            throw new RuntimeException('Cannot read numbered SQL migration: ' . $base);
         }
 
         $statements = orange_schema_migration_split_statements($raw);
@@ -501,6 +500,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
                 if (function_exists('error_log')) {
                     error_log('[orange] migration record empty failed: ' . $base);
                 }
+                throw new RuntimeException('Could not record empty numbered SQL migration: ' . $base, 0, $e);
             }
 
             continue;
@@ -536,8 +536,18 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
                 );
             }
             orange_schema_migration_failure_record($pdo, $base, $diagnostic);
+            throw new RuntimeException(
+                'Numbered SQL migration failed: '
+                . $base
+                . ' statement=' . (string) $diagnostic['statement_ordinal']
+                . ' sha256=' . (string) $diagnostic['sha256'],
+                0,
+                $e
+            );
         }
     }
+
+    $cache[$pdo] = true;
 }
 
 /**

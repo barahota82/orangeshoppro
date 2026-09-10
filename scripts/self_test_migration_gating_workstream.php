@@ -134,6 +134,7 @@ $check(
 
 $schemaMigrationsSource = (string) file_get_contents($root . '/includes/schema_migrations.php');
 $catalogSource = (string) file_get_contents($root . '/includes/catalog_schema.php');
+$healthSource = (string) file_get_contents($root . '/health.php');
 $webCatchupStart = strpos($catalogSource, 'function orange_catalog_schema_web_version_catchup');
 $webCatchupEnd = strpos($catalogSource, 'function orange_catalog_schema_integrity_migrations', $webCatchupStart ?: 0);
 $webCatchupBody = $webCatchupStart !== false && $webCatchupEnd !== false
@@ -149,6 +150,23 @@ $check(
     !str_contains($schemaMigrationsSource, 'DELETE FROM orange_schema_migration_failures')
     && str_contains($schemaMigrationsSource, 'orange_schema_migration_recent_failures($pdo)'),
     'failure rows remain and cooldown stays active'
+);
+$check(
+    str_contains($schemaMigrationsSource, 'Numbered SQL migration is in failure cooldown:')
+    && str_contains($schemaMigrationsSource, 'Numbered SQL migration failed:')
+    && str_contains($schemaMigrationsSource, '$cache[$pdo] = true;'),
+    'explicit apply fails closed on cooldown or execution failure'
+);
+$cacheMarkPos = strrpos($schemaMigrationsSource, '$cache[$pdo] = true;');
+$failureThrowPos = strpos($schemaMigrationsSource, 'Numbered SQL migration failed:');
+$check(
+    $cacheMarkPos !== false && $failureThrowPos !== false && $failureThrowPos < $cacheMarkPos,
+    'numbered SQL connection cache is marked only after failure paths'
+);
+$check(
+    !str_contains($healthSource, 'orange_run_migrations($pdoRollout)')
+    && str_contains($healthSource, 'orange_catalog_ensure_schema($pdoRollout)'),
+    'db-id-renumber health probe does not call numbered SQL apply path'
 );
 
 // Script contract via callback seam: refusal is side-effect free; --apply reaches runner once.
