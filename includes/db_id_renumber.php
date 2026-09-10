@@ -22,11 +22,40 @@ function orange_db_id_renumber_quote_table(string $table): string
 }
 
 /**
+ * تصنيف نقي قبل أي SQL يعتمد على id.
+ *
+ * @return 'missing'|'non_id_non_auto_increment'|'id_auto_increment_candidate'
+ */
+function orange_db_id_renumber_table_kind(bool $tableExists, bool $hasIdColumn): string
+{
+    if (!$tableExists) {
+        return 'missing';
+    }
+
+    return $hasIdColumn ? 'id_auto_increment_candidate' : 'non_id_non_auto_increment';
+}
+
+function orange_db_table_has_id_column(PDO $pdo, string $table): bool
+{
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, $table)) {
+        return false;
+    }
+    if (!function_exists('orange_table_has_column')) {
+        return false;
+    }
+
+    return orange_table_has_column($pdo, $table, 'id');
+}
+
+/**
  * @return bool true إذا MIN(id)=1 ولا فراغات بين MIN و MAX
  */
 function orange_db_ids_dense_from_one(PDO $pdo, string $table): bool
 {
     if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, $table)) {
+        return true;
+    }
+    if (!orange_db_table_has_id_column($pdo, $table)) {
         return true;
     }
 
@@ -49,6 +78,9 @@ function orange_db_ids_dense_from_one(PDO $pdo, string $table): bool
 function orange_db_build_dense_id_map(PDO $pdo, string $table): array
 {
     if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, $table)) {
+        return [];
+    }
+    if (!orange_db_table_has_id_column($pdo, $table)) {
         return [];
     }
 
@@ -77,6 +109,9 @@ function orange_db_build_dense_id_map(PDO $pdo, string $table): array
 function orange_db_renumber_table_to_dense_ids(PDO $pdo, string $table): array
 {
     if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, $table)) {
+        return [];
+    }
+    if (!orange_db_table_has_id_column($pdo, $table)) {
         return [];
     }
 
@@ -149,6 +184,9 @@ function orange_db_apply_id_map_to_column(
 function orange_db_align_table_auto_increment(PDO $pdo, string $table): void
 {
     if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, $table)) {
+        return;
+    }
+    if (!orange_db_table_has_id_column($pdo, $table)) {
         return;
     }
 
@@ -263,12 +301,14 @@ function orange_db_id_renumber_run_phase3(PDO $pdo): void
             orange_db_renumber_table_to_dense_ids($pdo, 'orange_gl_journal_type_rules');
         }
 
-        if (orange_table_exists($pdo, 'orange_gl_setting_alloc')
-            && orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'id')
-            && !orange_db_ids_dense_from_one($pdo, 'orange_gl_setting_alloc')) {
-            orange_db_renumber_table_to_dense_ids($pdo, 'orange_gl_setting_alloc');
-        } elseif (orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
-            orange_db_align_table_auto_increment($pdo, 'orange_gl_setting_alloc');
+        $allocExists = orange_table_exists($pdo, 'orange_gl_setting_alloc');
+        $allocHasId = $allocExists && orange_db_table_has_id_column($pdo, 'orange_gl_setting_alloc');
+        if (orange_db_id_renumber_table_kind($allocExists, $allocHasId) === 'id_auto_increment_candidate') {
+            if (!orange_db_ids_dense_from_one($pdo, 'orange_gl_setting_alloc')) {
+                orange_db_renumber_table_to_dense_ids($pdo, 'orange_gl_setting_alloc');
+            } else {
+                orange_db_align_table_auto_increment($pdo, 'orange_gl_setting_alloc');
+            }
         }
     } finally {
         $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);

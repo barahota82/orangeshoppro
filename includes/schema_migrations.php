@@ -14,6 +14,40 @@ function orange_schema_migrations_dir(): string
     return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'migrations';
 }
 
+/**
+ * Numbered SQL is a maintenance-only surface. PHP_SAPI is deliberately not
+ * sufficient because scheduled backup/finalizer processes are CLI too.
+ */
+function orange_schema_numbered_sql_apply_allowed(): bool
+{
+    return defined('ORANGE_NUMBERED_SQL_MAINTENANCE_CONTEXT')
+        && ORANGE_NUMBERED_SQL_MAINTENANCE_CONTEXT === true
+        && defined('ORANGE_NUMBERED_SQL_APPLY_OPT_IN')
+        && ORANGE_NUMBERED_SQL_APPLY_OPT_IN === true;
+}
+
+/**
+ * Per-connection execution cache; never lets one PDO identity suppress another.
+ *
+ * @return WeakMap<PDO,bool>
+ */
+function orange_schema_numbered_sql_connection_cache(): WeakMap
+{
+    static $cache = null;
+    if (!$cache instanceof WeakMap) {
+        $cache = new WeakMap();
+    }
+
+    return $cache;
+}
+
+function orange_schema_migration_bounded_text(string $text, int $maxLength): string
+{
+    return function_exists('mb_substr')
+        ? mb_substr($text, 0, $maxLength)
+        : substr($text, 0, $maxLength);
+}
+
 function orange_schema_migrations_ensure_table(PDO $pdo): void
 {
     orange_catalog_safe_exec(
@@ -69,15 +103,22 @@ function orange_schema_migration_recent_failures(PDO $pdo, int $cooldownSeconds 
     }
 }
 
-function orange_schema_migration_failure_record(PDO $pdo, string $filename, string $error): void
+function orange_schema_migration_failure_record(PDO $pdo, string $filename, array $diagnostic): void
 {
+    $encoded = json_encode(
+        $diagnostic,
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+    $safeError = is_string($encoded)
+        ? orange_schema_migration_bounded_text($encoded, 2000)
+        : '{"message":"migration_failed"}';
     try {
         $st = $pdo->prepare(
             'INSERT INTO orange_schema_migration_failures (filename, attempts, last_error, last_attempt_at)
              VALUES (?, 1, ?, NOW())
              ON DUPLICATE KEY UPDATE attempts = attempts + 1, last_error = VALUES(last_error), last_attempt_at = NOW()'
         );
-        $st->execute([$filename, mb_substr($error, 0, 2000)]);
+        $st->execute([$filename, $safeError]);
     } catch (Throwable $e) {
         // تتبّع الفشل ثانوي — لا نُسقط الطلب إن تعذّر التسجيل.
     }
@@ -85,21 +126,108 @@ function orange_schema_migration_failure_record(PDO $pdo, string $filename, stri
     orange_schema_migration_operational_log(
         'schema_migration_failed',
         'Numbered schema migration failed',
-        [
-            'filename' => $filename,
-            'error' => mb_substr($error, 0, 500),
-        ]
+        $diagnostic
     );
 }
 
-function orange_schema_migration_failure_clear(PDO $pdo, string $filename): void
+/**
+ * @return array{sqlstate:string|null,errno:int|null,message:string}
+ */
+function orange_schema_migration_sanitize_exception(Throwable $error): array
 {
-    try {
-        $st = $pdo->prepare('DELETE FROM orange_schema_migration_failures WHERE filename = ?');
-        $st->execute([$filename]);
-    } catch (Throwable $e) {
-        // تجاهل
+    $sqlState = null;
+    $errno = null;
+    if ($error instanceof PDOException && is_array($error->errorInfo ?? null)) {
+        $candidateState = strtoupper(trim((string) ($error->errorInfo[0] ?? '')));
+        if (preg_match('/^[0-9A-Z]{5}$/', $candidateState) === 1) {
+            $sqlState = $candidateState;
+        }
+        $candidateErrno = $error->errorInfo[1] ?? null;
+        if (is_int($candidateErrno) || (is_string($candidateErrno) && ctype_digit($candidateErrno))) {
+            $errno = (int) $candidateErrno;
+        }
     }
+    if ($sqlState === null) {
+        $message = $error->getMessage();
+        if (preg_match('/\bSQLSTATE\[([0-9A-Z]{5})\]/i', $message, $match) === 1) {
+            $sqlState = strtoupper($match[1]);
+        }
+    }
+    if ($errno === null) {
+        $message = $error->getMessage();
+        if (preg_match('/(?:native\s+error|errno|SQLSTATE\[[^\]]+\]\s*:?\s*)\D{0,8}(\d{3,6})\b/i', $message, $match) === 1) {
+            $errno = (int) $match[1];
+        }
+    }
+
+    $parts = ['Database statement failed'];
+    if ($sqlState !== null) {
+        $parts[] = 'SQLSTATE ' . $sqlState;
+    }
+    if ($errno !== null) {
+        $parts[] = 'errno ' . (string) $errno;
+    }
+
+    return [
+        'sqlstate' => $sqlState,
+        'errno' => $errno,
+        'message' => orange_schema_migration_bounded_text(implode('; ', $parts), 160),
+    ];
+}
+
+/**
+ * @return array{operation:string,table:string|null}
+ */
+function orange_schema_migration_infer_statement(string $sql): array
+{
+    $operation = 'UNKNOWN';
+    $table = null;
+    $patterns = [
+        '/^\s*(CREATE)\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(ALTER)\s+TABLE\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(INSERT)\s+INTO\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(REPLACE)\s+INTO\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(UPDATE)\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(DELETE)\s+FROM\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(DROP)\s+TABLE(?:\s+IF\s+EXISTS)?\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(TRUNCATE)\s+(?:TABLE\s+)?[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+        '/^\s*(?:CREATE|DROP)\s+(INDEX)\s+[`"]?[a-zA-Z0-9_]+[`"]?\s+ON\s+[`"]?([a-zA-Z0-9_]+)[`"]?/i',
+    ];
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $sql, $match) === 1) {
+            $operation = strtoupper($match[1]);
+            $table = strtolower($match[2]);
+            break;
+        }
+    }
+
+    return ['operation' => $operation, 'table' => $table];
+}
+
+/**
+ * The diagnostic contains structure only: never exception literals or SQL text.
+ *
+ * @return array<string,mixed>
+ */
+function orange_schema_migration_statement_diagnostic(
+    string $filename,
+    int $ordinal,
+    string $statement,
+    Throwable $error
+): array {
+    $shape = orange_schema_migration_infer_statement($statement);
+    $safeError = orange_schema_migration_sanitize_exception($error);
+
+    return [
+        'filename' => basename($filename),
+        'statement_ordinal' => max(1, $ordinal),
+        'sha256' => hash('sha256', $statement),
+        'operation' => $shape['operation'],
+        'table' => $shape['table'],
+        'sqlstate' => $safeError['sqlstate'],
+        'errno' => $safeError['errno'],
+        'message' => $safeError['message'],
+    ];
 }
 
 function orange_schema_migration_operational_log(
@@ -167,7 +295,7 @@ function orange_schema_migration_operational_status(PDO $pdo, int $cooldownSecon
             $inCooldown = (int) ($row['in_cooldown'] ?? 0) === 1;
             $lastError = isset($row['last_error']) ? trim((string) $row['last_error']) : '';
             if ($lastError !== '') {
-                $lastError = mb_substr($lastError, 0, 300);
+                $lastError = orange_schema_migration_bounded_text($lastError, 300);
             } else {
                 $lastError = null;
             }
@@ -193,37 +321,99 @@ function orange_schema_migration_operational_status(PDO $pdo, int $cooldownSecon
 }
 
 /**
- * يقسّم ملف SQL إلى جمل منفصلة (سطر ينتهي بـ ؛ يغلق الجملة). لا تضع فاصلة منقوطة داخل نصوص نصية في الترحيلات.
+ * يقسّم SQL مع BOM وأنواع الأسطر المختلفة، ويتجاهل الفواصل المنقوطة
+ * داخل النصوص/المعرّفات المقتبسة والتعليقات.
  *
  * @return list<string>
  */
 function orange_schema_migration_split_statements(string $sql): array
 {
-    $lines = preg_split("/\R/", $sql) ?: [];
-    $chunks = [];
+    if (str_starts_with($sql, "\xEF\xBB\xBF")) {
+        $sql = substr($sql, 3);
+    }
+    $sql = str_replace(["\r\n", "\r"], "\n", $sql);
+    $statements = [];
     $buf = '';
-    foreach ($lines as $line) {
-        $trimLine = trim($line);
-        if ($trimLine === '' || str_starts_with($trimLine, '--')) {
+    $quote = null;
+    $lineComment = false;
+    $blockComment = false;
+    $length = strlen($sql);
+
+    for ($i = 0; $i < $length; $i++) {
+        $char = $sql[$i];
+        $next = $i + 1 < $length ? $sql[$i + 1] : '';
+
+        if ($lineComment) {
+            if ($char === "\n") {
+                $lineComment = false;
+                $buf .= "\n";
+            }
             continue;
         }
-        $buf .= ($buf === '' ? '' : "\n") . $line;
-        if (str_ends_with(rtrim($line), ';')) {
+        if ($blockComment) {
+            if ($char === '*' && $next === '/') {
+                $blockComment = false;
+                $i++;
+            } elseif ($char === "\n") {
+                $buf .= "\n";
+            }
+            continue;
+        }
+
+        if ($quote !== null) {
+            $buf .= $char;
+            if ($char === '\\' && $next !== '') {
+                $buf .= $next;
+                $i++;
+                continue;
+            }
+            if ($char === $quote) {
+                if ($next === $quote) {
+                    $buf .= $next;
+                    $i++;
+                } else {
+                    $quote = null;
+                }
+            }
+            continue;
+        }
+
+        if ($char === '-' && $next === '-' && ($i + 2 >= $length || ctype_space($sql[$i + 2]))) {
+            $lineComment = true;
+            $i++;
+            continue;
+        }
+        if ($char === '#') {
+            $lineComment = true;
+            continue;
+        }
+        if ($char === '/' && $next === '*') {
+            $blockComment = true;
+            $i++;
+            continue;
+        }
+        if ($char === "'" || $char === '"' || $char === '`') {
+            $quote = $char;
+            $buf .= $char;
+            continue;
+        }
+        if ($char === ';') {
             $stmt = trim($buf);
-            $stmt = rtrim($stmt, " \t\n\r\0\x0B;");
-            $stmt = trim($stmt);
             if ($stmt !== '') {
-                $chunks[] = $stmt;
+                $statements[] = $stmt;
             }
             $buf = '';
+            continue;
         }
-    }
-    $stmt = trim($buf);
-    if ($stmt !== '') {
-        $chunks[] = $stmt;
+        $buf .= $char;
     }
 
-    return $chunks;
+    $stmt = trim($buf);
+    if ($stmt !== '') {
+        $statements[] = $stmt;
+    }
+
+    return $statements;
 }
 
 function orange_schema_migration_already_applied(PDO $pdo, string $filename): bool
@@ -236,12 +426,14 @@ function orange_schema_migration_already_applied(PDO $pdo, string $filename): bo
 
 function orange_schema_run_pending_migrations(PDO $pdo): void
 {
-    // يُستدعى من عدة مسارات في النواة/المسار السريع/البوابة؛ مرّة واحدة لكل طلب تكفي.
-    static $ranThisRequest = false;
-    if ($ranThisRequest) {
+    if (!orange_schema_numbered_sql_apply_allowed()) {
         return;
     }
-    $ranThisRequest = true;
+    $cache = orange_schema_numbered_sql_connection_cache();
+    if (isset($cache[$pdo])) {
+        return;
+    }
+    $cache[$pdo] = true;
 
     $dir = orange_schema_migrations_dir();
     if (!is_dir($dir)) {
@@ -251,10 +443,8 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
     orange_schema_migrations_ensure_table($pdo);
     orange_schema_migration_failures_ensure_table($pdo);
 
-    // على الويب: لا نعيد محاولة ملف فشل خلال فترة التهدئة (يمنع لوب الفشل واستنزاف الاتصالات).
-    // على CLI (php scripts/run_migrations.php): نتجاهل التهدئة لإتاحة تشغيل يدوي فوري بعد الإصلاح.
-    $isCli = PHP_SAPI === 'cli';
-    $recentFailures = $isCli ? [] : orange_schema_migration_recent_failures($pdo);
+    // التهدئة مستقلة عن SAPI؛ حتى الصيانة الصريحة لا تعيد قصف ملف فاشل.
+    $recentFailures = orange_schema_migration_recent_failures($pdo);
 
     $filesUnderscore = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9]_*.sql') ?: [];
     $filesPlain = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9].sql') ?: [];
@@ -292,7 +482,12 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
             if (function_exists('error_log')) {
                 error_log('[orange] migration read failed: ' . $base);
             }
-            orange_schema_migration_failure_record($pdo, $base, 'read failed');
+            $readError = new RuntimeException('Migration file could not be read');
+            orange_schema_migration_failure_record(
+                $pdo,
+                $base,
+                orange_schema_migration_statement_diagnostic($base, 1, '', $readError)
+            );
 
             continue;
         }
@@ -302,10 +497,9 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
             try {
                 $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
                 $ins->execute([$base]);
-                orange_schema_migration_failure_clear($pdo, $base);
             } catch (Throwable $e) {
                 if (function_exists('error_log')) {
-                    error_log('[orange] migration record empty: ' . $base . ' — ' . $e->getMessage());
+                    error_log('[orange] migration record empty failed: ' . $base);
                 }
             }
 
@@ -314,21 +508,34 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
 
         try {
             $pdo->beginTransaction();
+            $ordinal = 0;
             foreach ($statements as $sql) {
+                $ordinal++;
                 $pdo->exec($sql);
             }
             $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
             $ins->execute([$base]);
             $pdo->commit();
-            orange_schema_migration_failure_clear($pdo, $base);
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            $ordinal = max(1, (int) ($ordinal ?? 1));
+            $failedStatement = isset($sql) && is_string($sql) ? $sql : '';
+            $diagnostic = orange_schema_migration_statement_diagnostic($base, $ordinal, $failedStatement, $e);
             if (function_exists('error_log')) {
-                error_log('[orange] migration failed ' . $base . ': ' . $e->getMessage());
+                error_log(
+                    '[orange] migration failed '
+                    . $diagnostic['filename']
+                    . ' statement=' . (string) $diagnostic['statement_ordinal']
+                    . ' sha256=' . $diagnostic['sha256']
+                    . ' operation=' . $diagnostic['operation']
+                    . ' table=' . (string) ($diagnostic['table'] ?? '-')
+                    . ' sqlstate=' . (string) ($diagnostic['sqlstate'] ?? '-')
+                    . ' errno=' . (string) ($diagnostic['errno'] ?? '-')
+                );
             }
-            orange_schema_migration_failure_record($pdo, $base, $e->getMessage());
+            orange_schema_migration_failure_record($pdo, $base, $diagnostic);
         }
     }
 }
@@ -340,6 +547,9 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
  */
 function orange_schema_execute_numbered_file(PDO $pdo, string $fullPath): void
 {
+    if (!orange_schema_numbered_sql_apply_allowed()) {
+        throw new LogicException('Numbered SQL requires explicit maintenance context and apply opt-in');
+    }
     $raw = @file_get_contents($fullPath);
     if ($raw === false) {
         throw new RuntimeException('Cannot read migration: ' . $fullPath);
@@ -371,6 +581,9 @@ function orange_schema_execute_numbered_file(PDO $pdo, string $fullPath): void
  */
 function orange_schema_run_numbered_sql_chain(PDO $pdo, ?int $knownCurrentMeta): void
 {
+    if (!orange_schema_numbered_sql_apply_allowed()) {
+        return;
+    }
     orange_schema_meta_ensure_table($pdo);
     $current = $knownCurrentMeta;
     if ($current === null) {

@@ -97,6 +97,98 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
 }
 
 /**
+ * Seam نقي لاختيار موضع country_id: لا يُستخدم AFTER إلا لعمود ثبُت وجوده.
+ */
+function orange_catalog_country_id_position_clause(?string $anchor, bool $anchorExists): string
+{
+    if (!$anchorExists || $anchor === null || !preg_match('/^[a-zA-Z0-9_]+$/', $anchor)) {
+        return '';
+    }
+
+    return ' AFTER `' . $anchor . '`';
+}
+
+/**
+ * Seam نقي: أي DDL تابع ممنوع قبل إعادة إثبات وجود country_id.
+ */
+function orange_catalog_country_id_followup_allowed(bool $columnExistsAfterAdd): bool
+{
+    return $columnExistsAfterAdd;
+}
+
+/**
+ * يضيف country_id ثم يبطل الكاش ويعيد التحقق. لا يفترض وجود id.
+ */
+function orange_catalog_ensure_country_id_column(
+    PDO $pdo,
+    string $table,
+    ?string $anchor = 'id',
+    bool $ensureIndexAfterAdd = false,
+): bool
+{
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !orange_table_exists($pdo, $table)) {
+        return false;
+    }
+
+    $alreadyExists = orange_table_has_column($pdo, $table, 'country_id');
+    if (!$alreadyExists) {
+        $anchorExists = $anchor !== null && orange_table_has_column($pdo, $table, $anchor);
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE `' . $table . '` ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL'
+            . orange_catalog_country_id_position_clause($anchor, $anchorExists)
+        );
+        orange_schema_invalidate_column_check($table, 'country_id');
+    }
+
+    $existsAfterAdd = orange_table_has_column($pdo, $table, 'country_id');
+    if (!$alreadyExists
+        && orange_catalog_country_id_followup_allowed($existsAfterAdd)
+        && $ensureIndexAfterAdd) {
+        orange_catalog_ensure_country_id_index($pdo, $table);
+    }
+
+    return orange_catalog_country_id_followup_allowed($existsAfterAdd);
+}
+
+function orange_catalog_table_has_index(PDO $pdo, string $table, string $indexName): bool
+{
+    try {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(?) AND INDEX_NAME = ?
+             LIMIT 1'
+        );
+        $st->execute([$table, $indexName]);
+
+        return (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * لا ينشئ الفهرس إلا بعد إثبات وجود country_id، وباسم آمن ومكرر التشغيل.
+ */
+function orange_catalog_ensure_country_id_index(PDO $pdo, string $table): void
+{
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)
+        || !orange_table_has_column($pdo, $table, 'country_id')) {
+        return;
+    }
+
+    $indexName = 'idx_' . $table . '_country_id';
+    if (orange_catalog_table_has_index($pdo, $table, $indexName)) {
+        return;
+    }
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE INDEX `' . $indexName . '` ON `' . $table . '` (country_id)'
+    );
+}
+
+/**
  * عند تفعيل المتجر الموحّد: إن امتلأ عمود product_type_id لكل المنتجات بقيمة صالحة تُطبَّق مطابقة سياسة ERD بعد الترحيل (NOT NULL).
  * لا تُنفَّذ أي تعديل ما دام يوجد صف بلا نوع منتج أو بمرجعيته غير موجودة؛ يُسجَّل الخطأ فقط في الـ log إن تعذّر الـ MODIFY.
  */
@@ -976,14 +1068,20 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
 function orange_catalog_ensure_schema_core(PDO $pdo): void
 {
     // Per-connection charset (avoids editing config.php; some hosts break PDO::MYSQL_ATTR_INIT_COMMAND).
-    static $charsetApplied = false;
-    if (!$charsetApplied) {
+    static $charsetConnections = null;
+    if (!$charsetConnections instanceof WeakMap) {
+        $charsetConnections = new WeakMap();
+    }
+    if (!isset($charsetConnections[$pdo])) {
         orange_catalog_safe_exec($pdo, 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
-        $charsetApplied = true;
+        $charsetConnections[$pdo] = true;
     }
 
-    static $done = false;
-    if ($done) {
+    static $doneConnections = null;
+    if (!$doneConnections instanceof WeakMap) {
+        $doneConnections = new WeakMap();
+    }
+    if (isset($doneConnections[$pdo])) {
         return;
     }
 
@@ -998,7 +1096,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         if (! $ckOk && $metaOk) {
             orange_catalog_schema_checkpoint_save($pdo, $schemaRev);
         }
-        $done = true;
+        $doneConnections[$pdo] = true;
 
         return;
     }
@@ -3745,27 +3843,27 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     require_once __DIR__ . '/invoice_ancillary_lines_schema.php';
     orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
 
-    require_once __DIR__ . '/schema_migrations.php';
-    orange_schema_run_pending_migrations($pdo);
-
     require_once __DIR__ . '/document_sequences.php';
     orange_orders_migrate_legacy_invoice_numbers_v1($pdo);
 
     orange_catalog_schema_checkpoint_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
     orange_schema_meta_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
 
-    $done = true;
+    $doneConnections[$pdo] = true;
 }
 
 /**
- * ترحيل مرقّم اختياري: scripts/migrations/001.sql … NNN.sql ثم النواة الكاملة (انظر ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS في config / .env.php).
+ * مسار الصيانة الصريح: numbered SQL ثم نواة PHP. لا يكفي كون العملية CLI.
  *
  * @param int|null $_currentDbVersion إصدار orange_schema_meta الحالي (صف id=1)؛ null يعيد القراءة من القاعدة.
  */
 function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
 {
     require_once __DIR__ . '/schema_migrations.php';
-    orange_schema_run_numbered_sql_chain($pdo, $_currentDbVersion);
+    if (!orange_schema_numbered_sql_apply_allowed()) {
+        throw new LogicException('Numbered SQL migrations require scripts/run_migrations.php --apply');
+    }
+    orange_schema_run_pending_migrations($pdo);
     orange_catalog_ensure_schema_core($pdo);
 }
 
@@ -3796,8 +3894,6 @@ function orange_catalog_ensure_document_public_tokens_table(PDO $pdo): void
 
 function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
 {
-    require_once __DIR__ . '/schema_migrations.php';
-    orange_schema_run_pending_migrations($pdo);
     orange_catalog_migrate_delivery_promotions_invoice_lines_v91($pdo);
     orange_catalog_migrate_delivery_fee_apply_mode_v92($pdo);
     orange_catalog_migrate_delivery_fee_pending_v93($pdo);
@@ -3936,17 +4032,11 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
  */
 function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): void
 {
-    if (PHP_SAPI === 'cli') {
-        orange_run_migrations($pdo, $dbVersion);
-
-        return;
-    }
-
     @ini_set('max_execution_time', '0');
     @set_time_limit(0);
 
-    require_once __DIR__ . '/schema_migrations.php';
-    orange_schema_run_numbered_sql_chain($pdo, $dbVersion);
+    // Git-pull/first-request compatibility is PHP-only. Numbered SQL is never
+    // entered from storefront/admin/API, backup, finalizer, or metadata paths.
     orange_catalog_ensure_schema_fast_path_slice($pdo);
 
     $rev = ORANGE_SCHEMA_CODE_VERSION;
@@ -3956,7 +4046,7 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
     if (function_exists('error_log')) {
         error_log(
             '[orange] Web schema catch-up to rev ' . (string) $rev
-            . ' (lightweight). CLI: php scripts/run_migrations.php and php scripts/run_db_id_renumber_phases.php'
+            . ' (PHP lightweight; numbered SQL requires scripts/run_migrations.php --apply)'
         );
     }
 }
@@ -3966,9 +4056,12 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
  */
 function orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete(PDO $pdo): bool
 {
-    static $cached = null;
-    if ($cached !== null) {
-        return (bool) $cached;
+    static $cache = null;
+    if (!$cache instanceof WeakMap) {
+        $cache = new WeakMap();
+    }
+    if (isset($cache[$pdo])) {
+        return (bool) $cache[$pdo];
     }
 
     require_once __DIR__ . '/schema_migrations.php';
@@ -3985,9 +4078,9 @@ function orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete
         'SELECT COUNT(*) FROM orange_schema_migrations WHERE filename IN (' . $placeholders . ')'
     );
     $st->execute($markers);
-    $cached = ((int) $st->fetchColumn()) === count($markers);
+    $cache[$pdo] = ((int) $st->fetchColumn()) === count($markers);
 
-    return (bool) $cached;
+    return (bool) $cache[$pdo];
 }
 
 /**
@@ -3995,11 +4088,14 @@ function orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete
  */
 function orange_catalog_migrate_pre_apcu_integrity_v116_through_v119(PDO $pdo): void
 {
-    static $ranThisRequest = false;
-    if ($ranThisRequest) {
+    static $connections = null;
+    if (!$connections instanceof WeakMap) {
+        $connections = new WeakMap();
+    }
+    if (isset($connections[$pdo])) {
         return;
     }
-    $ranThisRequest = true;
+    $connections[$pdo] = true;
 
     if (orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete($pdo)) {
         return;
@@ -4012,26 +4108,55 @@ function orange_catalog_migrate_pre_apcu_integrity_v116_through_v119(PDO $pdo): 
 }
 
 /**
- * بوابة نشر الويب: قراءة إصدار القاعدة، سلسلة ###.sql عند الحاجة، ثم النواة؛ اختياري APCu ووضع متدهور عند الفشل (إعدادات).
+ * @return WeakMap<PDO,string>
+ */
+function orange_schema_steady_state_gate_cache(): WeakMap
+{
+    static $cache = null;
+    if (!$cache instanceof WeakMap) {
+        $cache = new WeakMap();
+    }
+
+    return $cache;
+}
+
+function orange_schema_steady_state_gate_cached(PDO $pdo): ?string
+{
+    $cache = orange_schema_steady_state_gate_cache();
+
+    return isset($cache[$pdo]) ? (string) $cache[$pdo] : null;
+}
+
+function orange_schema_steady_state_gate_mark(PDO $pdo, string $state): void
+{
+    if (!in_array($state, ['ok', 'degraded'], true)) {
+        throw new InvalidArgumentException('Invalid schema gate state');
+    }
+    $cache = orange_schema_steady_state_gate_cache();
+    $cache[$pdo] = $state;
+}
+
+function orange_schema_gate_route(int $dbVersion): string
+{
+    return $dbVersion < ORANGE_SCHEMA_CODE_VERSION ? 'php_catchup' : 'steady';
+}
+
+/**
+ * بوابة نشر الويب: PHP catch-up فقط. Numbered SQL مستبعد ما لم يدخل مسار الصيانة الصريح.
  */
 function orange_schema_check_and_bootstrap(PDO $pdo): void
 {
+    if (orange_schema_steady_state_gate_cached($pdo) !== null) {
+        return;
+    }
+
     orange_catalog_ensure_country_id_columns_once($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
-
-    static $gateOk = false;
-    if ($gateOk) {
-        return;
-    }
-    static $bootstrapFailedDegraded = false;
-    if ($bootstrapFailedDegraded) {
-        return;
-    }
 
     $apcuTtl = (int) (getenv('ORANGE_SCHEMA_APCU_GATE_SECONDS') ?: '0');
     $apcuKey = 'orange_schema_gate_' . (string) ORANGE_SCHEMA_CODE_VERSION;
     if ($apcuTtl > 0 && function_exists('apcu_fetch') && apcu_fetch($apcuKey)) {
-        $gateOk = true;
+        orange_schema_steady_state_gate_mark($pdo, 'ok');
 
         return;
     }
@@ -4049,7 +4174,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
             $parts = preg_split("/\R/", $fc, 2);
             $line = trim((string) ($parts[0] ?? ''));
             if ($line === (string) ORANGE_SCHEMA_CODE_VERSION) {
-                $gateOk = true;
+                orange_schema_steady_state_gate_mark($pdo, 'ok');
 
                 return;
             }
@@ -4064,11 +4189,9 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
         $dbVersion = $row ? (int) ($row['version'] ?? 0) : 0;
 
-        if ($dbVersion < ORANGE_SCHEMA_CODE_VERSION) {
+        if (orange_schema_gate_route($dbVersion) === 'php_catchup') {
             orange_catalog_schema_web_version_catchup($pdo, $dbVersion);
         } else {
-            require_once __DIR__ . '/schema_migrations.php';
-            orange_schema_run_pending_migrations($pdo);
             if (PHP_SAPI === 'cli') {
                 orange_catalog_ensure_schema_core($pdo);
             } else {
@@ -4094,7 +4217,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);
         }
-        $gateOk = true;
+        orange_schema_steady_state_gate_mark($pdo, 'ok');
     } catch (Throwable $e) {
         if ($catch) {
             if (function_exists('error_log')) {
@@ -4103,7 +4226,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
             if (!defined('ORANGE_SCHEMA_DEGRADED')) {
                 define('ORANGE_SCHEMA_DEGRADED', true);
             }
-            $bootstrapFailedDegraded = true;
+            orange_schema_steady_state_gate_mark($pdo, 'degraded');
 
             return;
         }
@@ -4299,34 +4422,31 @@ function orange_catalog_migrate_countries_foundation_v40(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'channels')) {
-        if (!orange_table_has_column($pdo, 'channels', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE channels ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-        }
-        if (!orange_table_has_column($pdo, 'channels', 'channel_kind')) {
+        $channelsCountryReady = orange_catalog_ensure_country_id_column($pdo, 'channels');
+        if ($channelsCountryReady && !orange_table_has_column($pdo, 'channels', 'channel_kind')) {
             orange_catalog_safe_exec(
                 $pdo,
                 "ALTER TABLE channels ADD COLUMN channel_kind VARCHAR(32) NOT NULL DEFAULT 'other' AFTER country_id"
             );
         }
-        if ($kwId > 0) {
+        if ($channelsCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE channels SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
             );
         }
-        orange_catalog_safe_exec(
-            $pdo,
-            "UPDATE channels SET channel_kind = 'web' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) IN ('web', 'online')"
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            "UPDATE channels SET channel_kind = 'whatsapp' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) = 'tiktok'"
-        );
+        if ($channelsCountryReady) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE channels SET channel_kind = 'web' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) IN ('web', 'online')"
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE channels SET channel_kind = 'whatsapp' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) = 'tiktok'"
+            );
+        }
 
-        foreach (['uq_channels_slug', 'uq_channels_path_segment'] as $ix) {
+        foreach ($channelsCountryReady ? ['uq_channels_slug', 'uq_channels_path_segment'] : [] as $ix) {
             $chk = $pdo->prepare(
                 'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
@@ -4336,34 +4456,31 @@ function orange_catalog_migrate_countries_foundation_v40(PDO $pdo): void
                 orange_catalog_safe_exec($pdo, 'ALTER TABLE channels DROP INDEX `' . str_replace('`', '``', $ix) . '`');
             }
         }
-        $chkComp = $pdo->prepare(
-            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
-        );
-        $chkComp->execute(['uq_channels_country_slug']);
-        if (!$chkComp->fetchColumn()) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE UNIQUE INDEX uq_channels_country_slug ON channels (country_id, slug)'
+        if ($channelsCountryReady) {
+            $chkComp = $pdo->prepare(
+                'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
             );
-        }
-        $chkComp->execute(['uq_channels_country_path']);
-        if (!$chkComp->fetchColumn()) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE UNIQUE INDEX uq_channels_country_path ON channels (country_id, path_segment)'
-            );
+            $chkComp->execute(['uq_channels_country_slug']);
+            if (!$chkComp->fetchColumn()) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'CREATE UNIQUE INDEX uq_channels_country_slug ON channels (country_id, slug)'
+                );
+            }
+            $chkComp->execute(['uq_channels_country_path']);
+            if (!$chkComp->fetchColumn()) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'CREATE UNIQUE INDEX uq_channels_country_path ON channels (country_id, path_segment)'
+                );
+            }
         }
     }
 
     if (orange_table_exists($pdo, 'delivery_areas')) {
-        if (!orange_table_has_column($pdo, 'delivery_areas', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE delivery_areas ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-        }
-        if ($kwId > 0) {
+        $deliveryAreasCountryReady = orange_catalog_ensure_country_id_column($pdo, 'delivery_areas');
+        if ($deliveryAreasCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE delivery_areas SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
@@ -4841,28 +4958,11 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
         if (!orange_table_exists($pdo, $tbl)) {
             continue;
         }
-        if (!orange_table_has_column($pdo, $tbl, 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE ' . $tbl . ' ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_' . $tbl . '_country_id ON ' . $tbl . ' (country_id)'
-            );
-            orange_schema_invalidate_column_check($tbl, 'country_id');
-        }
+        orange_catalog_ensure_country_id_column($pdo, $tbl, 'id', true);
     }
 
     if (orange_table_exists($pdo, 'orders')) {
-        if (!orange_table_has_column($pdo, 'orders', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE orders ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_country_id ON orders (country_id)');
-            orange_schema_invalidate_column_check('orders', 'country_id');
-        }
+        orange_catalog_ensure_country_id_column($pdo, 'orders', 'id', true);
         if (!orange_table_has_column($pdo, 'orders', 'warehouse_id')) {
             orange_catalog_safe_exec(
                 $pdo,
@@ -4884,14 +4984,7 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'stock_movements')) {
-        if (!orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE stock_movements ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_country_id ON stock_movements (country_id)');
-            orange_schema_invalidate_column_check('stock_movements', 'country_id');
-        }
+        orange_catalog_ensure_country_id_column($pdo, 'stock_movements', 'id', true);
         if (!orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
             orange_catalog_safe_exec(
                 $pdo,
@@ -4912,17 +5005,7 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'accounts')) {
-        if (!orange_table_has_column($pdo, 'accounts', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_accounts_country_id ON accounts (country_id)'
-            );
-            orange_schema_invalidate_column_check('accounts', 'country_id');
-        }
+        orange_catalog_ensure_country_id_column($pdo, 'accounts', 'id', true);
     }
 
     orange_catalog_backfill_kuwait_country_ids($pdo, $kwId);
@@ -5049,10 +5132,9 @@ function orange_catalog_ensure_journal_types_country_id_column(PDO $pdo): bool
     require_once __DIR__ . '/countries.php';
     $kwId = orange_countries_default_id($pdo);
 
-    orange_catalog_safe_exec(
-        $pdo,
-        'ALTER TABLE journal_types ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-    );
+    if (!orange_catalog_ensure_country_id_column($pdo, 'journal_types')) {
+        return false;
+    }
     if ($kwId > 0) {
         orange_catalog_safe_exec(
             $pdo,
@@ -5075,9 +5157,7 @@ function orange_catalog_ensure_journal_types_country_id_column(PDO $pdo): bool
         $pdo,
         'CREATE INDEX idx_journal_types_country_sort ON journal_types (country_id, sort_order)'
     );
-    orange_schema_invalidate_column_check('journal_types', 'country_id');
-
-    return orange_table_has_column($pdo, 'journal_types', 'country_id');
+    return true;
 }
 
 /**
@@ -5097,95 +5177,87 @@ function orange_catalog_migrate_country_admin_settings_v52(PDO $pdo): void
     orange_catalog_ensure_journal_types_country_id_column($pdo);
 
     if (orange_table_exists($pdo, 'fiscal_years') && !orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE fiscal_years ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        if ($kwId > 0) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'fiscal_years')) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE fiscal_years SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE fiscal_years MODIFY country_id INT UNSIGNED NOT NULL');
             orange_catalog_safe_exec(
                 $pdo,
-                'UPDATE fiscal_years SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                'CREATE INDEX idx_fiscal_years_country_range ON fiscal_years (country_id, start_date, end_date)'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE fiscal_years MODIFY country_id INT UNSIGNED NOT NULL');
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE INDEX idx_fiscal_years_country_range ON fiscal_years (country_id, start_date, end_date)'
-        );
     }
 
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE company_settings ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE company_settings SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-        }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings MODIFY country_id INT UNSIGNED NOT NULL');
-        try {
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE UNIQUE INDEX uq_company_settings_country ON company_settings (country_id)'
-            );
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] v52 uq_company_settings_country: ' . $e->getMessage());
+        if (orange_catalog_ensure_country_id_column($pdo, 'company_settings')) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE company_settings SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings MODIFY country_id INT UNSIGNED NOT NULL');
+            try {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'CREATE UNIQUE INDEX uq_company_settings_country ON company_settings (country_id)'
+                );
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] v52 uq_company_settings_country: ' . $e->getMessage());
+                }
             }
         }
     }
 
     if (orange_table_exists($pdo, 'storefront_copy_lines') && !orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE storefront_copy_lines ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        if ($kwId > 0) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'storefront_copy_lines')) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE storefront_copy_lines SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_copy_lines MODIFY country_id INT UNSIGNED NOT NULL');
             orange_catalog_safe_exec(
                 $pdo,
-                'UPDATE storefront_copy_lines SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                'CREATE INDEX idx_storefront_copy_country_scope ON storefront_copy_lines (country_id, scope, is_active, sort_order)'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_copy_lines MODIFY country_id INT UNSIGNED NOT NULL');
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE INDEX idx_storefront_copy_country_scope ON storefront_copy_lines (country_id, scope, is_active, sort_order)'
-        );
     }
 
     if (orange_table_exists($pdo, 'storefront_phone_merge_requests')
         && !orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE storefront_phone_merge_requests ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE storefront_phone_merge_requests SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-            if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'storefront_phone_merge_requests')) {
+            if ($kwId > 0) {
                 orange_catalog_safe_exec(
                     $pdo,
-                    'UPDATE storefront_phone_merge_requests r
-                     INNER JOIN channels c ON c.slug = r.proposed_channel_slug AND c.country_id > 0
-                     SET r.country_id = c.country_id
-                     WHERE r.proposed_channel_slug IS NOT NULL AND TRIM(r.proposed_channel_slug) <> \'\''
+                    'UPDATE storefront_phone_merge_requests SET country_id = ' . (int) $kwId
+                    . ' WHERE country_id IS NULL OR country_id = 0'
                 );
+                if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
+                    orange_catalog_safe_exec(
+                        $pdo,
+                        'UPDATE storefront_phone_merge_requests r
+                         INNER JOIN channels c ON c.slug = r.proposed_channel_slug AND c.country_id > 0
+                         SET r.country_id = c.country_id
+                         WHERE r.proposed_channel_slug IS NOT NULL AND TRIM(r.proposed_channel_slug) <> \'\''
+                    );
+                }
             }
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_phone_merge_requests MODIFY country_id INT UNSIGNED NOT NULL DEFAULT 0'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_spmr_country ON storefront_phone_merge_requests (country_id, expires_at)'
+            );
         }
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE storefront_phone_merge_requests MODIFY country_id INT UNSIGNED NOT NULL DEFAULT 0'
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE INDEX idx_spmr_country ON storefront_phone_merge_requests (country_id, expires_at)'
-        );
     }
 
     if ($kwId > 0 && orange_table_exists($pdo, 'countries')) {
@@ -5245,13 +5317,8 @@ function orange_catalog_migrate_gl_journal_type_rules_country_v53(PDO $pdo): voi
     require_once __DIR__ . '/countries.php';
     $kwId = orange_countries_default_id($pdo);
 
-    if (!orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE orange_gl_journal_type_rules ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        orange_schema_invalidate_column_check('orange_gl_journal_type_rules', 'country_id');
-
+    if (!orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')
+        && orange_catalog_ensure_country_id_column($pdo, 'orange_gl_journal_type_rules')) {
         if (orange_table_exists($pdo, 'journal_types')
             && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
             orange_catalog_safe_exec(
@@ -5790,17 +5857,8 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
         if (!orange_table_exists($pdo, $tbl)) {
             continue;
         }
-        if (!orange_table_has_column($pdo, $tbl, 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE ' . $tbl . ' ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_' . $tbl . '_country_id ON ' . $tbl . ' (country_id)'
-            );
-        }
-        if ($kwId > 0) {
+        $countryReady = orange_catalog_ensure_country_id_column($pdo, $tbl, 'id', true);
+        if ($countryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
@@ -5810,21 +5868,15 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'orders')) {
-        if (!orange_table_has_column($pdo, 'orders', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE orders ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_country_id ON orders (country_id)');
-        }
-        if (!orange_table_has_column($pdo, 'orders', 'warehouse_id')) {
+        $ordersCountryReady = orange_catalog_ensure_country_id_column($pdo, 'orders', 'id', true);
+        if ($ordersCountryReady && !orange_table_has_column($pdo, 'orders', 'warehouse_id')) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE orders ADD COLUMN warehouse_id INT UNSIGNED NULL DEFAULT NULL AFTER country_id'
             );
             orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_warehouse_id ON orders (warehouse_id)');
         }
-        if ($kwId > 0) {
+        if ($ordersCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE orders SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
@@ -5843,21 +5895,15 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'stock_movements')) {
-        if (!orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE stock_movements ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_country_id ON stock_movements (country_id)');
-        }
-        if (!orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
+        $stockMovementsCountryReady = orange_catalog_ensure_country_id_column($pdo, 'stock_movements', 'id', true);
+        if ($stockMovementsCountryReady && !orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE stock_movements ADD COLUMN warehouse_id INT UNSIGNED NULL DEFAULT NULL AFTER country_id'
             );
             orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_warehouse_id ON stock_movements (warehouse_id)');
         }
-        if ($kwId > 0) {
+        if ($stockMovementsCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE stock_movements SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
@@ -5910,41 +5956,30 @@ function orange_catalog_migrate_country_accounts_v46(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'storefront_accounts')) {
-        if (!orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE storefront_accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_storefront_accounts_country_id ON storefront_accounts (country_id)'
-            );
-        }
-        if ($kwId > 0) {
+        $storefrontAccountsCountryReady = orange_catalog_ensure_country_id_column(
+            $pdo,
+            'storefront_accounts',
+            'id',
+            true
+        );
+        if ($storefrontAccountsCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE storefront_accounts SET country_id = ' . (int) $kwId
                 . ' WHERE country_id IS NULL OR country_id = 0'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_accounts DROP INDEX uq_storefront_accounts_email');
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE UNIQUE INDEX uq_storefront_accounts_email_country ON storefront_accounts (email, country_id)'
-        );
+        if ($storefrontAccountsCountryReady) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_accounts DROP INDEX uq_storefront_accounts_email');
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_storefront_accounts_email_country ON storefront_accounts (email, country_id)'
+            );
+        }
     }
 
     if (orange_table_exists($pdo, 'admins')) {
-        if (!orange_table_has_column($pdo, 'admins', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE admins ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_admins_country_id ON admins (country_id)'
-            );
-        }
+        orange_catalog_ensure_country_id_column($pdo, 'admins', 'id', true);
     }
 
     try {
@@ -5979,17 +6014,13 @@ function orange_catalog_migrate_country_gl_v47(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'journal_vouchers')) {
-        if (!orange_table_has_column($pdo, 'journal_vouchers', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE journal_vouchers ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER fiscal_year_id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_journal_vouchers_country_id ON journal_vouchers (country_id)'
-            );
-        }
-        if ($kwId > 0) {
+        $journalVouchersCountryReady = orange_catalog_ensure_country_id_column(
+            $pdo,
+            'journal_vouchers',
+            'fiscal_year_id',
+            true
+        );
+        if ($journalVouchersCountryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE journal_vouchers SET country_id = ' . (int) $kwId
@@ -6034,17 +6065,8 @@ function orange_catalog_migrate_country_cart_promotions_v48(PDO $pdo): void
         if (!orange_table_exists($pdo, $tbl)) {
             continue;
         }
-        if (!orange_table_has_column($pdo, $tbl, 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE ' . $tbl . ' ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_' . $tbl . '_country_id ON ' . $tbl . ' (country_id)'
-            );
-        }
-        if ($kwId > 0) {
+        $countryReady = orange_catalog_ensure_country_id_column($pdo, $tbl, 'id', true);
+        if ($countryReady && $kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
                 'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
@@ -6089,78 +6111,62 @@ function orange_catalog_migrate_country_gl_accounts_v49(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'accounts')) {
-        if (!orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'accounts', 'id', true)) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE accounts SET country_id = ' . (int) $kwId
+                    . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts DROP INDEX uq_accounts_code');
             orange_catalog_safe_exec(
                 $pdo,
-                'ALTER TABLE accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                'CREATE INDEX idx_accounts_country_id ON accounts (country_id)'
-            );
-        }
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE accounts SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
+                'CREATE UNIQUE INDEX uq_accounts_country_code ON accounts (country_id, code)'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts DROP INDEX uq_accounts_code');
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE UNIQUE INDEX uq_accounts_country_code ON accounts (country_id, code)'
-        );
     }
 
     if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
-        if (!orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'orange_gl_account_settings', 'setting_key')) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE orange_gl_account_settings SET country_id = ' . (int) $kwId
+                    . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings DROP PRIMARY KEY');
             orange_catalog_safe_exec(
                 $pdo,
-                'ALTER TABLE orange_gl_account_settings ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER setting_key'
+                'ALTER TABLE orange_gl_account_settings MODIFY country_id INT UNSIGNED NOT NULL'
             );
-        }
-        if ($kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
-                'UPDATE orange_gl_account_settings SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
+                'ALTER TABLE orange_gl_account_settings ADD PRIMARY KEY (setting_key, country_id)'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings DROP PRIMARY KEY');
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE orange_gl_account_settings MODIFY country_id INT UNSIGNED NOT NULL'
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE orange_gl_account_settings ADD PRIMARY KEY (setting_key, country_id)'
-        );
     }
 
     if (orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
-        if (!orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'country_id')) {
+        if (orange_catalog_ensure_country_id_column($pdo, 'orange_gl_setting_alloc', 'setting_key')) {
+            if ($kwId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE orange_gl_setting_alloc SET country_id = ' . (int) $kwId
+                    . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_setting_alloc DROP PRIMARY KEY');
             orange_catalog_safe_exec(
                 $pdo,
-                'ALTER TABLE orange_gl_setting_alloc ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER setting_key'
+                'ALTER TABLE orange_gl_setting_alloc MODIFY country_id INT UNSIGNED NOT NULL'
             );
-        }
-        if ($kwId > 0) {
             orange_catalog_safe_exec(
                 $pdo,
-                'UPDATE orange_gl_setting_alloc SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
+                'ALTER TABLE orange_gl_setting_alloc ADD PRIMARY KEY (setting_key, country_id)'
             );
         }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_setting_alloc DROP PRIMARY KEY');
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE orange_gl_setting_alloc MODIFY country_id INT UNSIGNED NOT NULL'
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE orange_gl_setting_alloc ADD PRIMARY KEY (setting_key, country_id)'
-        );
     }
 
     try {
@@ -6210,17 +6216,7 @@ function orange_catalog_migrate_sales_returns_analytics_v78(PDO $pdo): void
         );
         orange_schema_invalidate_column_check('sales_returns', 'invoice_reference');
     }
-    if (!orange_table_has_column($pdo, 'sales_returns', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE sales_returns ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER invoice_reference'
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE INDEX idx_sales_returns_country_id ON sales_returns (country_id)'
-        );
-        orange_schema_invalidate_column_check('sales_returns', 'country_id');
-    }
+    orange_catalog_ensure_country_id_column($pdo, 'sales_returns', 'invoice_reference', true);
 
     orange_catalog_safe_exec(
         $pdo,
@@ -6755,12 +6751,19 @@ function orange_catalog_migrate_delivery_promotions_invoice_lines_v91(PDO $pdo):
 
     if (orange_table_exists($pdo, 'delivery_fee_promotions')) {
         if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'country_id')) {
+            $hasIdAnchor = orange_table_has_column($pdo, 'delivery_fee_promotions', 'id');
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE delivery_fee_promotions
-                    ADD COLUMN country_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER id'
+                    ADD COLUMN country_id INT UNSIGNED NOT NULL DEFAULT 0'
+                . orange_catalog_country_id_position_clause('id', $hasIdAnchor)
             );
             orange_schema_invalidate_column_check('delivery_fee_promotions', 'country_id');
+        }
+        if (!orange_catalog_country_id_followup_allowed(
+            orange_table_has_column($pdo, 'delivery_fee_promotions', 'country_id')
+        )) {
+            return;
         }
         if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'name_ar')) {
             orange_catalog_safe_exec(
@@ -9442,13 +9445,7 @@ function orange_catalog_migrate_admin_time_country_authority_v123(PDO $pdo): voi
     };
 
     if (orange_table_exists($pdo, 'orange_company_documents')) {
-        if (!orange_table_has_column($pdo, 'orange_company_documents', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE orange_company_documents ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-            );
-            orange_schema_invalidate_column_check('orange_company_documents', 'country_id');
-        }
+        orange_catalog_ensure_country_id_column($pdo, 'orange_company_documents');
         if (orange_table_has_column($pdo, 'orange_company_documents', 'country_id')) {
             $rows = $pdo->query(
                 'SELECT id, entity_table, entity_id, country_id FROM orange_company_documents
@@ -9490,14 +9487,12 @@ function orange_catalog_migrate_admin_time_country_authority_v123(PDO $pdo): voi
     }
 
     if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
-        if (!orange_table_has_column($pdo, 'orange_admin_audit_log', 'country_id')) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'ALTER TABLE orange_admin_audit_log ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER entity_id'
-            );
-            orange_schema_invalidate_column_check('orange_admin_audit_log', 'country_id');
-        }
-        if (!orange_table_has_column($pdo, 'orange_admin_audit_log', 'is_global')) {
+        $auditCountryReady = orange_catalog_ensure_country_id_column(
+            $pdo,
+            'orange_admin_audit_log',
+            'entity_id'
+        );
+        if ($auditCountryReady && !orange_table_has_column($pdo, 'orange_admin_audit_log', 'is_global')) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE orange_admin_audit_log ADD COLUMN is_global TINYINT(1) NOT NULL DEFAULT 0 AFTER country_id'

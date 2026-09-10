@@ -437,7 +437,6 @@ function orange_backup_run_php_native_snapshot(
         }
 
         $pdo = db();
-        orange_catalog_ensure_schema($pdo);
         $metadata = orange_backup_collect_safe_metadata($pdo, $projectRoot, $env);
         $result = orange_backup_full_finalize_workspace([
             'workspace' => $tempWorkDir,
@@ -552,7 +551,6 @@ function orange_backup_run_via_pdo(string $projectRoot, string $backupRoot, stri
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
     $pdo = db();
-    orange_catalog_ensure_schema($pdo);
     $dbName = defined('DB_NAME') ? (string) DB_NAME : orange_backup_load_db_settings($projectRoot)['name'];
     $preflight = orange_backup_pdo_export_preflight($pdo, $dbName);
     if (!$preflight['ready']) {

@@ -55,10 +55,27 @@ $metadataOk = false;
 
 if (is_file($envPath)) {
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
-    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+    if (!function_exists('orange_table_exists')) {
+        /**
+         * Read-only compatibility helper used by backup_full.php metadata collection.
+         */
+        function orange_table_exists(PDO $pdo, string $table): bool
+        {
+            try {
+                $st = $pdo->prepare(
+                    'SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+                     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? LIMIT 1'
+                );
+                $st->execute([defined('DB_NAME') ? (string) DB_NAME : '', $table]);
+
+                return (bool) $st->fetchColumn();
+            } catch (Throwable) {
+                return false;
+            }
+        }
+    }
     try {
         $pdo = db();
-        orange_catalog_ensure_schema($pdo);
         $metadata = orange_backup_collect_safe_metadata($pdo, $projectRoot, $env);
         $metadataOk = true;
     } catch (Throwable $e) {

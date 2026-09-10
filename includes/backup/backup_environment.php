@@ -819,7 +819,6 @@ function orange_backup_collect_environment_report(string $projectRoot): array
             require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
             require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_full.php';
             $pdo = db();
-            orange_catalog_ensure_schema($pdo);
             $databaseConnected = true;
             $schemaRevision = orange_backup_schema_revision_live($pdo) ?: ORANGE_CATALOG_SCHEMA_PHP_REVISION;
         } catch (Throwable $e) {
