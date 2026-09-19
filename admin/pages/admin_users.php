@@ -829,6 +829,10 @@ auPermBindMatrixEvents();
 renderPermMatrix(0, {}, false);
 (function auBootLoadAdmins() {
     function boot() {
+        if (typeof postJSON !== 'function') {
+            setTimeout(boot, 30);
+            return;
+        }
         loadAdmins();
     }
     if (document.readyState === 'loading') {
