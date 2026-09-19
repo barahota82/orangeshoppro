@@ -696,7 +696,8 @@ function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
     if (!orange_table_exists($pdo, 'admin_permissions')) {
         return;
     }
-    $groupKeys = array_keys(orange_admin_resource_labels());
+    // Restore permissions are standalone high-friction grants, not legacy page groups.
+    $groupKeys = array_values(array_diff(array_keys(orange_admin_resource_labels()), orange_admin_restore_permission_keys()));
     $cols = orange_admin_permissions_cap_columns($pdo);
     $sel = $pdo->query(
         'SELECT admin_id, resource_key, can_view, can_edit, can_delete'
