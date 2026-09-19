@@ -8,6 +8,146 @@ declare(strict_types=1);
  */
 
 /**
+ * @return list<int>
+ */
+function orange_product_delete_variant_ids(PDO $pdo, int $productId): array
+{
+    if ($productId <= 0 || !orange_table_exists($pdo, 'product_variants')) {
+        return [];
+    }
+
+    $st = $pdo->prepare('SELECT id FROM product_variants WHERE product_id = ?');
+    $st->execute([$productId]);
+
+    $ids = [];
+    while (($vid = $st->fetchColumn()) !== false) {
+        $vid = (int) $vid;
+        if ($vid > 0) {
+            $ids[] = $vid;
+        }
+    }
+
+    return array_values(array_unique($ids));
+}
+
+/**
+ * Promotion rows have used product IDs in newer saves and variant IDs in older saves.
+ *
+ * @param list<int> $variantIds
+ */
+function orange_product_delete_stored_ref_matches(int $storedId, int $productId, array $variantIds): bool
+{
+    if ($storedId <= 0 || $productId <= 0) {
+        return false;
+    }
+
+    return $storedId === $productId || in_array($storedId, $variantIds, true);
+}
+
+/**
+ * @param mixed $value
+ * @param list<int> $variantIds
+ */
+function orange_product_delete_json_ref_matches(mixed $value, int $productId, array $variantIds, bool $numericValueIsRef): bool
+{
+    if (is_int($value) || is_float($value) || (is_string($value) && preg_match('/^\d+$/', trim($value)))) {
+        return $numericValueIsRef && orange_product_delete_stored_ref_matches((int) $value, $productId, $variantIds);
+    }
+    if (!is_array($value)) {
+        return false;
+    }
+
+    foreach (['product_id', 'fixed_product_id', 'same_variant_product_id'] as $key) {
+        if (array_key_exists($key, $value) && (int) $value[$key] === $productId) {
+            return true;
+        }
+    }
+    foreach (['variant_id', 'fixed_variant_id'] as $key) {
+        if (array_key_exists($key, $value)
+            && orange_product_delete_stored_ref_matches((int) $value[$key], $productId, $variantIds)) {
+            return true;
+        }
+    }
+
+    foreach ($value as $child) {
+        if (is_array($child) && orange_product_delete_json_ref_matches($child, $productId, $variantIds, false)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @param list<int> $variantIds
+ */
+function orange_product_delete_json_column_refs_product(?string $json, int $productId, array $variantIds, bool $numericValueIsRef): bool
+{
+    if ($json === null || trim($json) === '') {
+        return false;
+    }
+
+    $decoded = json_decode($json, true);
+    if (!is_array($decoded)) {
+        return false;
+    }
+
+    return orange_product_delete_json_ref_matches($decoded, $productId, $variantIds, $numericValueIsRef);
+}
+
+/**
+ * @param list<int> $variantIds
+ */
+function orange_product_delete_cart_promotion_refs_product(PDO $pdo, int $productId, array $variantIds): bool
+{
+    if (orange_table_exists($pdo, 'cart_gift_promotions')) {
+        $cols = ['fixed_variant_id', 'pool_variant_ids'];
+        if (orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_pool_config')) {
+            $cols[] = 'gift_pool_config';
+        }
+        $st = $pdo->query('SELECT ' . implode(', ', $cols) . ' FROM cart_gift_promotions');
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (orange_product_delete_stored_ref_matches((int) ($row['fixed_variant_id'] ?? 0), $productId, $variantIds)
+                || orange_product_delete_json_column_refs_product(isset($row['pool_variant_ids']) ? (string) $row['pool_variant_ids'] : null, $productId, $variantIds, true)
+                || orange_product_delete_json_column_refs_product(isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null, $productId, $variantIds, false)) {
+                return true;
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'cart_bogo_promotions')) {
+        $cols = ['fixed_variant_id', 'pool_variant_ids', 'buy_components_json'];
+        if (orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id')) {
+            $cols[] = 'same_variant_product_id';
+        }
+        if (orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config')) {
+            $cols[] = 'gift_pool_config';
+        }
+        $st = $pdo->query('SELECT ' . implode(', ', $cols) . ' FROM cart_bogo_promotions');
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if ((int) ($row['same_variant_product_id'] ?? 0) === $productId
+                || orange_product_delete_stored_ref_matches((int) ($row['fixed_variant_id'] ?? 0), $productId, $variantIds)
+                || orange_product_delete_json_column_refs_product(isset($row['pool_variant_ids']) ? (string) $row['pool_variant_ids'] : null, $productId, $variantIds, true)
+                || orange_product_delete_json_column_refs_product(isset($row['buy_components_json']) ? (string) $row['buy_components_json'] : null, $productId, $variantIds, false)
+                || orange_product_delete_json_column_refs_product(isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null, $productId, $variantIds, false)) {
+                return true;
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'cart_combo_promotions')) {
+        $st = $pdo->query('SELECT components_json FROM cart_combo_promotions');
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (orange_product_delete_json_column_refs_product(isset($row['components_json']) ? (string) $row['components_json'] : null, $productId, $variantIds, false)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
  * @return list<string> Machine-readable block reasons; empty = hard delete allowed.
  */
 function orange_product_delete_history_block_reasons(PDO $pdo, int $productId): array
@@ -16,6 +156,7 @@ function orange_product_delete_history_block_reasons(PDO $pdo, int $productId): 
         return ['invalid_product_id'];
     }
 
+    $variantIds = orange_product_delete_variant_ids($pdo, $productId);
     $checks = [
         'order_items' => static function (PDO $pdo, int $productId): bool {
             if (!orange_table_exists($pdo, 'order_items')) {
@@ -152,6 +293,9 @@ function orange_product_delete_history_block_reasons(PDO $pdo, int $productId): 
 
             return $st->execute([$productId]) && (bool) $st->fetchColumn();
         },
+        'cart_promotion_rules' => static function (PDO $pdo, int $productId) use ($variantIds): bool {
+            return orange_product_delete_cart_promotion_refs_product($pdo, $productId, $variantIds);
+        },
     ];
 
     $blocked = [];
@@ -166,7 +310,7 @@ function orange_product_delete_history_block_reasons(PDO $pdo, int $productId): 
 
 function orange_product_delete_history_block_message(): string
 {
-    return 'لا يمكن حذف المنتج لوجود حركات أو سجل تجاري. عطّل المنتج (غير نشط — is_active = 0) من شاشة المنتجات بدلاً من الحذف.';
+    return 'لا يمكن حذف المنتج لوجود حركات أو سجل تجاري أو عروض مرتبطة. عطّل المنتج (غير نشط — is_active = 0) من شاشة المنتجات بدلاً من الحذف.';
 }
 
 /**
