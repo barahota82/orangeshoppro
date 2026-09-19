@@ -161,8 +161,7 @@ function find_mysqldump_where_recursive(string $root, int $timeoutSeconds = 30):
         return [];
     }
 
-    $line = 'where /r ' . escapeshellarg($root) . ' mysqldump.exe';
-    $result = orange_backup_run_command_capture(['cmd.exe', '/c', $line], $timeoutSeconds);
+    $result = orange_backup_run_command_capture(['where.exe', '/r', $root, 'mysqldump.exe'], $timeoutSeconds);
     if ($result['exit_code'] !== 0) {
         return [];
     }
