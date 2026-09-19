@@ -140,6 +140,34 @@ orange_backup_write_json($incompleteDir . DIRECTORY_SEPARATOR . 'manifest.json',
 $incompleteResult = orange_backup_verify_full_package($incompleteDir);
 self_test(!$incompleteResult['ok'], 'incomplete package rejected');
 
+// Empty uploads archive rejection
+$emptyUploadsDir = $tmp . DIRECTORY_SEPARATOR . 'empty_uploads_pkg';
+mkdir($emptyUploadsDir);
+file_put_contents($emptyUploadsDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'data');
+file_put_contents($emptyUploadsDir . DIRECTORY_SEPARATOR . 'uploads.zip', '');
+orange_backup_write_json($emptyUploadsDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'schema_revision' => 121,
+    'dump_file' => 'dump.sql.gz',
+    'uploads_file' => 'uploads.zip',
+    'dump_sha256' => orange_backup_sha256_file($emptyUploadsDir . DIRECTORY_SEPARATOR . 'dump.sql.gz'),
+    'uploads_sha256' => hash('sha256', ''),
+    'dump_size_bytes' => 4,
+    'uploads_size_bytes' => 0,
+    'backup_status' => 'success',
+    'health_report_file' => 'health.json',
+    'checksums_file' => 'checksums.sha256',
+    'package_version' => '1.2',
+    'generated_at' => gmdate('c'),
+]);
+orange_backup_write_json($emptyUploadsDir . DIRECTORY_SEPARATOR . 'health.json', [
+    'package_status' => 'healthy',
+    'schema_revision' => 121,
+]);
+orange_backup_write_checksums($emptyUploadsDir, ['dump.sql.gz', 'uploads.zip', 'manifest.json', 'health.json']);
+$emptyUploadsResult = orange_backup_verify_full_package($emptyUploadsDir);
+self_test(!$emptyUploadsResult['ok'], 'empty uploads archive rejected');
+
 // Corrupted file rejection
 $corruptDir = $tmp . DIRECTORY_SEPARATOR . 'corrupt_pkg';
 mkdir($corruptDir);

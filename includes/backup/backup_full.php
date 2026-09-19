@@ -153,6 +153,7 @@ function orange_backup_full_finalize_workspace(array $options): array
     $dumpCreated = is_file($dumpPath);
     $uploadsCreated = is_file($uploadsPath);
     $dumpNonZero = $dumpCreated && filesize($dumpPath) > 0;
+    $uploadsNonZero = $uploadsCreated && filesize($uploadsPath) > 0;
     $uploadsReadable = $uploadsCreated && is_readable($uploadsPath);
 
     if (!$dumpCreated) {
@@ -163,6 +164,9 @@ function orange_backup_full_finalize_workspace(array $options): array
     }
     if ($dumpCreated && !$dumpNonZero) {
         $failureReasons[] = 'Database dump has zero size.';
+    }
+    if ($uploadsCreated && !$uploadsNonZero) {
+        $failureReasons[] = 'Uploads archive has zero size.';
     }
     if ($uploadsCreated && !$uploadsReadable) {
         $failureReasons[] = 'Uploads archive is not readable.';
@@ -189,7 +193,7 @@ function orange_backup_full_finalize_workspace(array $options): array
         }
     }
 
-    if ($uploadsReadable) {
+    if ($uploadsReadable && $uploadsNonZero) {
         try {
             $uploadsSha256 = orange_backup_sha256_file($uploadsPath);
             $uploadsChecksumVerified = true;
@@ -251,6 +255,7 @@ function orange_backup_full_finalize_workspace(array $options): array
         'database_dump_created' => $dumpCreated,
         'uploads_archive_created' => $uploadsCreated,
         'dump_non_zero_size' => $dumpNonZero,
+        'uploads_archive_non_zero_size' => $uploadsNonZero,
         'uploads_archive_readable' => $uploadsReadable,
         'dump_checksum_verified' => $dumpChecksumVerified,
         'uploads_checksum_verified' => $uploadsChecksumVerified,
@@ -438,9 +443,13 @@ function orange_backup_verify_full_package(string $packagePath): array
     $uploadsFile = (string) ($manifest['uploads_file'] ?? '');
     if ($dumpFile === '' || !is_file($resolved . DIRECTORY_SEPARATOR . $dumpFile)) {
         $errors[] = 'Dump file missing: ' . $dumpFile;
+    } elseif (filesize($resolved . DIRECTORY_SEPARATOR . $dumpFile) <= 0) {
+        $errors[] = 'Dump file has zero size: ' . $dumpFile;
     }
     if ($uploadsFile === '' || !is_file($resolved . DIRECTORY_SEPARATOR . $uploadsFile)) {
         $errors[] = 'Uploads archive missing: ' . $uploadsFile;
+    } elseif (filesize($resolved . DIRECTORY_SEPARATOR . $uploadsFile) <= 0) {
+        $errors[] = 'Uploads archive has zero size: ' . $uploadsFile;
     }
 
     $healthPath = $resolved . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE;
