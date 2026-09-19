@@ -347,7 +347,7 @@ function orange_backup_detect_mysqldump(array $env): array
         ];
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (DIRECTORY_SEPARATOR === '\\' && orange_backup_can_execute_commands()) {
         $which = orange_backup_run_command_capture(['where.exe', 'mysqldump'], 15);
         if ($which['exit_code'] === 0) {
             $lines = preg_split('/\R/', str_replace("\r", '', (string) ($which['stdout'] ?? ''))) ?: [];
@@ -499,7 +499,7 @@ function orange_backup_detect_powershell(array $env): array
         }
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (DIRECTORY_SEPARATOR === '\\' && orange_backup_can_execute_commands()) {
         foreach (['powershell.exe', 'pwsh.exe'] as $binary) {
             $which = orange_backup_run_command_capture(['where.exe', $binary], 15);
             if ($which['exit_code'] !== 0) {

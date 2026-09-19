@@ -32,6 +32,35 @@ function orange_backup_normalize_directory_path(string $path): string
     return rtrim($normalized, DIRECTORY_SEPARATOR);
 }
 
+function orange_backup_directory_path_is_absolute(string $path): bool
+{
+    $path = trim($path);
+    if ($path === '') {
+        return false;
+    }
+    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1) {
+        return true;
+    }
+    if (str_starts_with($path, '\\\\') || str_starts_with($path, '//')) {
+        return true;
+    }
+
+    return str_starts_with($path, '/') || str_starts_with($path, '\\');
+}
+
+function orange_backup_absolute_directory_path(string $path): string
+{
+    $normalized = orange_backup_normalize_directory_path($path);
+    if ($normalized === '' || orange_backup_directory_path_is_absolute($normalized)) {
+        return $normalized;
+    }
+
+    $cwd = getcwd();
+    $base = $cwd !== false ? $cwd : orange_backup_project_root();
+
+    return orange_backup_normalize_directory_path(rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $normalized);
+}
+
 /**
  * @return array<string, mixed>
  */
@@ -100,7 +129,7 @@ function orange_backup_resolve_root(array $env, ?string $cliOverride = null): st
     }
     if ($resolved === false) {
         if (is_dir($candidate)) {
-            $resolved = orange_backup_normalize_directory_path($candidate);
+            $resolved = orange_backup_absolute_directory_path($candidate);
         } else {
             throw new RuntimeException('ORANGE_BACKUP_ROOT is not a directory: ' . $candidate);
         }
