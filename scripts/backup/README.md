@@ -1,7 +1,7 @@
-# Orange Backup Script — Phase 1A (Full Disaster Backup)
+# Orange Backup Script — Phase 1A + Phase 1B.1 Registry
 
-Phase 1A scope: **full database + full uploads backup only**.  
-**Not in this phase:** Country Recovery Package (CRP), table registry, staging restore, production merge, admin backup module, restore APIs.
+Phase 1A scope: **full database + full uploads backup**. Phase 1B.1 adds the **table registry inventory only**.  
+**Not implemented yet:** Country Recovery Package (CRP) export/restore, staging restore, production merge, admin backup module, restore APIs.
 
 **Primary entry point (Plesk):** `scripts/backup/run_full_backup.php`  
 **Optional lower-level entry point (RDP / command line):** `scripts/backup/orange_backup.ps1`
@@ -32,7 +32,7 @@ The PHP entry point:
 - resolves the project root automatically from the script location,
 - validates `ORANGE_BACKUP_ROOT` via `backup_paths.php`,
 - acquires a lock file to prevent concurrent runs,
-- selects the safest backend (PowerShell when explicitly executable, otherwise PHP mysqldump via `proc_open`),
+- selects the safest backend (PowerShell when explicitly executable, otherwise PHP mysqldump via `proc_open`; guarded PDO fallback only when mysqldump is unavailable and preflight is safe),
 - writes logs under `{BackupRoot}/logs/run_full_backup_*.log`,
 - never prints database credentials,
 - exits `0` on success, non-zero on failure (`2` when another backup is already running).
@@ -95,7 +95,7 @@ Each successful run writes:
 1. Create `private\orange_backups` (or equivalent) **outside** `orangeshoppro.com` / `httpdocs`.
 2. Grant the **Plesk scheduled-task PHP identity** write permission on that folder.
 3. Locate `mysqldump.exe` on the host (Plesk / MariaDB bin path) and set `ORANGE_MYSQLDUMP_PATH`.
-4. Confirm **`proc_open` is enabled** for the PHP CLI profile used by scheduled tasks. If disabled, the task **must fail** — do not expect success.
+4. Confirm **`proc_open` is enabled** for the preferred mysqldump backend in the PHP CLI profile used by scheduled tasks. If PowerShell/mysqldump cannot run and the PDO fallback preflight is not safe, the task **must fail closed**.
 5. Run `backup_environment_check.php` until `can_run_full_backup=yes`.
 
 Rules enforced by `includes/backup/backup_paths.php`:
