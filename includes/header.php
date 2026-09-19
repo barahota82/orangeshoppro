@@ -31,7 +31,7 @@ $taglineJsonAttr = htmlspecialchars(json_encode($taglineCycle, JSON_UNESCAPED_UN
 
 require_once __DIR__ . '/upload_paths.php';
 
-/* ثيم موحّد؛ لون شريط المتصفح من الهوية الافتراضية؛ الشعار من uploads/channels إن وُجد ملف مرفوع */
+/* ثيم وشعار موحدان لكل القنوات؛ القناة تحدد المسار والسياق فقط. */
 $theme = 'orange';
 $sfDisplayName = storefront_channel_display_name($channel, $channelSlug);
 $sfThemeColor = '#ff6a00';

@@ -22,52 +22,11 @@ function orange_products_upload_dir(): string
 }
 
 /**
- * Ensure directory exists and is writable. Returns absolute path or null.
+ * Ensure product upload directory exists and is writable. Returns absolute path or null.
  *
  * On Windows/Plesk: إن فشل إنشاء المجلد، يدوياً أنشئ `uploads` و `uploads/products` من مدير الملفات
  * وامنح حساب الموقع (IIS_IUSRS / app pool) صلاحية الكتابة.
  */
-/**
- * شعارات القنوات: /uploads/channels (ويب: /uploads/channels/).
- */
-function orange_channels_upload_dir(): string
-{
-    return orange_project_root_path() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'channels';
-}
-
-function orange_ensure_channels_upload_dir(): ?string
-{
-    $dir = orange_channels_upload_dir();
-    $uploadsDir = dirname($dir);
-
-    if (is_file($uploadsDir)) {
-        return null;
-    }
-    if (is_file($dir)) {
-        return null;
-    }
-
-    if (!is_dir($uploadsDir)) {
-        if (!@mkdir($uploadsDir, 0755, false) && !is_dir($uploadsDir)) {
-            @mkdir($uploadsDir, 0775, false);
-        }
-    }
-    if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
-        return null;
-    }
-
-    if (!is_dir($dir)) {
-        if (!@mkdir($dir, 0755, false) && !is_dir($dir)) {
-            @mkdir($dir, 0775, false);
-        }
-    }
-    if (!is_dir($dir) || !is_writable($dir)) {
-        return null;
-    }
-
-    return $dir;
-}
-
 function orange_ensure_products_upload_dir(): ?string
 {
     $dir = orange_products_upload_dir();
@@ -211,32 +170,6 @@ function storefront_product_image_href(?string $mainImageFromDb): string
 }
 
 /**
- * هل يوجد ملف شعار قناة مطابق لما في قاعدة البيانات أو نسخة ‎.webp‎ بنفس الاسم الأساسي تحت uploads/channels.
- */
-function orange_channels_logo_file_resolved_exists(?string $filenameFromDb): bool
-{
-    $raw = trim(str_replace('\\', '/', (string) $filenameFromDb));
-    if ($raw === '') {
-        return false;
-    }
-    $base = basename($raw);
-    if ($base === '' || $base === '.' || $base === '..') {
-        return false;
-    }
-    $dir = orange_channels_upload_dir();
-    if (is_file($dir . DIRECTORY_SEPARATOR . $base)) {
-        return true;
-    }
-    $stem = pathinfo($base, PATHINFO_FILENAME);
-    if ($stem !== '' && $stem !== '.' && $stem !== '..'
-        && is_file($dir . DIRECTORY_SEPARATOR . $stem . '.webp')) {
-        return true;
-    }
-
-    return false;
-}
-
-/**
  * تحت ‎/assets/images‎: يفضّل ‎stem.webp‎ إن وُجد على القرص، وإلا الملف المسمّى في المسار إن وُجد، وإلا يعيد المسار كما مرّ (سلوك سابق؛ قد ينتج 404).
  *
  * @param string $relativePath مثل ‎/assets/images/logo-orange.png‎
@@ -265,46 +198,6 @@ function storefront_asset_image_preferred_path(string $relativePath): string
     }
 
     return $relativePath;
-}
-
-/**
- * مسار URL تحت ‎/uploads/channels/‎ لشعار مرفوع (اسم ملف في الجذر). يفضّل ‎.webp‎ المرافق إن وُجد.
- *
- * @return string مثل ‎/uploads/channels/x.webp‎ أو المسار للأصل، أو ‎''‎ إن المدخل غير صالح
- */
-function storefront_channel_logo_web_path(?string $filenameFromDb): string
-{
-    $raw = trim(str_replace('\\', '/', (string) $filenameFromDb));
-    if ($raw === '') {
-        return '';
-    }
-    $base = basename($raw);
-    if ($base === '' || $base === '.' || $base === '..') {
-        return '';
-    }
-    $dir = orange_channels_upload_dir();
-    $stem = pathinfo($base, PATHINFO_FILENAME);
-    if ($stem !== '' && $stem !== '.' && $stem !== '..') {
-        $webp = $stem . '.webp';
-        if (is_file($dir . DIRECTORY_SEPARATOR . $webp)) {
-            return '/uploads/channels/' . rawurlencode($webp);
-        }
-    }
-
-    return '/uploads/channels/' . rawurlencode($base);
-}
-
-/**
- * مسار شعار قناة لـ ‎src‎ في HTML (يشمل ‎PUBLIC_BASE_PATH‎ إن وُجد).
- */
-function storefront_channel_logo_href(?string $filenameFromDb): string
-{
-    $rel = storefront_channel_logo_web_path($filenameFromDb);
-    if ($rel === '') {
-        return '';
-    }
-
-    return storefront_public_path($rel);
 }
 
 /**
