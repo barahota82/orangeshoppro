@@ -179,14 +179,37 @@ try {
         ], 422);
     }
 
+    $pdo->beginTransaction();
+
+    $lockReturn = $pdo->prepare('SELECT * FROM purchase_returns WHERE id = ? LIMIT 1 FOR UPDATE');
+    $lockReturn->execute([$returnId]);
+    $lockedRow = $lockReturn->fetch(PDO::FETCH_ASSOC);
+    if (!$lockedRow) {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => 'مردود المشتريات غير موجود'], 404);
+    }
+    $row = $lockedRow;
+    $returnCountryLock = orange_edit_lock_country_for_purchase_return($pdo, $row);
+    try {
+        orange_edit_lock_assert_may_mutate(
+            $pdo,
+            $admin,
+            'purchase_return',
+            $returnId,
+            $action === 'delete' ? 'delete' : 'edit',
+            $returnCountryLock
+        );
+    } catch (RuntimeException $e) {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
+
     $preUpdatePurchaseIdOpt = 0;
     $preUpdateItems = [];
     if ($action !== 'delete') {
         $preUpdatePurchaseIdOpt = (int) ($data['purchase_id'] ?? (int) ($row['purchase_id'] ?? 0));
         $preUpdateItems = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     }
-
-    $pdo->beginTransaction();
 
     if ($action !== 'delete' && $preUpdatePurchaseIdOpt > 0 && $preUpdateItems !== []) {
         try {
