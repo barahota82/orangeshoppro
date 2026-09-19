@@ -72,13 +72,13 @@ Direct anonymous `GET` to these URLs must return **404** (or equivalent deny) af
      <system.webServer>
        <rewrite>
          <rules>
-           <!-- paste OrangeDenyUploads* rules here, BEFORE OrangeStorefrontDynamic / other catch-all rules -->
+           <!-- paste OrangeDenyUploads* rules here, BEFORE OrangeStaticCacheAssets and BEFORE OrangeStorefrontDynamic / other catch-all rules -->
          </rules>
        </rewrite>
      </system.webServer>
    </configuration>
    ```
-   If the site has **no** `<rewrite>` section yet, merge the rewrite block from `web.config.example` first, then add the deny rules.
+   If the site has **no** `<rewrite>` section yet, merge the rewrite block from `web.config.example` first, keeping the deny rules as the first rules. They must run before any static asset cache/allow rule with `stopProcessing="true"`.
 
 5. **Subfolder site** (`PUBLIC_BASE_PATH` in `.env.php`, e.g. `/shop`): edit each rule’s `match url` to include the prefix, e.g. `^shop/uploads/payment_proofs(/.*)?$`.
 
