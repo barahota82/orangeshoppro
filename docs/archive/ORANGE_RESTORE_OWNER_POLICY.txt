@@ -151,8 +151,8 @@ Rules:
 - Documented in `.env.example.php`, `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt`,
   and `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
 
-**Fail closed:** If merge credentials are missing, empty, or equal to `DB_USER` or the
-staging restore user, Production Merge must abort before any production write.
+**Fail closed:** If merge credentials are missing, empty, or equal to the application
+or staging restore user/password, Production Merge must abort before any production write.
 
 **تنفيذ:** Dedicated merge credentials + fail-closed gate — **architecture approved;
 not implemented** (Phase 2D.1).
