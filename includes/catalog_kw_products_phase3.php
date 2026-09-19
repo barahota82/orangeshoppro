@@ -191,6 +191,7 @@ function orange_catalog_kw_products_phase3_probe_missing_size_family(PDO $pdo, i
         || !orange_table_exists($pdo, 'product_types')
         || !orange_table_has_column($pdo, 'products', 'size_family_id')
         || !orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
+        || !orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')
     ) {
         return false;
     }
@@ -356,6 +357,7 @@ function orange_catalog_backfill_kw_product_size_families(PDO $pdo, int $country
         || !orange_table_exists($pdo, 'size_families')
         || !orange_table_has_column($pdo, 'products', 'size_family_id')
         || !orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
+        || !orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')
     ) {
         return 0;
     }
