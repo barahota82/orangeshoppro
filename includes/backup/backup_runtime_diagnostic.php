@@ -72,7 +72,7 @@ function orange_backup_runtime_diagnostic_dir_flags(string $path): array
 }
 
 /**
- * Diagnostic PID liveness — never treat unprobeable as alive.
+ * Diagnostic PID liveness.
  * Never spawns a process (no tasklist/proc_open). Windows without posix ⇒ unknown.
  *
  * @return 'alive'|'dead'|'unknown'
@@ -91,7 +91,21 @@ function orange_backup_runtime_diagnostic_pid_liveness(int $pid): string
     }
     // Signal 0 is a non-destructive existence check (does not kill).
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0) ? 'alive' : 'dead';
+        if (@posix_kill($pid, 0)) {
+            return 'alive';
+        }
+        $errno = function_exists('posix_get_last_error') ? posix_get_last_error() : 0;
+        $eperm = defined('POSIX_EPERM') ? (int) constant('POSIX_EPERM') : 1;
+        $esrch = defined('POSIX_ESRCH') ? (int) constant('POSIX_ESRCH') : 3;
+        if ($errno === $eperm) {
+            // A different OS user owns the process: it exists, but this PHP user cannot signal it.
+            return 'alive';
+        }
+        if ($errno === $esrch) {
+            return 'dead';
+        }
+
+        return 'unknown';
     }
 
     // No spawn-based probes in diagnostic (Owner: never spawn/kill).
