@@ -22,12 +22,15 @@ Repair (Restore-only; Phase-2B.1 staging policy unchanged)
 1) skips purely numeric ident.dot.ident pairs;
 2) requires the same object-name context gate as Phase-2B.1
    (`orange_restore_sql_is_schema_qualified_object_context`).
+3) the shared object-name gate covers DDL/metadata object contexts such as
+   CREATE INDEX ... ON db.table and CREATE/ALTER/DROP VIEW db.view.
 
 Real external / system schema object references remain rejected.
 
 تنفيذ
 -----
 - includes/backup/restore/restore_private_sql_import_policy.php
+- includes/backup/restore/restore_sql_safety.php
 - scripts/self_test_restore_center_step7_cross_database_reference_closure.php
 - Evidence: D:\orange_restore_step7_cross_database_reference_closure_evidence\
 
