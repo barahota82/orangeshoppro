@@ -104,7 +104,16 @@ function orange_restore_private_engine_trace_process_alive(int $pid): string
         return orange_restore_center_process_alive($pid) ? 'alive' : 'dead';
     }
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0) ? 'alive' : 'dead';
+        if (@posix_kill($pid, 0)) {
+            return 'alive';
+        }
+        $errno = function_exists('posix_get_last_error') ? (int) posix_get_last_error() : 0;
+        // EPERM means another user owns a live process; do not classify it as dead.
+        if ($errno === 1) {
+            return 'alive';
+        }
+
+        return 'dead';
     }
 
     return 'unknown';
