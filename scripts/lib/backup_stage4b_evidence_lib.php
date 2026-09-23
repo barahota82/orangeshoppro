@@ -7,6 +7,20 @@ declare(strict_types=1);
  * Evidence only; no Production mutations.
  */
 
+function s4b_ev_evidence_dir(string $folderName): string
+{
+    $safeName = trim(str_replace(['/', '\\'], '', $folderName));
+    if ($safeName === '') {
+        throw new InvalidArgumentException('Evidence folder name is required.');
+    }
+
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\' . $safeName;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $safeName;
+}
+
 function s4b_ev_extract_function(string $src, string $name): string
 {
     $needle = 'function ' . $name . '(';
