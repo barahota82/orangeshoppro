@@ -803,6 +803,88 @@ function orange_backup_admin_collect_storage_totals(string $backupRoot, ?array $
 }
 
 /**
+ * Refresh the Admin UI storage cache outside ordinary list/startup requests.
+ *
+ * @param array{countries_with_packages?:int,stored_country_packages_total?:int,full_snapshots_total?:int}|null $inventory
+ * @return array<string, mixed>|null complete storage payload, or null when the cache cannot be written
+ */
+function orange_backup_admin_refresh_storage_totals_cache(string $backupRoot, ?array $inventory = null): ?array
+{
+    $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
+    $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
+    $logsDir = orange_backup_path_inside_root($backupRoot, 'logs');
+    $inventory = $inventory ?? orange_backup_admin_package_inventory_counts($backupRoot);
+    $signature = [
+        'snapshots_mtime' => is_dir($snapshotsDir) ? (int) (filemtime($snapshotsDir) ?: 0) : 0,
+        'country_mtime' => is_dir($countryRoot) ? (int) (filemtime($countryRoot) ?: 0) : 0,
+        'logs_mtime' => is_dir($logsDir) ? (int) (filemtime($logsDir) ?: 0) : 0,
+        'full_snapshots_total' => $inventory['full_snapshots_total'],
+        'stored_country_packages_total' => $inventory['stored_country_packages_total'],
+        'countries_with_packages' => $inventory['countries_with_packages'],
+    ];
+
+    $snapshotsBytes = orange_backup_admin_dir_size_bytes($snapshotsDir);
+    $countryBytes = orange_backup_admin_dir_size_bytes($countryRoot);
+    $logsBytes = orange_backup_admin_dir_size_bytes($logsDir);
+    $totalBytes = $snapshotsBytes + $countryBytes + $logsBytes;
+    $storage = [
+        'snapshots_bytes' => $snapshotsBytes,
+        'country_packages_bytes' => $countryBytes,
+        'logs_bytes' => $logsBytes,
+        'total_bytes' => $totalBytes,
+        'snapshots_human' => orange_backup_admin_format_bytes($snapshotsBytes),
+        'country_packages_human' => orange_backup_admin_format_bytes($countryBytes),
+        'logs_human' => orange_backup_admin_format_bytes($logsBytes),
+        'total_human' => orange_backup_admin_format_bytes($totalBytes),
+    ];
+
+    $cachePath = orange_backup_path_inside_root(
+        $backupRoot,
+        'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json'
+    );
+    $locksDir = dirname($cachePath);
+    if (!is_dir($locksDir) && !@mkdir($locksDir, 0775, true) && !is_dir($locksDir)) {
+        return null;
+    }
+    if (!is_writable($locksDir)) {
+        return null;
+    }
+
+    $payload = json_encode(
+        [
+            'version' => 1,
+            'signature' => $signature,
+            'storage' => $storage,
+            'cached_at' => gmdate('c'),
+        ],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
+    if (!is_string($payload)) {
+        return null;
+    }
+    if (@file_put_contents($cachePath, $payload . "\n", LOCK_EX) === false) {
+        return null;
+    }
+
+    return $storage + [
+        'storage_status' => 'complete',
+        'storage_is_complete' => true,
+        'storage_source' => 'refresh',
+    ];
+}
+
+function orange_backup_admin_refresh_storage_totals_cache_for_project(string $projectRoot): void
+{
+    try {
+        $env = orange_backup_load_env_array($projectRoot);
+        $backupRoot = orange_backup_resolve_root($env);
+        orange_backup_admin_refresh_storage_totals_cache($backupRoot);
+    } catch (Throwable $e) {
+        error_log('[orange backup admin] storage totals cache refresh skipped: ' . $e->getMessage());
+    }
+}
+
+/**
  * Find newest healthy full package, reusing summaries already loaded for the UI.
  *
  * @param list<array<string, mixed>> $alreadySummarized
@@ -1583,6 +1665,9 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
         (string) ($capture['stderr'] ?? '')
     );
     $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
+    if (!empty($parsed['ok'])) {
+        orange_backup_admin_refresh_storage_totals_cache_for_project($projectRoot);
+    }
 
     return array_merge($parsed, [
         'started_at' => $startedAt,
@@ -1653,6 +1738,9 @@ function orange_backup_admin_run_country_batch(string $projectRoot, array $optio
                 ? 'Country batch export completed.'
                 : 'Country batch export failed.',
         ];
+    }
+    if (!empty($cliResult['ok'])) {
+        orange_backup_admin_refresh_storage_totals_cache_for_project($projectRoot);
     }
 
     return array_merge($cliResult, [
