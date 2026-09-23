@@ -18,7 +18,7 @@ $projectRoot = dirname(__DIR__);
 require_once $projectRoot . '/scripts/lib/backup_stage4b_evidence_lib.php';
 require_once $projectRoot . '/includes/backup/backup_qualification.php';
 
-$evidenceDir = 'D:\\orange_stage4b_evidence';
+$evidenceDir = s4b_ev_evidence_dir('orange_stage4b_evidence');
 $runtimeDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 @mkdir($runtimeDir, 0775, true);
 @mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'shots', 0775, true);
