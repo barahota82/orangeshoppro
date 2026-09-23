@@ -6,6 +6,7 @@ declare(strict_types=1);
  * Restore Center — top-card elimination + centered message surfaces.
  *
  * Usage: php scripts/self_test_restore_center_message_surfaces.php
+ * Evidence: D:\orange_restore_step1_impl_evidence on Windows; system temp dir elsewhere.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -33,8 +34,17 @@ function rms_ok(bool $cond, string $label): void
     }
 }
 
+function rms_evidence_dir(string $folder): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\' . $folder;
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $folder;
+}
+
 $src = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
-$auditPath = 'D:/orange_restore_step1_audit_evidence/restore_top_message_caller_inventory.json';
+$auditPath = rms_evidence_dir('orange_restore_step1_audit_evidence') . DIRECTORY_SEPARATOR . 'restore_top_message_caller_inventory.json';
 $audit = is_file($auditPath) ? json_decode((string) file_get_contents($auditPath), true) : null;
 
 rms_ok($src !== '', 'page readable');
@@ -58,7 +68,15 @@ $termCalls = substr_count($src, 'showRcTerminalMessage(');
 $journeyCalls = substr_count($src, 'showRcJourneyInlineMessage(');
 rms_ok($termCalls >= 40 && $termCalls < 55, 'terminal dialog callers bounded (got ' . $termCalls . ')');
 rms_ok($journeyCalls >= 21, 'journey inline callers >=21 (got ' . $journeyCalls . ')');
-rms_ok(is_array($audit) && isset($audit['callers']) && count($audit['callers']) === 62, 'audit inventory 62 callers');
+$auditCallers = is_array($audit['callers'] ?? null) ? $audit['callers'] : null;
+if ($auditCallers === null) {
+    $skip++;
+    echo "SKIP audit inventory artifact not present\n";
+    echo "RESTORE_MESSAGE_AUDIT_INVENTORY_SKIP=1\n";
+} else {
+    rms_ok(count($auditCallers) === 62, 'audit inventory 62 callers');
+    echo "RESTORE_MESSAGE_AUDIT_INVENTORY_SKIP=0\n";
+}
 
 $destinations = [
     'SELECTED_PACKAGE_SUMMARY' => ['الحزمة المحددة', 'لم يتم اختيار حزمة استرداد بعد.'],
@@ -93,25 +111,27 @@ $byDest = [
 ];
 $mapped = 0;
 $unknown = 0;
-foreach (($audit['callers'] ?? []) as $c) {
-    $dest = (string) ($c['proposed_classification'] ?? '');
-    if ($dest === 'SELECTED_PACKAGE_SUMMARY') {
-        $byDest['SELECTED_PACKAGE_SUMMARY']++;
-        $mapped++;
-        continue;
+if ($auditCallers !== null) {
+    foreach ($auditCallers as $c) {
+        $dest = (string) ($c['proposed_classification'] ?? '');
+        if ($dest === 'SELECTED_PACKAGE_SUMMARY') {
+            $byDest['SELECTED_PACKAGE_SUMMARY']++;
+            $mapped++;
+            continue;
+        }
+        if (isset($byDest[$dest])) {
+            $byDest[$dest]++;
+            $mapped++;
+        } else {
+            $unknown++;
+        }
     }
-    if (isset($byDest[$dest])) {
-        $byDest[$dest]++;
-        $mapped++;
-    } else {
-        $unknown++;
-    }
+    rms_ok($mapped === 62 && $unknown === 0, 'TOTAL=MAPPED=62 UNKNOWN=0');
+    rms_ok($byDest['SELECTED_PACKAGE_SUMMARY'] === 1, 'SELECTED_PACKAGE_SUMMARY=1');
+    rms_ok($byDest['CENTERED_SYSTEM_DIALOG'] === 6, 'CENTERED_SYSTEM_DIALOG=6');
+    rms_ok($byDest['CENTERED_OPERATION_RESULT_DIALOG'] === 34, 'CENTERED_OPERATION_RESULT_DIALOG=34');
+    rms_ok($byDest['JOURNEY_STEP_INLINE_MESSAGE'] === 21, 'JOURNEY_STEP_INLINE_MESSAGE=21');
 }
-rms_ok($mapped === 62 && $unknown === 0, 'TOTAL=MAPPED=62 UNKNOWN=0');
-rms_ok($byDest['SELECTED_PACKAGE_SUMMARY'] === 1, 'SELECTED_PACKAGE_SUMMARY=1');
-rms_ok($byDest['CENTERED_SYSTEM_DIALOG'] === 6, 'CENTERED_SYSTEM_DIALOG=6');
-rms_ok($byDest['CENTERED_OPERATION_RESULT_DIALOG'] === 34, 'CENTERED_OPERATION_RESULT_DIALOG=34');
-rms_ok($byDest['JOURNEY_STEP_INLINE_MESSAGE'] === 21, 'JOURNEY_STEP_INLINE_MESSAGE=21');
 rms_ok(str_contains($src, 'showRcJourneyInlineMessage(e.message || \'تعذر العرض\')'), 'journey routing for تعذر العرض');
 rms_ok(!str_contains($src, 'showRcTerminalMessage(e.message || \'تعذر العرض\''), 'تعذر العرض not centered');
 
@@ -136,7 +156,7 @@ $matrix = [
     'REMOVE_OBSOLETE_NOTE' => 'Former ineligible-selection showAlert removed; counted under SELECTED_PACKAGE_SUMMARY for TOTAL=MAPPED=62. REMOVE_OBSOLETE_MESSAGE=1 is disposition of that same caller.',
     'confirm_unchanged' => 2,
 ];
-$evidenceDir = 'D:\\orange_restore_step1_impl_evidence';
+$evidenceDir = rms_evidence_dir('orange_restore_step1_impl_evidence');
 @mkdir($evidenceDir . '/shots', 0775, true);
 @mkdir($evidenceDir . '/runtime', 0775, true);
 file_put_contents($evidenceDir . '/restore_message_surface_final_matrix.json', json_encode($matrix, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
