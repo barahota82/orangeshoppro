@@ -16,6 +16,11 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $mainRoot = dirname(__DIR__);
+if (PHP_OS_FAMILY !== 'Windows') {
+    echo "SKIP: genuine Step-6 route fixture requires Windows/Laragon tooling.\n";
+    exit(0);
+}
+
 $runtimeRoot = 'D:\\orange_restore_step6_runtime';
 $dataRoot = 'D:\\orange_restore_step6_data';
 $ev = 'D:\\orange_restore_step6_final_closure_evidence';
