@@ -8,15 +8,18 @@ declare(strict_types=1);
  * No Backup execution / Verify / DRV / Restore / live mutation.
  */
 
-$projectRoot = 'D:/orange';
-$php = 'C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/php.exe';
+$projectRoot = realpath(dirname(__DIR__)) ?: dirname(__DIR__);
+$projectRoot = str_replace('\\', '/', $projectRoot);
+$php = PHP_BINARY;
 $endpoint = $projectRoot . '/admin/api/backup/list.php';
 $fixture = $projectRoot . '/scripts/self_test_backup_center_list_endpoint_fatal_origin_b1_shutdown_fixture.php';
 $backupAdmin = $projectRoot . '/includes/backup/backup_admin.php';
 $bootstrap = $projectRoot . '/admin/api/backup/_bootstrap.php';
 $config = $projectRoot . '/config.php';
 $ui = $projectRoot . '/admin/pages/backup_center.php';
-$ev = 'D:/orange_backup_list_endpoint_fatal_origin_b1_evidence';
+$ev = DIRECTORY_SEPARATOR === '\\'
+    ? 'D:/orange_backup_list_endpoint_fatal_origin_b1_evidence'
+    : sys_get_temp_dir() . '/orange_backup_list_endpoint_fatal_origin_b1_evidence';
 
 $pass = 0;
 $fail = 0;
@@ -95,11 +98,14 @@ $ok(str_contains($b1Slice, 'ORANGE_JSON_RESPONSE_EMITTED') && str_contains($b1Sl
 // D — child-process fixture
 $run = static function (string $mode) use ($php, $fixture): array {
     $cmd = escapeshellarg($php) . ' ' . escapeshellarg($fixture) . ' ' . escapeshellarg($mode);
+    $orderFile = sys_get_temp_dir() . '/orange_backup_list_b1_shutdown_order.txt';
+    if (is_file($orderFile)) {
+        @unlink($orderFile);
+    }
     $out = [];
     $code = 0;
     exec($cmd . ' 2>&1', $out, $code);
     $text = implode("\n", $out);
-    $orderFile = sys_get_temp_dir() . '/orange_backup_list_b1_shutdown_order.txt';
     $order = is_file($orderFile) ? trim((string) file_get_contents($orderFile)) : '';
 
     return ['code' => $code, 'out' => $text, 'order' => $order];

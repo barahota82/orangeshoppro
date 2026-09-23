@@ -17,6 +17,7 @@ if (PHP_SAPI !== 'cli') {
 
 @ini_set('display_errors', '0');
 @ini_set('display_startup_errors', '0');
+@ini_set('log_errors', '0');
 
 $GLOBALS['__order'] = [];
 $GLOBALS['orange_backup_list_b1_authorized'] = false;
