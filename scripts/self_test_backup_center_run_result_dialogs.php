@@ -6,7 +6,8 @@ declare(strict_types=1);
  * Post-Stage7 — Full Backup + Country Batch centered run-result dialog UX.
  *
  * Usage: php scripts/self_test_backup_center_run_result_dialogs.php
- * Evidence (outside Git): D:\orange_run_result_dialog_evidence\
+ * Evidence (outside Git): D:\orange_run_result_dialog_evidence\ on Windows,
+ * or sys_get_temp_dir()/orange_run_result_dialog_evidence on Linux/macOS.
  * Owner final wording + centered run-result dialogs.
  */
 
@@ -46,6 +47,15 @@ function rrd_extract(string $src, string $name): string
     }
 
     return $body;
+}
+
+function rrd_evidence_dir(): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\orange_run_result_dialog_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_run_result_dialog_evidence';
 }
 
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
@@ -171,7 +181,7 @@ rrd_ok(
 );
 rrd_ok(is_file($projectRoot . '/admin/pages/restore_center.php'), '35. Restore Center page presence unchanged');
 
-$evidenceDir = 'D:\\orange_run_result_dialog_evidence';
+$evidenceDir = rrd_evidence_dir();
 $runtimeDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 $shotsDir = $evidenceDir . DIRECTORY_SEPARATOR . 'shots';
 @mkdir($runtimeDir, 0775, true);
