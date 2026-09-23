@@ -34,7 +34,16 @@ function al_ok(bool $cond, string $label): void
     }
 }
 
-$evidenceDir = 'D:/orange_restore_failed_retry_and_action_lock_evidence';
+function al_evidence_dir(string $folder): string
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'D:/' . $folder;
+    }
+
+    return sys_get_temp_dir() . DIRECTORY_SEPARATOR . $folder;
+}
+
+$evidenceDir = al_evidence_dir('orange_restore_failed_retry_and_action_lock_evidence');
 if (!is_dir($evidenceDir)) {
     mkdir($evidenceDir, 0777, true);
 }
