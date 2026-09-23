@@ -6,14 +6,30 @@ declare(strict_types=1);
  * Read-only fixtures only. Does not execute Step 7/8 or mutate live job.
  */
 
-$projectRoot = 'D:/orange';
-$ev = 'D:/orange_restore_step7_actual_package_diagnostic_root_cause_evidence';
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "CLI only\n");
+    exit(1);
+}
+
+$projectRoot = dirname(__DIR__);
+$evidenceEnv = trim((string) getenv('ORANGE_RESTORE_STEP7_ACTUAL_PACKAGE_EVIDENCE'));
+$ev = $evidenceEnv !== ''
+    ? $evidenceEnv
+    : ((PHP_OS_FAMILY === 'Windows' && is_dir('D:/orange_restore_step7_actual_package_diagnostic_root_cause_evidence'))
+        ? 'D:/orange_restore_step7_actual_package_diagnostic_root_cause_evidence'
+        : (sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_actual_package_diagnostic_root_cause_evidence'));
+if (!is_dir($ev) && !mkdir($ev, 0777, true) && !is_dir($ev)) {
+    fwrite(STDERR, "Cannot create evidence fixture directory\n");
+    exit(1);
+}
+
 require_once $projectRoot . '/includes/backup/restore/restore_sql_compat_engine.php';
 require_once $projectRoot . '/includes/backup/restore/restore_center_orchestrator.php';
 require_once $projectRoot . '/includes/backup/restore/restore_private_engine_trace.php';
 
 $pass = 0;
 $fail = 0;
+$skip = 0;
 $ok = static function (bool $cond, string $label) use (&$pass, &$fail): void {
     if ($cond) {
         echo "PASS $label\n";
@@ -22,6 +38,22 @@ $ok = static function (bool $cond, string $label) use (&$pass, &$fail): void {
         echo "FAIL $label\n";
         $fail++;
     }
+};
+$skipOk = static function (string $label) use (&$skip): void {
+    echo "SKIP $label\n";
+    $skip++;
+};
+
+/**
+ * @throws RuntimeException
+ */
+$writeGzipFromText = static function (string $path, string $sql): void {
+    $hout = gzopen($path, 'wb9');
+    if ($hout === false) {
+        throw new RuntimeException('cannot_create_gzip_fixture');
+    }
+    gzwrite($hout, $sql);
+    gzclose($hout);
 };
 
 $orch = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_center_orchestrator.php');
@@ -37,24 +69,45 @@ $ok(!preg_match('/\$sql\s*\.=\s*\$chunk/', $engine), 'unbounded sql concat still
 
 // A: pre-fix defect class — double scan under max_execution_time collapses (historical proof file).
 $before = json_decode((string) @file_get_contents($ev . '/_double_scan_result.json'), true);
-$ok(is_array($before) && !empty($before['DOUBLE_SCAN_FATAL']), 'A pre-fix double-scan Fatal reproduced (evidence)');
-$ok(is_array($before) && (($before['fatal_class'] ?? '') === 'max_execution_time'), 'A fatal class=max_execution_time');
+if (is_array($before)) {
+    $ok(!empty($before['DOUBLE_SCAN_FATAL']), 'A pre-fix double-scan Fatal reproduced (evidence)');
+    $ok((($before['fatal_class'] ?? '') === 'max_execution_time'), 'A fatal class=max_execution_time');
+} else {
+    $skipOk('A historical pre-fix evidence file absent in this environment');
+}
 
 // B: after-fix double scan returns structured, memoized, no Fatal.
 $gz = $ev . '/_prodshape_base.sql.gz';
 if (!is_file($gz)) {
     $src = $projectRoot . '/scripts/orange_db.sql';
-    $hout = gzopen($gz, 'wb9');
-    $hin = fopen($src, 'rb');
-    while (!feof($hin)) {
-        $c = fread($hin, 1048576);
-        if ($c === false) {
-            break;
+    if (is_file($src)) {
+        $hout = gzopen($gz, 'wb9');
+        $hin = fopen($src, 'rb');
+        if ($hout === false || $hin === false) {
+            if (is_resource($hout)) {
+                gzclose($hout);
+            }
+            if (is_resource($hin)) {
+                fclose($hin);
+            }
+            throw new RuntimeException('cannot_copy_orange_db_sql_fixture');
         }
-        gzwrite($hout, $c);
+        while (!feof($hin)) {
+            $c = fread($hin, 1048576);
+            if ($c === false) {
+                break;
+            }
+            gzwrite($hout, $c);
+        }
+        fclose($hin);
+        gzclose($hout);
+    } else {
+        $skipOk('scripts/orange_db.sql absent; using synthetic incompatible SQL fixture');
+        $writeGzipFromText(
+            $gz,
+            "USE `other_db`;\nCREATE TABLE `probe` (`id` INT);\nINSERT INTO `probe` VALUES (1);\n"
+        );
     }
-    fclose($hin);
-    gzclose($hout);
 }
 $manifest = [
     'package_version' => 'probe',
@@ -70,8 +123,8 @@ $c2 = orange_restore_sql_compat_scan_package($gz, $manifest, 'orange_db', 'yes',
 $ok(!empty($c2['scan_memo_hit']), 'B second scan is memo hit');
 $ok(((string) ($c1['exact_not_ready_reason'] ?? '')) === ((string) ($c2['exact_not_ready_reason'] ?? '')), 'B memo preserves exact reason');
 $ok(((string) ($c1['exact_not_ready_reason'] ?? '')) !== 'server_error', 'B never collapses to server_error');
-$ok(empty($c1['ok']) || empty($c1['compatible']) || true, 'B does not invent READY from exception');
-// Production-shape orange_db dump is multi-db → NOT_READY with exact reason (truthful).
+$ok(empty($c1['ok']) || empty($c1['compatible']), 'B does not invent READY from exception');
+// Production-shape orange_db dump, or the synthetic fallback, must fail closed with an exact reason.
 $ok(((string) ($c1['exact_not_ready_reason'] ?? '')) !== '', 'B exact reason present');
 $ok(empty($c1['compatible']), 'B fail-closed compatible=false for multi-db fixture');
 
@@ -101,5 +154,5 @@ $ok(!str_contains($diagApi, 'execution_started = true'), 'F diagnostic API does 
 $ok(str_contains($diagApi, 'step7_action_enabled'), 'F diagnostic exposes step7_action_enabled fail-closed field');
 
 echo "PASS_COUNT=$pass\nFAIL_COUNT=$fail\n";
-echo 'RAW_FAIL=' . $fail . "\nCORE_SKIP=0\nASSERTION_WEAKENED=0\n";
+echo 'RAW_FAIL=' . $fail . "\nCORE_SKIP=$skip\nASSERTION_WEAKENED=0\n";
 exit($fail === 0 ? 0 : 1);
