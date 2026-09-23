@@ -103,6 +103,8 @@ s7plc_ok(str_contains($adminSrc, 'orange_restore_step7_retry_preflight'), 'BUTTO
 s7plc_ok(str_contains($traceSrc, 'orange_restore_step7_retry_preflight'), 'TRACE uses authoritative preflight');
 s7plc_ok(str_contains($uiSrc, 'exact_not_ready_reason') || str_contains($uiSrc, 'سبب NOT_READY'), 'diagnostic UI exposes exact reason');
 s7plc_ok(str_contains($uiSrc, 'process_absence_proven') || str_contains($uiSrc, 'إثبات غياب العملية'), 'diagnostic UI exposes process absence');
+s7plc_ok(str_contains($engSrc, 'orange_backup_can_execute_commands') && str_contains($engSrc, 'INSPECTION_UNAVAILABLE'), 'bounded pid inspect fails closed when command execution is unavailable');
+s7plc_ok(str_contains($engSrc, 'Parse image name from tasklist BEFORE PowerShell/CIM'), 'bounded pid inspect validates tasklist image before CIM');
 $markers['NOT_READY_REASON_HIDDEN_MUTATION_DETECTED'] = str_contains($orchSrc, 'exact_not_ready_reason') ? 1 : 0;
 $markers['UNKNOWN_TO_DEAD_MUTATION_DETECTED'] = !preg_match('/METADATA_ABSENT[^\n]{0,80}=>\s*[\'"]dead[\'"]/', $engSrc) ? 1 : 0;
 $markers['PREFLIGHT_DIVERGENCE_MUTATION_DETECTED'] = (
