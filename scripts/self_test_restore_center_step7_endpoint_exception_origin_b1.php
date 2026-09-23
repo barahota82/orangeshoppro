@@ -7,11 +7,12 @@ declare(strict_types=1);
  * Static + isolated function checks only. No live job / package / worker / Step 7/8.
  */
 
-$projectRoot = 'D:/orange';
-$php = 'C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/php.exe';
+$projectRoot = str_replace('\\', '/', dirname(__DIR__));
+$php = str_replace('\\', '/', PHP_BINARY);
 $endpoint = $projectRoot . '/admin/api/restore/job/orchestrator-diagnostics.php';
 $orch = $projectRoot . '/includes/backup/restore/restore_center_orchestrator.php';
-$ev = 'D:/orange_restore_step7_forensic_root_cause_closure_evidence';
+$evidenceRoot = DIRECTORY_SEPARATOR === '\\' ? 'D:/' : rtrim(sys_get_temp_dir(), '/\\');
+$ev = rtrim(str_replace('\\', '/', $evidenceRoot), '/') . '/orange_restore_step7_forensic_root_cause_closure_evidence';
 
 $pass = 0;
 $fail = 0;
