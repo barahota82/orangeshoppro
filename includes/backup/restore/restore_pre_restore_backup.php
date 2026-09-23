@@ -636,6 +636,8 @@ function orange_restore_pre_backup_invoke_engine(string $projectRoot, ?string $b
         && is_array($GLOBALS['orange_backup_admin_run_full_for_api_options'])) {
         $options = $GLOBALS['orange_backup_admin_run_full_for_api_options'];
     }
+    // Step 6 requires the package id emitted by the Full Backup run itself; no latest-dir fallback.
+    $options['refresh_snapshot_after_cli'] = false;
 
     $raw = orange_backup_admin_run_full_for_api($projectRoot, $options);
     $snapshot = isset($raw['snapshot']) && is_string($raw['snapshot']) && $raw['snapshot'] !== ''

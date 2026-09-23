@@ -54,11 +54,13 @@ p2_ok(!str_contains($pre, 'orange_backup_execute_full_authoritative'), 'no remov
 p2_ok(!preg_match('/\$raw\s*=\s*orange_backup_run_full\s*\(/', $pre), 'no direct orange_backup_run_full in Restore');
 p2_ok(str_contains($pre, 'backup_package_id_missing') || str_contains($pre, 'Exact package'), 'exact package bind guard present');
 p2_ok(!preg_match('/\borange_backup_latest_snapshot_name\s*\(/', $pre), 'Restore does not call latest-directory guess');
+p2_ok(str_contains($pre, "\$options['refresh_snapshot_after_cli'] = false"), 'Step6 disables Backup Center latest-snapshot fallback');
 p2_ok(str_contains($admin, "'shared_full_backup_service' => 'orange_backup_admin_run_full_for_api'"), 'restore_admin service id updated');
 
 /* Backup Center immutable path intact */
 p2_ok(str_contains($runFull, 'orange_backup_admin_run_full_for_api'), 'Backup run-full unchanged caller');
 p2_ok(str_contains($backupAdmin, 'function orange_backup_admin_run_full_for_api'), 'Backup callable present');
+p2_ok(str_contains($backupAdmin, "refresh_snapshot_after_cli'] ?? true"), 'Backup callable fallback remains opt-out only');
 p2_ok(!str_contains($backupAdmin, 'function orange_backup_execute_full_authoritative'), 'Backup authoritative wrapper stays absent');
 
 /* No orchestrator / detached Step6 */
