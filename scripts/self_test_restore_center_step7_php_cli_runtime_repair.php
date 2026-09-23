@@ -17,7 +17,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
-$evDir = 'D:\\orange_restore_step7_php_cli_repair_evidence';
+$evDir = PHP_OS_FAMILY === 'Windows'
+    ? 'D:\\orange_restore_step7_php_cli_repair_evidence'
+    : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_step7_php_cli_repair_evidence';
 if (!is_dir($evDir)) {
     mkdir($evDir, 0777, true);
 }
@@ -85,8 +87,8 @@ try {
     // Copy real PHP into fixture tree so SAPI probe / is_file succeed.
     if (!@copy($realPhp, $fakeCli)) {
         file_put_contents($fakeCli, "#!/bin/sh\necho cli\n");
-        @chmod($fakeCli, 0755);
     }
+    @chmod($fakeCli, 0755);
     $GLOBALS['orange_backup_test_env_override'] = ['ORANGE_PHP_CLI' => $fakeCli];
     $GLOBALS['orange_backup_test_php_binary'] = '';
     $GLOBALS['orange_backup_test_php_bindir'] = '';
@@ -251,6 +253,7 @@ file_put_contents($meta, json_encode([
     "ready" => true,
 ], JSON_UNESCAPED_UNICODE) . "\n");
 fwrite(STDOUT, "shadow_ok\n");
+usleep(500000);
 exit(0);
 ');
 
