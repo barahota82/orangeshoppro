@@ -14,6 +14,7 @@ $allowed = [
     'payment_review',
     'product_display_order',
     'storefront_hero',
+    'brand_identity',
     'storefront_merge_requests',
     'countries',
     'country_screen_copy',

@@ -37,7 +37,7 @@ orange_error_boundary_register_once();
 |--------------------------------------------------------------------------
 */
 const DB_HOST = 'localhost';
-const DB_NAME = 'orange_db';
+const DB_NAME = 'orangetest';
 
 define('DB_USER', (string)($env['DB_USER'] ?? ''));
 define('DB_PASS', (string)($env['DB_PASS'] ?? ''));
@@ -61,7 +61,7 @@ define(
     $__long === true || $__long === 1 || $__long === '1'
 );
 
-/** اختياري: أصل الموقع العام بدون شرطة مثلاً `https://example.com` — لروابط canonical وOpen Graph عند غياب Host في CLI */
+/** أصل الموقع العام بدون شرطة نهائية (مفتاح SITE_PUBLIC_URL). فارغ/غائب = فشل مغلق في orange_site_public_origin(). */
 $__siteOrigin = trim((string)($env['SITE_PUBLIC_URL'] ?? ''), " \t\n\r\0\x0B/");
 define('ORANGE_SITE_PUBLIC_ORIGIN', $__siteOrigin);
 
@@ -1345,20 +1345,16 @@ function storefront_whatsapp_href(array $channel, string $prefillText = ''): ?st
  * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product, token for verify)
  */
 /**
- * أصل الموقع (https://النطاق) — من SITE_PUBLIC_URL أو من طلب HTTP الحالي.
+ * أصل الموقع العام — من SITE_PUBLIC_URL فقط.
+ * إن كان الإعداد فارغاً أو غائباً: فشل مغلق (لا Host ولا localhost كأصل عام).
  */
 function orange_site_public_origin(): string
 {
     if (ORANGE_SITE_PUBLIC_ORIGIN !== '') {
         return rtrim(ORANGE_SITE_PUBLIC_ORIGIN, '/');
     }
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
-        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
-    $scheme = $https ? 'https' : 'http';
-    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
 
-    return $scheme . '://' . $host;
+    throw new RuntimeException('orange_site_public_origin: SITE_PUBLIC_URL is not configured');
 }
 
 /**

@@ -217,6 +217,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'delivery_areas', 'label' => 'محافظات ومناطق التوصيل'],
                         ['page' => 'product_display_order', 'label' => 'ترتيب عرض المنتجات'],
                         ['page' => 'storefront_hero', 'label' => 'بانر الصفحة الرئيسية'],
+                        ['page' => 'brand_identity', 'label' => 'هوية العلامة'],
                         ['page' => 'storefront_promo_messages', 'label' => 'الرسائل التحفيزية'],
                         ['page' => 'storefront_merge_requests', 'label' => 'دمج هاتف التسجيل'],
                     ],
@@ -395,6 +396,7 @@ function orange_admin_permission_actions_for_page(string $page): array
 
     static $viewEditDeletePages = [
         'storefront_hero',
+        'brand_identity',
         'bank_reconciliation',
     ];
 

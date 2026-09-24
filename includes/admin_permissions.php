@@ -149,6 +149,7 @@ function orange_admin_page_resource(string $page): string
         'restore_center' => 'reports',
         'company_settings' => 'settings',
         'storefront_hero' => 'settings',
+        'brand_identity' => 'settings',
         'storefront_merge_requests' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
@@ -220,6 +221,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'storefront' => 'settings',
         'countries' => 'settings',
         'admins' => 'admin_users',
+        'brand_identity' => 'settings',
     ];
 
     return $map[$folder] ?? 'catalog';
@@ -349,6 +351,7 @@ function orange_admin_api_page_from_script(): ?string
         'countries' => 'countries',
         'country-screen-copy' => 'country_screen_copy',
         'admins' => 'admin_users',
+        'brand_identity' => 'brand_identity',
     ];
 
     if (preg_match('#/admin/api/([^/]+)/#', $path, $m)) {

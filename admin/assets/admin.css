@@ -581,6 +581,25 @@ a { text-decoration: none; color: inherit; }
     background: linear-gradient(135deg, #fb923c 0%, #ea580c 50%, #c2410c 100%);
     box-shadow: 0 4px 14px rgba(234, 88, 12, 0.45);
 }
+.admin-sidebar-brand__mark--slot {
+    background: none;
+    box-shadow: none;
+    overflow: hidden;
+}
+.admin-sidebar-brand__mark--slot img {
+    display: block;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+.admin-sidebar-brand__title--slot img {
+    display: block;
+    height: auto;
+    width: auto;
+    max-height: 22px;
+    max-width: min(160px, 100%);
+    object-fit: contain;
+}
 .admin-sidebar-brand__title {
     font-family: var(--font-display);
     font-size: 1.05rem;
@@ -2212,6 +2231,7 @@ td.admin-ops-cell {
     white-space: nowrap;
 }
 .login-card {
+    position: relative;
     width: 100%;
     max-width: 420px;
     margin: 0 auto;
@@ -2248,6 +2268,37 @@ td.admin-ops-cell {
     margin-bottom: 20px;
     background: linear-gradient(135deg, #fb923c, #ea580c, #c2410c);
     box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4);
+}
+.login-card.has-identity-content::before {
+    background: transparent;
+    box-shadow: none;
+}
+.login-card__identity {
+    position: absolute;
+    top: 32px;
+    inset-inline-start: 28px;
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+.login-card__identity-mark {
+    position: absolute;
+    inset: 0;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 14px;
+}
+.login-card__identity-word {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    max-height: 14px;
+    width: calc(100% - 4px);
+    object-fit: contain;
 }
 .admin-login-page {
     min-height: 100vh;

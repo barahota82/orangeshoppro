@@ -121,9 +121,22 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                 <span class="admin-menu-toggle__text">القائمة</span>
             </button>
             <div class="admin-topbar-brand" role="banner">
+                <?php
+                require_once __DIR__ . '/../../includes/brand_identity_runtime.php';
+                $orangeAdminMarkUrl = orange_brand_identity_runtime_consume_slot_url('ADMIN_BRAND_MARK', '');
+                $orangeAdminWordUrl = orange_brand_identity_runtime_consume_slot_url('ADMIN_COMPANY_WORDMARK', '');
+                ?>
+                <?php if ($orangeAdminMarkUrl !== ''): ?>
+                <div class="admin-sidebar-brand__mark admin-sidebar-brand__mark--slot"><img src="<?php echo htmlspecialchars($orangeAdminMarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="40" height="40" decoding="async"></div>
+                <?php else: ?>
                 <div class="admin-sidebar-brand__mark" aria-hidden="true"></div>
+                <?php endif; ?>
                 <div class="admin-sidebar-brand__text">
+                    <?php if ($orangeAdminWordUrl !== ''): ?>
+                    <div class="admin-sidebar-brand__title admin-sidebar-brand__title--slot"><img src="<?php echo htmlspecialchars($orangeAdminWordUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="Orange" height="22" decoding="async"></div>
+                    <?php else: ?>
                     <div class="admin-sidebar-brand__title">Orange</div>
+                    <?php endif; ?>
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>

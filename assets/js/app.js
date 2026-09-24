@@ -204,6 +204,14 @@ function storefrontOpacityTextLoop(opts) {
     }
 
     function bootTagline() {
+        const staticWrap = document.querySelector('.brand-tagline[data-static="1"]');
+        if (staticWrap) {
+            return;
+        }
+        const msgs = collectMessages(document.getElementById('brandTaglineText'));
+        if (msgs.length < 2) {
+            return;
+        }
         loop.start();
         if (syncToHero) {
             return;

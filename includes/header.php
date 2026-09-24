@@ -51,14 +51,21 @@ try {
     $orangeSfLoggedInForJs = false;
 }
 
-$orangeChannelLogoUrl = storefront_public_path(storefront_asset_url('/assets/images/logo.webp'));
+require_once __DIR__ . '/brand_identity_runtime.php';
+$orangeChannelLogoUrl = orange_brand_identity_runtime_consume_slot_url(
+    'STOREFRONT_BRAND_MARK',
+    storefront_public_path(storefront_asset_url('/assets/images/logo.webp'))
+);
 $orangePwaApple180Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-180.png'));
 $orangePwaApple120Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-120.png'));
 $orangePwaIcon192Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-192.png'));
 $orangePwaIcon512Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-512.png'));
-$orangeWordmarkUrl = storefront_public_path(storefront_asset_url(
-    storefront_asset_image_preferred_path('/assets/images/orange-company.webp')
-));
+$orangeWordmarkUrl = orange_brand_identity_runtime_consume_slot_url(
+    'STOREFRONT_COMPANY_WORDMARK',
+    storefront_public_path(storefront_asset_url(
+        storefront_asset_image_preferred_path('/assets/images/orange-company.webp')
+    ))
+);
 $orangeManifestHref = storefront_public_path('/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]));
 
 $pdoSfHdr = db();
@@ -421,7 +428,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             <div class="brand-text">
                 <div class="brand-stack">
                     <div class="brand-wordmark-anchor">
-                        <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" width="248" height="32" decoding="async"></h1><small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
+                        <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" width="248" height="32" decoding="async"></h1><small class="brand-tagline brand-tagline--cycle" data-static="1" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
                     </div>
                 </div>
             </div>

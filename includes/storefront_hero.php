@@ -154,56 +154,55 @@ function orange_storefront_header_tagline_row_lang_cycle(array $row): array
 }
 
 /**
- * جمل التناوب تحت الشعار: لكل صف نشط header_tagline يُعرض التناوب بكل اللغات غير الفارغة.
+ * شعار نصي واحد: هوية نشطة إن وُجدت، وإلا أول صف header_tagline.
+ * اللغة الحالية → الإنجليزي إن فارغ → فراغ مع بقاء الحاوية. بلا تناوب لغات.
  *
  * @return list<string>
  */
 function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, ?int $countryId = null): array
 {
     static $cached = [];
+    require_once __DIR__ . '/brand_identity_runtime.php';
+    $locale = function_exists('current_lang') ? (string) current_lang() : 'en';
+    $locale = orange_brand_identity_runtime_normalize_ui_locale($locale);
     $forStorefront = $countryId === null;
     $cid = $forStorefront
         ? orange_storefront_settings_country_id($pdo)
         : orange_admin_settings_effective_country_id($pdo, $countryId);
-    $cacheKey = ($forStorefront ? 'sf:' : 'adm:') . (string) $cid;
+    $cacheKey = ($forStorefront ? 'sf:' : 'adm:') . (string) $cid . ':' . $locale;
     if (isset($cached[$cacheKey])) {
         return $cached[$cacheKey];
     }
-    $out = [];
+    $identity = orange_brand_identity_runtime_slogan_text($locale);
+    if ($identity !== null) {
+        $cached[$cacheKey] = [$identity];
+
+        return $cached[$cacheKey];
+    }
+    $text = '';
     try {
         if (orange_table_exists($pdo, 'storefront_copy_lines')) {
             if (orange_storefront_copy_has_country_column($pdo) && $cid > 0) {
                 $st = $pdo->prepare(
-                    'SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                    'SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1'
                 );
                 $st->execute([$cid, 'header_tagline']);
             } else {
                 $st = $pdo->prepare(
-                    'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                    'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1'
                 );
                 $st->execute(['header_tagline']);
             }
-            while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-                if (!is_array($row)) {
-                    break;
-                }
-                foreach (orange_storefront_header_tagline_row_lang_cycle($row) as $t) {
-                    $out[] = $t;
-                }
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                $text = orange_storefront_copy_slogan_from_row($row, $locale);
             }
         }
     } catch (Throwable $e) {
-        $out = [];
+        $text = '';
     }
 
-    /* لا قراءة عامة من storefront_home_hero — محتوى الهيدر من storefront_copy_lines للدولة فقط. */
-    if ($out === []) {
-        $cached[$cacheKey] = ['', ''];
-
-        return $cached[$cacheKey];
-    }
-
-    $cached[$cacheKey] = orange_storefront_copy_pad_rotation($out);
+    $cached[$cacheKey] = [$text];
 
     return $cached[$cacheKey];
 }

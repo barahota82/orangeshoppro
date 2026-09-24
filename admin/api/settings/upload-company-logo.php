@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/upload_paths.php';
 require_admin_api();
 
 try {
@@ -41,7 +42,15 @@ try {
         json_response(['success' => false, 'message' => 'فشل حفظ الملف على السيرفر'], 500);
     }
 
-    json_response(['success' => true, 'filename' => $filename]);
+    orange_image_write_webp_beside($dest);
+    $served = $filename;
+    $webpName = 'company-logo.webp';
+    $webpAbs = $uploadDir . DIRECTORY_SEPARATOR . $webpName;
+    if (is_file($webpAbs)) {
+        $served = $webpName;
+    }
+
+    json_response(['success' => true, 'filename' => $served]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر رفع شعار الشركة');
 }

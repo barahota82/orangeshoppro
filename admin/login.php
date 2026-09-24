@@ -60,7 +60,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.css')), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body class="admin-login-page">
-    <div class="login-card">
+    <?php
+    require_once __DIR__ . '/../includes/brand_identity_runtime.php';
+    $orangeLoginMarkUrl = orange_brand_identity_runtime_consume_slot_url('ADMIN_BRAND_MARK', '');
+    $orangeLoginHasIdentity = $orangeLoginMarkUrl !== '';
+    ?>
+    <div class="login-card<?php echo $orangeLoginHasIdentity ? ' has-identity-content' : ''; ?>">
+        <?php if ($orangeLoginHasIdentity): ?>
+        <span class="login-card__identity" aria-hidden="true">
+            <img class="login-card__identity-mark" src="<?php echo htmlspecialchars($orangeLoginMarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="48" height="48" decoding="async">
+        </span>
+        <?php endif; ?>
         <h1>تسجيل الدخول</h1>
         <p class="login-card__hint">لوحة التحكم المؤسسية — مساحة آمنة للفريق الداخلي فقط.</p>
         <?php if ($error): ?>

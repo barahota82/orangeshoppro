@@ -105,35 +105,38 @@ function orange_ensure_products_upload_dir(): ?string
 }
 
 /**
- * يحاول إنشاء ‎{نفس_الاسم}.webp‎ بجانب ملف الصورة المرفوع (jpg/png/gif). لا يفعل شيئاً لـ webp أو لأنواع غير مدعومة؛ يتجاهل الفشل بصمت.
+ * يكتب ‎{نفس_الاسم}.webp‎ مضغوطاً للعرض بجانب الأصل (jpg/png/gif) أو يعيد ترميز WebP الموجود
+ * في مكانه عندما يكون المسار المخزّن نفسه هو ‎.webp‎. لا يغيّر الأبعاد. يتجاهل الفشل بصمت.
  */
 function orange_image_write_webp_beside(string $absolutePath): void
 {
-    if (!is_file($absolutePath) || !is_readable($absolutePath) || !function_exists('imagewebp')) {
+    if (!is_file($absolutePath) || !is_readable($absolutePath) || !function_exists('imagewebp') || !function_exists('imagecreatefromstring')) {
         return;
     }
     $ext = strtolower((string) pathinfo($absolutePath, PATHINFO_EXTENSION));
-    if ($ext === 'webp') {
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
         return;
     }
-    $loader = match ($ext) {
-        'jpg', 'jpeg' => 'imagecreatefromjpeg',
-        'png' => 'imagecreatefrompng',
-        'gif' => 'imagecreatefromgif',
-        default => null,
-    };
-    if ($loader === null || !function_exists($loader)) {
+    $raw = @file_get_contents($absolutePath);
+    if (!is_string($raw) || $raw === '') {
         return;
     }
-    $im = @$loader($absolutePath);
+    $im = @imagecreatefromstring($raw);
     if ($im === false) {
+        return;
+    }
+    $srcW = imagesx($im);
+    $srcH = imagesy($im);
+    if ($srcW < 1 || $srcH < 1) {
+        imagedestroy($im);
+
         return;
     }
     if (function_exists('imagepalettetotruecolor')) {
         @imagepalettetotruecolor($im);
     }
     if (function_exists('imagealphablending')) {
-        @imagealphablending($im, true);
+        @imagealphablending($im, false);
     }
     if (function_exists('imagesavealpha')) {
         @imagesavealpha($im, true);
@@ -144,9 +147,40 @@ function orange_image_write_webp_beside(string $absolutePath): void
 
         return;
     }
-    $webpPath = dirname($absolutePath) . DIRECTORY_SEPARATOR . $stem . '.webp';
-    @imagewebp($im, $webpPath, 82);
+    $dir = dirname($absolutePath);
+    $webpPath = $dir . DIRECTORY_SEPARATOR . $stem . '.webp';
+    $tmp = $dir . DIRECTORY_SEPARATOR . $stem . '.webp.part.' . bin2hex(random_bytes(4));
+    $wrote = @imagewebp($im, $tmp, 82);
     imagedestroy($im);
+    if ($wrote !== true || !is_file($tmp)) {
+        @unlink($tmp);
+
+        return;
+    }
+    $info = @getimagesize($tmp);
+    if (!is_array($info) || (int) $info[0] !== $srcW || (int) $info[1] !== $srcH) {
+        @unlink($tmp);
+
+        return;
+    }
+    $srcNorm = strtolower(str_replace('\\', '/', $absolutePath));
+    $dstNorm = strtolower(str_replace('\\', '/', $webpPath));
+    if ($srcNorm === $dstNorm) {
+        if (!@rename($tmp, $webpPath) && !@copy($tmp, $webpPath)) {
+            @unlink($tmp);
+
+            return;
+        }
+        @unlink($tmp);
+
+        return;
+    }
+    if (!@rename($tmp, $webpPath) && !@copy($tmp, $webpPath)) {
+        @unlink($tmp);
+
+        return;
+    }
+    @unlink($tmp);
 }
 
 /**
