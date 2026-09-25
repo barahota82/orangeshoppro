@@ -55,6 +55,10 @@ return [
     // اختياري: تجاوز Geo على جذر الموقع / للتطوير المحلي (kw، eg، …)
     // 'ORANGE_STOREFRONT_GEO_OVERRIDE' => 'kw',
 
+    // Isolated Brand Identity Control (SQLite). Absolute path outside httpdocs/public_html/wwwroot.
+    // Empty/absent = fail-closed static/CSS identity. Never a live MySQL Control path.
+    // 'ORANGE_BRAND_IDENTITY_CONTROL_SQLITE' => '<OWNER_PRIVATE_SQLITE_PATH_OUTSIDE_DOCUMENT_ROOT>',
+
     // اختياري — ترحيل المخطط (راجع docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt):
     // سلسلة صارمة 001.sql…NNN.sql مع تحديث orange_schema_meta بعد كل ملف (كل DDL في SQL). الافتراضي false.
     // 'ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS' => true,

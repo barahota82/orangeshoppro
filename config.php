@@ -91,6 +91,12 @@ define('ORANGE_STOREFRONT_PREVIEW_TOKEN', trim((string) ($env['ORANGE_STOREFRONT
 /** اختياري: تجاوز Geo للتطوير المحلي (مثل kw) — راجع .env.example.php */
 define('ORANGE_STOREFRONT_GEO_OVERRIDE', trim((string) ($env['ORANGE_STOREFRONT_GEO_OVERRIDE'] ?? '')));
 
+/** Isolated Brand Identity Control (SQLite). Empty = fail-closed CSS/static identity. */
+$__biSqlite = trim((string) ($env['ORANGE_BRAND_IDENTITY_CONTROL_SQLITE'] ?? ''));
+if ($__biSqlite !== '' && !defined('ORANGE_BRAND_IDENTITY_CONTROL_SQLITE')) {
+    define('ORANGE_BRAND_IDENTITY_CONTROL_SQLITE', $__biSqlite);
+}
+
 /** ترحيل المخطط: سلسلة صارمة 001.sql…NNN.sql تُحدّث orange_schema_meta خطوة بخطوة (كل DDL في SQL) — الافتراضي false (آمن مع جسم PHP). */
 $__strictNum = $env['ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS'] ?? false;
 define(

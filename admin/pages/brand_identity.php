@@ -1,7 +1,15 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/../../includes/brand_identity.php';
 $biPreview = storefront_public_path('/admin/brand_identity_preview.php');
 $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
+$biSlotLabels = [
+    'STOREFRONT_BRAND_MARK' => 'علامة المتجر',
+    'STOREFRONT_COMPANY_WORDMARK' => 'كلمة الشركة — المتجر',
+    'ADMIN_BRAND_MARK' => 'علامة الأدمن والدخول',
+    'ADMIN_COMPANY_WORDMARK' => 'كلمة الشركة — الأدمن فقط',
+];
+$biSlotCodes = orange_brand_identity_slot_codes();
 ?>
 <div class="card" dir="rtl">
     <h2 style="margin-top:0">هوية العلامة</h2>
@@ -9,17 +17,21 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
     <p id="biStatus" class="muted">جاري التحميل…</p>
     <div id="biCurrent"></div>
     <hr>
-    <h3>رفع أو استبدال موضع</h3>
-    <div class="pd-form-grid" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
-        <label>الموضع
-            <select id="biSlot"></select>
-        </label>
-        <label>ملف PNG/WEBP/JPEG
-            <input type="file" id="biFile" accept="image/png,image/webp,image/jpeg">
-        </label>
-        <button type="button" class="btn" id="biUpload">رفع</button>
+    <h3>المواضع الأربعة</h3>
+    <p class="muted">كل موضع مستقل: الحالة الحالية، رفع/استبدال، معاينة الأصل والحالي. المواضع غير المرفوعة تُعاد استخدام إصداراتها النشطة الحالية.</p>
+    <div id="biSlotGrid" class="bi-slot-grid">
+        <?php foreach ($biSlotCodes as $code): ?>
+        <section class="card bi-slot-card" data-slot-code="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>">
+            <h3 class="bi-slot-title"><?php echo htmlspecialchars($biSlotLabels[$code] ?? $code, ENT_QUOTES, 'UTF-8'); ?></h3>
+            <p class="muted bi-slot-code"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></p>
+            <div class="bi-slot-current" data-slot-current="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>">لا توجد صورة نشطة بعد.</div>
+            <label>ملف PNG/WEBP/JPEG
+                <input type="file" class="bi-slot-file" data-slot-file="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" accept="image/png,image/webp,image/jpeg">
+            </label>
+            <button type="button" class="btn bi-slot-upload" data-slot-upload="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>">رفع / استبدال</button>
+        </section>
+        <?php endforeach; ?>
     </div>
-    <p class="muted">المواضع غير المرفوعة تُعاد استخدام إصداراتها النشطة الحالية. يمكن تعديل صورة واحدة أو الشعار فقط.</p>
     <div id="biDraftSlots" class="muted"></div>
     <hr>
     <h3>الشعار النصي (ليس موضع صورة)</h3>
@@ -43,6 +55,11 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
     <h3>سجل التدقيق</h3>
     <div id="biAudit"></div>
 </div>
+<style>
+.bi-slot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); gap:12px; }
+.bi-slot-card h3 { margin-top:0; }
+.bi-slot-current img { height:40px; max-width:160px; object-fit:contain; }
+</style>
 <script>
 (function () {
     const api = <?php echo json_encode(storefront_public_path('/admin/api/brand_identity/manage.php'), JSON_UNESCAPED_UNICODE); ?>;
@@ -108,9 +125,19 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
         };
         return map[code] || code;
     }
-    function renderSlotSelect(codes) {
-        const sel = el('biSlot');
-        sel.innerHTML = (codes || []).map((c) => '<option value="' + esc(c) + '">' + esc(slotLabel(c)) + '</option>').join('');
+    function fillSlotCards(slots) {
+        document.querySelectorAll('[data-slot-current]').forEach((node) => {
+            const code = node.getAttribute('data-slot-current');
+            const s = (slots || {})[code] || {};
+            const st = s.slot_version ? String(s.slot_version.state || '') : '—';
+            const img = s.url ? '<img src="' + esc(s.url) + '" alt="">' : '<span class="muted">لا توجد صورة نشطة بعد.</span>';
+            const dim = (s.width && s.height) ? (s.width + '×' + s.height + ' (' + Number(s.aspect_ratio || 0).toFixed(3) + ')') : '—';
+            const sha = s.object && s.object.sha256 ? s.object.sha256 : '';
+            const orig = s.original_object && s.original_object.sha256 ? s.original_object.sha256 : sha;
+            const dl = sha ? '<a href="' + esc(objectUrl(sha, true)) + '">الحالي</a>' : '—';
+            const dlo = orig ? ' · <a href="' + esc(objectUrl(orig, true)) + '">الأصل</a>' : '';
+            node.innerHTML = img + '<p class="muted">الحالة: ' + esc(st) + ' · الأبعاد: ' + esc(dim) + ' · ' + dl + dlo + '</p>';
+        });
     }
     function reviewState(data) {
         const rec = (data && data.visual_review) || {};
@@ -154,7 +181,6 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
             return;
         }
         show('مخزن الهوية جاهز. صلاحية الصفحة: ' + (data.permission_page || 'brand_identity') + ' / ' + (data.permission_resource || 'settings'));
-        renderSlotSelect(data.slot_codes || []);
         renderSloganFields(data.locales || [], data.translations || []);
         const currentIds = data.draft_slot_version_ids || {};
         Object.keys(currentIds).forEach((code) => {
@@ -163,30 +189,18 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
         el('biDraftSlots').textContent = 'إصدارات المسودة (إعادة استخدام النشط إن لم يُرفع جديد): ' + JSON.stringify(draft);
         const cur = data.current_release || null;
         const slots = data.slots || {};
+        fillSlotCards(slots);
         let html = '';
         if (cur) {
             html += '<p><strong>الإصدار النشط الحالي:</strong> #' + esc(cur.id) + ' — ' + esc(cur.state || '') + '</p>';
         } else {
             html += '<p class="muted">لا يوجد إصدار نشط بعد.</p>';
         }
-        html += '<table class="admin-table"><thead><tr><th>الموضع</th><th>الحالة</th><th>الأبعاد</th><th>الحالي</th><th>تنزيل</th></tr></thead><tbody>';
-        Object.keys(slots).forEach((code) => {
-            const s = slots[code] || {};
-            const st = s.slot_version ? String(s.slot_version.state || '') : '—';
-            const img = s.url ? '<img src="' + esc(s.url) + '" alt="" style="height:32px;max-width:120px;object-fit:contain">' : '—';
-            const dim = (s.width && s.height) ? (s.width + '×' + s.height + ' (' + Number(s.aspect_ratio || 0).toFixed(3) + ')') : '—';
-            const sha = s.object && s.object.sha256 ? s.object.sha256 : '';
-            const orig = s.original_object && s.original_object.sha256 ? s.original_object.sha256 : sha;
-            const dl = sha ? '<a href="' + esc(objectUrl(sha, true)) + '">الحالي</a>' : '—';
-            const dlo = orig ? ' · <a href="' + esc(objectUrl(orig, true)) + '">الأصل</a>' : '';
-            html += '<tr><td>' + esc(slotLabel(code)) + '<br><span class="muted">' + esc(code) + '</span></td><td>' + esc(st) + '</td><td>' + esc(dim) + '</td><td>' + img + '</td><td>' + dl + dlo + '</td></tr>';
-        });
-        html += '</tbody></table>';
         el('biCurrent').innerHTML = html;
         const archives = data.slot_archives || {};
         el('biArchives').innerHTML = Object.keys(archives).map((code) => {
             const rows = archives[code] || [];
-            return '<details><summary>' + esc(slotLabel(code)) + '</summary><table class="admin-table"><tbody>' +
+            return '<details><summary>' + esc(slotLabel(code)) + ' <span class="muted">' + esc(code) + '</span></summary><table class="admin-table"><tbody>' +
                 rows.map((row) => {
                     return '<tr><td>#' + esc(row.id) + '</td><td>' + esc(row.state || '') + '</td><td>' + esc(row.created_at || '') + '</td>' +
                         '<td><button type="button" class="btn btn-secondary" data-slot-roll="' + esc(code) + '" data-slot-ver="' + esc(row.id) + '">رجوع لهذا الموضع</button></td></tr>';
@@ -219,10 +233,13 @@ $biObject = storefront_public_path('/admin/api/brand_identity/object.php');
         const j = await jpost({ action: 'current' });
         render(j.data || j);
     }
-    el('biUpload').addEventListener('click', async () => {
-        const f = el('biFile').files[0];
-        if (!f) { show('اختر ملفاً'); return; }
-        const slot = el('biSlot').value;
+    el('biSlotGrid').addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-slot-upload]');
+        if (!btn) return;
+        const slot = btn.getAttribute('data-slot-upload');
+        const input = document.querySelector('[data-slot-file="' + slot + '"]');
+        const f = input && input.files && input.files[0];
+        if (!f) { show('اختر ملفاً لـ ' + slot); return; }
         const j = await jpost({ action: 'upload_slot', slot_code: slot }, f);
         if (!j.success) { show(j.message || 'فشل الرفع'); return; }
         draft[slot] = j.slot_version_id;
