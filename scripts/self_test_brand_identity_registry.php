@@ -8,6 +8,7 @@ declare(strict_types=1);
  * Memory/fake adapter exists only in this file for pure domain proofs.
  */
 
+require_once dirname(__DIR__) . '/scripts/_m05_storefront_lang_options_fixture.php';
 require_once dirname(__DIR__) . '/includes/upload_paths.php';
 require_once dirname(__DIR__) . '/includes/brand_identity_schema.php';
 require_once dirname(__DIR__) . '/includes/brand_identity.php';
@@ -599,12 +600,15 @@ if (is_file($emptyDb)) {
 }
 $emptyPdo = new PDO('sqlite:' . $emptyDb, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 orange_m03_sqlite_install($emptyPdo, false);
-orange_m03_prove('28_missing_locale_authority_fails_closed', orange_m03_expect_code(
-    static function () use ($emptyPdo): void {
-        orange_brand_identity_approved_locales($emptyPdo);
-    },
-    'BRAND_IDENTITY_LOCALE_AUTHORITY_UNAVAILABLE'
-) && !preg_match("/\\['ar'\\s*,\\s*'en'\\s*,\\s*'fil'\\s*,\\s*'hi'\\]/", $lib));
+$emptyLocales = orange_brand_identity_approved_locales($emptyPdo);
+sort($emptyLocales);
+orange_m03_prove(
+    '28_locale_authority_is_storefront_helper_not_ctrl_locales',
+    $emptyLocales === ['ar', 'en', 'fil', 'hi']
+    && !preg_match("/\\['ar'\\s*,\\s*'en'\\s*,\\s*'fil'\\s*,\\s*'hi'\\]/", $lib)
+    && !str_contains($lib, 'FROM ctrl_locales')
+    && str_contains($lib, 'storefront_lang_options')
+);
 
 $objDir = orange_brand_identity_objects_dir();
 $objBak = $objDir . '_bak_step3';

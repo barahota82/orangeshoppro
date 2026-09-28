@@ -77,6 +77,20 @@ function orange_backup_registry_table_definitions(): array
         'catalog_subcategories' => $g(33),
         'document_sequences' => $g(34),
         'storefront_home_hero' => $g(35),
+        'orange_brand_identity_versions' => $g(36, true),
+        'orange_brand_identity_translations' => $g(37, true),
+        'orange_brand_asset_objects' => orange_backup_registry_row(
+            'global',
+            38,
+            orange_backup_registry_full_table(),
+            null,
+            true,
+            true
+        ),
+        'orange_brand_slot_versions' => $g(39, true),
+        'orange_brand_releases' => $g(40, true),
+        'orange_brand_release_slots' => $g(41, true),
+        'orange_brand_identity_audit_events' => $g(42),
 
         // --- Global schema / admin platform (not country-exported) ---
         'orange_schema_meta' => $g(100),

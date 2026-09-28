@@ -3,16 +3,14 @@
 declare(strict_types=1);
 
 /**
- * M03 Step 3 — dormant Brand Identity schema contract (persistent).
+ * Brand Identity MySQL schema contract (seven GLOBAL tables).
  *
- * NOT executed against live Control / Country MySQL by this candidate.
- * NOT wired into live includes/control_schema.php.
+ * Production install path: Owner-authorized empty CREATE SQL, not HTTP.
+ * Not wired into includes/control_schema.php.
  * Does NOT bump ORANGE_CONTROL_SCHEMA_REVISION (accepted live = 5).
  * Does NOT bump Country schema 124.
- * Does NOT reuse M02 Domain tables.
- *
- * Future apply binding: Control revision 6 (see control_rev6_brand_identity_migrate.php).
- * Live Control revision must remain 5 until a later Owner-authorized apply.
+ * Does NOT stamp Control revision 6.
+ * Does NOT create or read Control ctrl_locales.
  */
 
 const ORANGE_BRAND_IDENTITY_SCHEMA_CONTRACT = 'M03_STEP3_PERSISTENT_SEVEN_TABLES_V1';
@@ -302,7 +300,7 @@ function orange_brand_identity_schema_required_uniques(): array
 }
 
 /**
- * Future / disposable-only MySQL install. Do not call against live Control in M03.
+ * Disposable/test/bootstrap install only. Ordinary HTTP reads must not call this.
  */
 function orange_brand_identity_install_tables(PDO $pdo): void
 {
@@ -549,4 +547,58 @@ function orange_brand_identity_verify_schema_sqlite(PDO $pdo): void
             orange_brand_identity_schema_verify_failed();
         }
     }
+}
+
+/**
+ * True when the seven Brand Identity tables already exist on a MySQL connection.
+ * Does not create tables and does not bump Country schema 124.
+ */
+function orange_brand_identity_mysql_tables_ready(PDO $pdo): bool
+{
+    try {
+        if (strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) !== 'mysql') {
+            return false;
+        }
+        $need = orange_brand_identity_schema_table_names();
+        if ($need === []) {
+            return false;
+        }
+        $placeholders = implode(',', array_fill(0, count($need), '?'));
+        $st = $pdo->prepare(
+            'SELECT DATABASE() AS db_name,
+                    COUNT(*) AS n,
+                    GROUP_CONCAT(TABLE_NAME ORDER BY TABLE_NAME SEPARATOR ",") AS names
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = ? AND TABLE_NAME IN (' . $placeholders . ')'
+        );
+        $st->execute(array_merge(['BASE TABLE'], $need));
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row) || trim((string) ($row['db_name'] ?? '')) === '') {
+            return false;
+        }
+        $names = trim((string) ($row['names'] ?? ''));
+        $found = $names === '' ? [] : explode(',', $names);
+        $found = array_values(array_unique($found));
+        sort($found, SORT_STRING);
+        $want = $need;
+        sort($want, SORT_STRING);
+
+        return $found === $want && (int) ($row['n'] ?? 0) === count($want);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Install/verify the seven Brand Identity tables on the current application MySQL.
+ * Does NOT bump ORANGE_CATALOG_SCHEMA_PHP_REVISION / Country 124.
+ * Does NOT stamp Control revision 6.
+ */
+function orange_brand_identity_ensure_mysql_schema(PDO $pdo): void
+{
+    if (strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) !== 'mysql') {
+        throw new RuntimeException('BRAND_IDENTITY_MYSQL_SCHEMA_REQUIRED');
+    }
+    orange_brand_identity_install_tables($pdo);
+    orange_brand_identity_verify_schema($pdo);
 }

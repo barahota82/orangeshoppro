@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 /**
- * M03 dormant Brand Identity registry — persistent Control PDO library.
- * No Admin/Storefront/PWA/document rendering.
- * No process-local static store. No silent memory fallback.
+ * Brand Identity registry library.
+ * Normal runtime authority is application MySQL after the seven tables exist.
+ * Disposable SQLite is allowed only for library schema-verify self-tests.
  */
 
 require_once __DIR__ . '/brand_identity_schema.php';
@@ -73,30 +73,33 @@ function orange_brand_identity_normalize_locale_code(string $raw): ?string
 }
 
 /**
- * Production locale universe: Control ctrl_locales.is_active_global = 1.
- * Fail closed when the Control locale table cannot be read or is empty.
+ * Production locale universe: the same storefront helper as the live shop.
+ * Authority is array_keys(storefront_lang_options()) — not Control ctrl_locales,
+ * not a Brand-Identity-only hard-coded list, and not a Country locale table.
+ * Fail closed when the helper is missing or yields no valid codes.
  *
  * @return list<string>
  */
 function orange_brand_identity_approved_locales(PDO $controlPdo): array
 {
-    $pdo = orange_brand_identity_require_control_pdo($controlPdo);
+    orange_brand_identity_require_control_pdo($controlPdo);
+    if (!function_exists('storefront_lang_options')) {
+        throw new RuntimeException('BRAND_IDENTITY_LOCALE_AUTHORITY_UNAVAILABLE');
+    }
     try {
-        $st = $pdo->query('SELECT locale_code FROM ctrl_locales WHERE is_active_global = 1');
-        if ($st === false) {
-            throw new RuntimeException('BRAND_IDENTITY_LOCALE_AUTHORITY_UNAVAILABLE');
-        }
-        $codes = [];
-        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-            $norm = orange_brand_identity_normalize_locale_code((string) ($row['locale_code'] ?? ''));
-            if ($norm !== null) {
-                $codes[] = $norm;
-            }
-        }
-    } catch (RuntimeException $e) {
-        throw $e;
+        $opts = storefront_lang_options();
     } catch (Throwable $e) {
         throw new RuntimeException('BRAND_IDENTITY_LOCALE_AUTHORITY_UNAVAILABLE');
+    }
+    if (!is_array($opts) || $opts === []) {
+        throw new RuntimeException('BRAND_IDENTITY_LOCALE_AUTHORITY_UNAVAILABLE');
+    }
+    $codes = [];
+    foreach (array_keys($opts) as $raw) {
+        $norm = orange_brand_identity_normalize_locale_code((string) $raw);
+        if ($norm !== null) {
+            $codes[] = $norm;
+        }
     }
     $codes = array_values(array_unique($codes));
     if ($codes === []) {

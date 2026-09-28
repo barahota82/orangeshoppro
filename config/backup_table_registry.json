@@ -1,12 +1,12 @@
 {
     "registry_version": "1.0",
     "schema_revision": 124,
-    "generated_at": "2026-07-27T06:03:49+00:00",
+    "generated_at": "2026-09-25T04:49:29+00:00",
     "generated_by": "scripts/backup/build_table_registry.php",
     "do_not_edit": "Generated only — regenerate with build_table_registry.php",
-    "table_count": 117,
+    "table_count": 124,
     "ownership_summary": {
-        "global": 32,
+        "global": 39,
         "country_owned": 52,
         "dependent": 28,
         "excluded_ephemeral": 5
@@ -796,6 +796,90 @@
             "parent_dependency": null,
             "uploads_linked": false,
             "integrity_critical": false
+        },
+        "orange_brand_asset_objects": {
+            "ownership_type": "global",
+            "export_order": 38,
+            "delete_order": 838,
+            "restore_order": 38,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": true,
+            "integrity_critical": true
+        },
+        "orange_brand_identity_audit_events": {
+            "ownership_type": "global",
+            "export_order": 42,
+            "delete_order": 842,
+            "restore_order": 42,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_brand_identity_translations": {
+            "ownership_type": "global",
+            "export_order": 37,
+            "delete_order": 837,
+            "restore_order": 37,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_brand_identity_versions": {
+            "ownership_type": "global",
+            "export_order": 36,
+            "delete_order": 836,
+            "restore_order": 36,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_brand_release_slots": {
+            "ownership_type": "global",
+            "export_order": 41,
+            "delete_order": 841,
+            "restore_order": 41,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_brand_releases": {
+            "ownership_type": "global",
+            "export_order": 40,
+            "delete_order": 840,
+            "restore_order": 40,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_brand_slot_versions": {
+            "ownership_type": "global",
+            "export_order": 39,
+            "delete_order": 839,
+            "restore_order": 39,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
         },
         "orange_catalog_data_migration_log": {
             "ownership_type": "global",

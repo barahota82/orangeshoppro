@@ -114,7 +114,7 @@ $biSlotCodes = orange_brand_identity_slot_codes();
         });
         el('biSloganFields').innerHTML = lastLocales.map((loc) => {
             return '<label>' + esc(loc) + ' <input type="text" id="biSlogan_' + esc(loc) + '" value="' + esc(by[loc] || '') + '"></label>';
-        }).join('') || '<p class="muted">لا توجد لغات نشطة من سلطة Control.</p>';
+        }).join('') || '<p class="muted">لا توجد لغات نشطة من storefront_lang_options().</p>';
     }
     function slotLabel(code) {
         const map = {
@@ -177,7 +177,7 @@ $biSlotCodes = orange_brand_identity_slot_codes();
     function render(data) {
         lastSnapshot = data;
         if (!data || data.control_available === false) {
-            show('مخزن الهوية غير مهيأ على هذا الجهاز (Control معزول فقط).');
+            show('جداول هوية العلامة غير مهيأة على هذا الخادم.');
             return;
         }
         show('مخزن الهوية جاهز. صلاحية الصفحة: ' + (data.permission_page || 'brand_identity') + ' / ' + (data.permission_resource || 'settings'));

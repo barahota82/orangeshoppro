@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 /**
- * M05-local Brand Identity admin helpers.
- * Does not call orange_catalog_ensure_schema().
- * Does not stamp live Rev6 or open the dormant DB router.
+ * Brand Identity admin helpers.
+ * Does not call orange_catalog_ensure_schema() and does not create tables on HTTP reads.
  */
 
 require_once __DIR__ . '/brand_identity_runtime.php';

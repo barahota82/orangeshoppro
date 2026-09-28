@@ -52,7 +52,7 @@ try {
             json_response([
                 'success' => true,
                 'control_available' => false,
-                'message' => 'Control identity store is not configured on this host.',
+                'message' => 'Brand Identity MySQL tables are not ready on this host.',
                 'slots' => [],
                 'locales' => [],
                 'permission_page' => orange_brand_identity_api_permission_page(),

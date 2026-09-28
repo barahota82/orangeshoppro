@@ -3,17 +3,18 @@
 declare(strict_types=1);
 
 /**
- * M05 runtime consumer of the M03 Brand Identity foundation.
- * Fail-closed to current static/CSS identity when disposable Control is absent.
- * Does not invoke Control schema ensure and does not stamp live Rev6.
+ * Brand Identity runtime consumer.
+ * Normal authority is application MySQL after the seven tables exist.
+ * Fail-closed to static/CSS fallbacks when tables are absent or empty.
+ * Does not create tables on ordinary reads and does not stamp Control Rev6.
  */
 
 require_once __DIR__ . '/brand_identity.php';
 
 /**
- * Isolated Control PDO for identity tables only.
- * Env: ORANGE_BRAND_IDENTITY_CONTROL_SQLITE = absolute sqlite path (disposable).
- * Tests/admin may bind a live PDO via orange_brand_identity_runtime_bind_control().
+ * Isolated identity PDO bind (tests / admin snapshot helpers).
+ * Normal hosted runtime authority is application MySQL via db() after the
+ * seven Brand Identity tables exist.
  */
 function orange_brand_identity_runtime_bind_control(?PDO $pdo): void
 {
@@ -62,34 +63,47 @@ function orange_brand_identity_runtime_slot_from_release(PDO $pdo, int $releaseI
     return null;
 }
 
+function orange_brand_identity_runtime_app_mysql_pdo(): ?PDO
+{
+    if (!function_exists('db')) {
+        return null;
+    }
+    try {
+        $pdo = db();
+        if (!($pdo instanceof PDO)) {
+            return null;
+        }
+        if (strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) !== 'mysql') {
+            return null;
+        }
+        if (!orange_brand_identity_mysql_tables_ready($pdo)) {
+            return null;
+        }
+
+        return $pdo;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Normal runtime authority: injected test PDO, else application MySQL.
+ * Does not open ORANGE_BRAND_IDENTITY_CONTROL_SQLITE and has no SQLite fallback.
+ */
 function orange_brand_identity_runtime_control_pdo(): ?PDO
 {
     if (isset($GLOBALS['ORANGE_BRAND_IDENTITY_RUNTIME_PDO'])
         && $GLOBALS['ORANGE_BRAND_IDENTITY_RUNTIME_PDO'] instanceof PDO) {
         return $GLOBALS['ORANGE_BRAND_IDENTITY_RUNTIME_PDO'];
     }
-    $path = '';
-    if (defined('ORANGE_BRAND_IDENTITY_CONTROL_SQLITE')) {
-        $path = trim((string) constant('ORANGE_BRAND_IDENTITY_CONTROL_SQLITE'));
-    }
-    if ($path === '') {
-        $fromEnv = getenv('ORANGE_BRAND_IDENTITY_CONTROL_SQLITE');
-        $path = is_string($fromEnv) ? trim($fromEnv) : '';
-    }
-    if ($path === '' || !is_file($path)) {
-        return null;
-    }
-    try {
-        $pdo = new PDO('sqlite:' . $path, null, null, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        ]);
-        $pdo->exec('PRAGMA foreign_keys = ON');
-        $GLOBALS['ORANGE_BRAND_IDENTITY_RUNTIME_PDO'] = $pdo;
+    $mysql = orange_brand_identity_runtime_app_mysql_pdo();
+    if ($mysql instanceof PDO) {
+        $GLOBALS['ORANGE_BRAND_IDENTITY_RUNTIME_PDO'] = $mysql;
 
-        return $pdo;
-    } catch (Throwable $e) {
-        return null;
+        return $mysql;
     }
+
+    return null;
 }
 
 /**
