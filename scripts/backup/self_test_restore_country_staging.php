@@ -79,7 +79,9 @@ function country_restore_write_package(string $dir, array $overrides = []): void
     global $projectRoot;
 
     $registry = orange_backup_registry_load($projectRoot);
-    $dependencyGraph = orange_country_export_build_dependency_graph($registry);
+    $boundaryMatrix = orange_country_boundary_matrix_load($projectRoot);
+    $restoreBatches = orange_country_boundary_matrix_restore_batches($boundaryMatrix);
+    $dependencyGraph = orange_country_export_build_dependency_graph_c3($boundaryMatrix, $registry, $restoreBatches);
     $meta = $registry['tables']['customers'] ?? null;
     $restoreOrder = is_array($meta) ? (int) ($meta['restore_order'] ?? 10) : 10;
 
@@ -105,9 +107,12 @@ function country_restore_write_package(string $dir, array $overrides = []): void
         'country_code' => 'kw',
         'country_label' => 'Kuwait',
         'schema_revision' => 121,
+        'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+        'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'registry_version' => '1.0',
         'export_backend' => 'php_country_export',
         'package_status' => 'healthy',
+        'restore_batches' => $restoreBatches,
     ], $overrides['manifest'] ?? []);
 
     $health = array_merge([
@@ -116,6 +121,8 @@ function country_restore_write_package(string $dir, array $overrides = []): void
         'country_id' => 1,
         'country_code' => 'kw',
         'schema_revision' => 121,
+        'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+        'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'registry_version' => '1.0',
         'failure_reasons' => [],
         'warnings' => [],
@@ -129,9 +136,12 @@ function country_restore_write_package(string $dir, array $overrides = []): void
         'country_id' => 1,
         'country_code' => 'kw',
         'schema_revision' => 121,
+        'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+        'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'registry_version' => '1.0',
         'tables' => ['customers' => 1],
         'ownership_summary' => [],
+        'restore_batches' => $restoreBatches,
         'other_country_markers' => [],
     ]);
     orange_backup_write_json($dir . DIRECTORY_SEPARATOR . 'id_snapshot.json', [
@@ -192,9 +202,11 @@ country_restore_self_test($badPlan['ok'] === false, 'import plan: registry misma
 
 // Dependency graph mismatch
 $registry = orange_backup_registry_load($projectRoot);
+$boundaryMatrix = orange_country_boundary_matrix_load($projectRoot);
+$restoreBatches = orange_country_boundary_matrix_restore_batches($boundaryMatrix);
 $badGraphDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . 'bad_graph';
 mkdir($badGraphDir, 0775, true);
-$brokenGraph = orange_country_export_build_dependency_graph($registry);
+$brokenGraph = orange_country_export_build_dependency_graph_c3($boundaryMatrix, $registry, $restoreBatches);
 if (($brokenGraph['edges'][0]['from'] ?? '') !== '') {
     $brokenGraph['edges'][0]['to'] = '__invalid_parent__';
 }

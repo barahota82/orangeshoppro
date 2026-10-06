@@ -774,36 +774,46 @@ function orange_restore_country_staging_clear_tables(
     $sliceWitness['country_id'] = $countryId;
     $result['slice_witness'] = $sliceWitness;
 
+    $previousForeignKeyChecks = 1;
+    try {
+        $previousForeignKeyChecks = (int) $pdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn();
+    } catch (Throwable $e) {
+        $previousForeignKeyChecks = 1;
+    }
+
     $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    foreach ($tables as $tableName) {
-        orange_restore_staging_assert_safe_target($pdo, $stagingDb);
-        $quoted = '`' . str_replace('`', '``', $tableName) . '`';
-        if ($tableName === 'admins') {
-            $delete = $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE `country_id` = ?');
-            $delete->execute([$countryId]);
-            continue;
-        }
-        if ($tableName === 'admin_permissions') {
-            if ($deleteAdminIds === []) {
+    try {
+        foreach ($tables as $tableName) {
+            orange_restore_staging_assert_safe_target($pdo, $stagingDb);
+            $quoted = '`' . str_replace('`', '``', $tableName) . '`';
+            if ($tableName === 'admins') {
+                $delete = $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE `country_id` = ?');
+                $delete->execute([$countryId]);
                 continue;
             }
-            $placeholders = implode(',', array_fill(0, count($deleteAdminIds), '?'));
-            $delete = $pdo->prepare(
-                'DELETE FROM ' . $quoted . ' WHERE `admin_id` IN (' . $placeholders . ')'
-            );
-            $delete->execute($deleteAdminIds);
-            continue;
+            if ($tableName === 'admin_permissions') {
+                if ($deleteAdminIds === []) {
+                    continue;
+                }
+                $placeholders = implode(',', array_fill(0, count($deleteAdminIds), '?'));
+                $delete = $pdo->prepare(
+                    'DELETE FROM ' . $quoted . ' WHERE `admin_id` IN (' . $placeholders . ')'
+                );
+                $delete->execute($deleteAdminIds);
+                continue;
+            }
+            if ($tableName === 'document_sequences') {
+                $delete = $pdo->prepare(
+                    'DELETE FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\''
+                );
+                $delete->execute([$scopeLike]);
+                continue;
+            }
+            $pdo->exec('DELETE FROM ' . $quoted);
         }
-        if ($tableName === 'document_sequences') {
-            $delete = $pdo->prepare(
-                'DELETE FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\''
-            );
-            $delete->execute([$scopeLike]);
-            continue;
-        }
-        $pdo->exec('DELETE FROM ' . $quoted);
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=' . (string) $previousForeignKeyChecks);
     }
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
     orange_restore_log('Country staging table clear... OK (tables=' . (string) count($tables) . ')');
 
