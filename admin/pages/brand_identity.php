@@ -35,8 +35,10 @@ $biSlotCodes = orange_brand_identity_slot_codes();
     <div id="biDraftSlots" class="muted"></div>
     <hr>
     <h3>الشعار النصي (ليس موضع صورة)</h3>
-    <div id="biSloganFields" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-    <p class="muted">العرض: لغة الواجهة ثم الإنجليزي ثم فراغ.</p>
+    <p class="muted">أضف لغة يدوياً. القائمة من مرجع اللغات، وليست لغات واجهة المتجر فقط. حفظ الشعار لا يفعّل اللغة للزائر. لا ترجمة تلقائية. العرض للزائر: لغة الواجهة ثم الإنجليزي ثم فراغ.</p>
+    <p id="biRefNotice" class="muted" hidden></p>
+    <div id="biSloganFields"></div>
+    <button type="button" class="btn" id="biAddSloganLang">+ إضافة لغة</button>
     <hr>
     <label>ملاحظة المسودة <input type="text" id="biNote" value="معاينة هوية"></label>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -59,6 +61,11 @@ $biSlotCodes = orange_brand_identity_slot_codes();
 .bi-slot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); gap:12px; }
 .bi-slot-card h3 { margin-top:0; }
 .bi-slot-current img { height:40px; max-width:160px; object-fit:contain; }
+#biSloganFields { background:#ffffff; padding:8px; }
+#biSloganTable { width:100%; border-collapse:collapse; background:#ffffff; }
+#biSloganTable th, #biSloganTable td { padding:6px 8px; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+#biSloganTable input[type=text], #biSloganTable select { width:100%; box-sizing:border-box; }
+.bi-role { font-size:12px; color:#475569; }
 </style>
 <script>
 (function () {
@@ -70,6 +77,7 @@ $biSlotCodes = orange_brand_identity_slot_codes();
     let lastPreviewToken = '';
     let lastLocales = [];
     let lastSnapshot = null;
+    let editorSource = { identity_version_id: 0, release_id: 0, kind: 'none' };
     const requiredReviews = [
         'storefront:desktop', 'storefront:mobile',
         'admin:desktop', 'admin:mobile',
@@ -101,20 +109,194 @@ $biSlotCodes = orange_brand_identity_slot_codes();
         });
         return r.json();
     }
-    function sloganValue(locale) {
-        const node = el('biSlogan_' + locale);
-        return node ? node.value : '';
+    function referenceRowsFrom(data) {
+        if (data && Array.isArray(data.locale_rows) && data.locale_rows.length) {
+            return data.locale_rows;
+        }
+        if (data && Array.isArray(data.language_reference) && data.language_reference.length) {
+            return data.language_reference.map((row) => ({
+                code: row.code,
+                label: row.label || row.code,
+                roles: []
+            }));
+        }
+        return [];
     }
-    function renderSloganFields(locales, translations) {
-        lastLocales = Array.isArray(locales) ? locales : [];
-        const by = {};
+    function adoptEditorSourceFrom(data) {
+        editorSource = {
+            identity_version_id: data && data.displayed_identity_version_id != null ? data.displayed_identity_version_id : 0,
+            release_id: data && data.displayed_release_id != null ? data.displayed_release_id : 0,
+            kind: data && data.displayed_source_kind ? String(data.displayed_source_kind) : 'none'
+        };
+    }
+    function editorBaseIdForSubmit() {
+        const raw = editorSource && editorSource.identity_version_id;
+        if (raw === 0 || raw === '0') return 0;
+        if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0) return raw;
+        if (typeof raw === 'string' && /^(0|[1-9][0-9]*)$/.test(raw)) return raw;
+        return raw;
+    }
+    function showReferenceNotice(data) {
+        const node = el('biRefNotice');
+        if (!node) return;
+        const text = data && data.language_reference_notice_ar ? String(data.language_reference_notice_ar) : '';
+        node.textContent = text;
+        node.hidden = text === '';
+    }
+    function roleTextForCode(code) {
+        const ref = referenceRowsFrom(lastSnapshot || {});
+        const row = (ref || []).find((r) => String(r.code || '') === String(code || ''));
+        if (!row) return '';
+        if (row.role_text) return String(row.role_text);
+        const roles = Array.isArray(row.roles) ? row.roles : [];
+        return roles.length ? roles.join(' · ') : '';
+    }
+    function updateSloganRoleCells() {
+        document.querySelectorAll('#biSloganTable tbody tr').forEach((tr) => {
+            const role = tr.querySelector('[data-slogan-role]');
+            if (!role) return;
+            if (tr.getAttribute('data-retired') === '1') {
+                role.textContent = 'محفوظة سابقاً — غير مدعومة في المرجع الحالي، ولن تُنسخ إلى الإصدار التالي';
+                return;
+            }
+            const sel = tr.querySelector('select[data-slogan-locale]');
+            const loc = sel ? String(sel.value || '').trim() : '';
+            const text = loc ? roleTextForCode(loc) : '';
+            role.textContent = text !== '' ? text : '—';
+        });
+    }
+    function collectSloganRows() {
+        const rows = [];
+        document.querySelectorAll('#biSloganTable tbody tr').forEach((tr) => {
+            if (tr.getAttribute('data-retired') === '1') {
+                const inp = tr.querySelector('input[data-slogan-text]');
+                rows.push({
+                    locale: String(tr.getAttribute('data-locale') || ''),
+                    text_key: 'STOREFRONT_SLOGAN',
+                    text_value: inp ? inp.value : '',
+                    retired: true
+                });
+                return;
+            }
+            const sel = tr.querySelector('select[data-slogan-locale]');
+            const inp = tr.querySelector('input[data-slogan-text]');
+            const loc = sel ? String(sel.value || '').trim() : String(tr.getAttribute('data-locale') || '').trim();
+            rows.push({
+                locale: loc,
+                text_key: 'STOREFRONT_SLOGAN',
+                text_value: inp ? inp.value : '',
+                retired: false,
+                selectEl: sel
+            });
+        });
+        return rows;
+    }
+    function collectSelectedSloganTranslations() {
+        const seen = {};
+        const out = [];
+        collectSloganRows().forEach((row) => {
+            if (row.retired) return;
+            if (!row.locale) {
+                if (String(row.text_value || '').trim() !== '') {
+                    const err = new Error('يوجد نص شعار بلا لغة مختارة. اختر اللغة قبل إنشاء المعاينة.');
+                    err.focusEl = row.selectEl || null;
+                    throw err;
+                }
+                return;
+            }
+            if (seen[row.locale]) {
+                throw new Error('لغة مكررة');
+            }
+            seen[row.locale] = true;
+            out.push({
+                locale: row.locale,
+                text_key: 'STOREFRONT_SLOGAN',
+                text_value: row.text_value
+            });
+        });
+        return out;
+    }
+    function usedSloganCodes() {
+        return collectSloganRows().map((row) => row.locale).filter(Boolean);
+    }
+    function sloganOptionHtml(refRows, selected, used) {
+        let html = '<option value="">اختر لغة</option>';
+        (refRows || []).forEach((row) => {
+            const code = String(row.code || '');
+            if (!code) return;
+            if (used.indexOf(code) >= 0 && code !== selected) return;
+            const roles = Array.isArray(row.roles) ? row.roles : [];
+            html += '<option value="' + esc(code) + '"' + (code === selected ? ' selected' : '') + '>';
+            html += esc((row.label || code) + ' (' + code + ')' + (roles.length ? ' — ' + roles.join(' · ') : ''));
+            html += '</option>';
+        });
+        return html;
+    }
+    function refreshSloganSelects() {
+        const ref = referenceRowsFrom(lastSnapshot || {});
+        const used = usedSloganCodes();
+        document.querySelectorAll('#biSloganTable select[data-slogan-locale]').forEach((sel) => {
+            const current = String(sel.value || '');
+            sel.innerHTML = sloganOptionHtml(ref, current, used);
+            if (current) sel.value = current;
+        });
+        updateSloganRoleCells();
+    }
+    function addSloganLanguageRow(prefill, opts) {
+        const table = el('biSloganTable');
+        if (!table) {
+            renderSloganEditor(lastSnapshot || {}, []);
+        }
+        const tbody = document.querySelector('#biSloganTable tbody');
+        if (!tbody) return;
+        const loc = prefill && prefill.locale ? String(prefill.locale) : '';
+        const text = prefill && typeof prefill.text_value === 'string' ? prefill.text_value : '';
+        const retired = !!(opts && opts.retired);
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-locale', loc);
+        if (retired) {
+            tr.setAttribute('data-retired', '1');
+            tr.innerHTML = '<td><span data-retired-locale="' + esc(loc) + '">' + esc(loc) + ' — محفوظة سابقاً</span></td>'
+                + '<td class="bi-role" data-slogan-role>محفوظة سابقاً — غير مدعومة في المرجع الحالي، ولن تُنسخ إلى الإصدار التالي</td>'
+                + '<td><input type="text" data-slogan-text value="' + esc(text) + '" readonly></td>';
+            tbody.appendChild(tr);
+            return;
+        }
+        tr.innerHTML = '<td><select data-slogan-locale></select></td><td class="bi-role" data-slogan-role>—</td><td><input type="text" data-slogan-text value="' + esc(text) + '"></td>';
+        tbody.appendChild(tr);
+        refreshSloganSelects();
+        const sel = tr.querySelector('select[data-slogan-locale]');
+        if (sel && loc) sel.value = loc;
+        refreshSloganSelects();
+    }
+    function renderSloganEditor(data, existingRows) {
+        lastSnapshot = data || lastSnapshot;
+        showReferenceNotice(lastSnapshot || {});
+        const ref = referenceRowsFrom(data || lastSnapshot || {});
+        const refCodes = ref.map((row) => String(row.code || '')).filter(Boolean);
+        lastLocales = refCodes;
+        const rows = Array.isArray(existingRows) ? existingRows : [];
+        let html = '<table class="admin-table" id="biSloganTable"><thead><tr>';
+        html += '<th>اللغة</th><th>الدور</th><th>نص الشعار</th>';
+        html += '</tr></thead><tbody></tbody></table>';
+        if (!ref.length) {
+            html = '<p class="muted">مرجع اللغات غير متاح للاختيار حالياً.</p>' + html;
+        }
+        el('biSloganFields').innerHTML = html;
+        rows.forEach((row) => {
+            const code = String(row.locale || '');
+            const retired = !!(code && refCodes.indexOf(code) < 0);
+            addSloganLanguageRow(row, { retired: retired });
+        });
+        updateSloganRoleCells();
+    }
+    function renderSloganFields(rows, translations) {
+        const saved = [];
         (translations || []).forEach((t) => {
             if (t.text_key !== 'STOREFRONT_SLOGAN') return;
-            by[t.locale] = t.text_value || '';
+            saved.push({ locale: t.locale, text_value: t.text_value || '' });
         });
-        el('biSloganFields').innerHTML = lastLocales.map((loc) => {
-            return '<label>' + esc(loc) + ' <input type="text" id="biSlogan_' + esc(loc) + '" value="' + esc(by[loc] || '') + '"></label>';
-        }).join('') || '<p class="muted">لا توجد لغات نشطة من storefront_lang_options().</p>';
+        renderSloganEditor({ locale_rows: rows, language_reference: rows }, saved);
     }
     function slotLabel(code) {
         const map = {
@@ -174,14 +356,28 @@ $biSlotCodes = orange_brand_identity_slot_codes();
         });
         el('biRealPreview').innerHTML = html;
     }
-    function render(data) {
+    function render(data, opts) {
+        const preserveSlogan = !!(opts && opts.preserveSlogan);
+        const keptSlogan = preserveSlogan ? collectSloganRows() : null;
         lastSnapshot = data;
+        if (!preserveSlogan) {
+            adoptEditorSourceFrom(data);
+        }
         if (!data || data.control_available === false) {
             show('جداول هوية العلامة غير مهيأة على هذا الخادم.');
             return;
         }
         show('مخزن الهوية جاهز. صلاحية الصفحة: ' + (data.permission_page || 'brand_identity') + ' / ' + (data.permission_resource || 'settings'));
-        renderSloganFields(data.locales || [], data.translations || []);
+        if (preserveSlogan && keptSlogan) {
+            renderSloganEditor(data, keptSlogan);
+        } else {
+            const saved = [];
+            (data.translations || []).forEach((t) => {
+                if (t.text_key !== 'STOREFRONT_SLOGAN') return;
+                saved.push({ locale: t.locale, text_value: t.text_value || '' });
+            });
+            renderSloganEditor(data, saved);
+        }
         const currentIds = data.draft_slot_version_ids || {};
         Object.keys(currentIds).forEach((code) => {
             if (!draft[code]) draft[code] = currentIds[code];
@@ -244,19 +440,37 @@ $biSlotCodes = orange_brand_identity_slot_codes();
         if (!j.success) { show(j.message || 'فشل الرفع'); return; }
         draft[slot] = j.slot_version_id;
         show('تم الرفع: ' + slot);
-        render(j.data);
+        render(j.data, { preserveSlogan: true });
+    });
+    el('biAddSloganLang').addEventListener('click', () => {
+        addSloganLanguageRow();
+    });
+    el('biSloganFields').addEventListener('change', (ev) => {
+        if (ev.target && ev.target.matches('select[data-slogan-locale]')) {
+            ev.target.closest('tr').setAttribute('data-locale', ev.target.value || '');
+            refreshSloganSelects();
+            updateSloganRoleCells();
+        }
     });
     el('biPreview').addEventListener('click', async () => {
-        const translations = lastLocales.map((loc) => ({
-            locale: loc,
-            text_key: 'STOREFRONT_SLOGAN',
-            text_value: sloganValue(loc)
-        }));
+        let translations;
+        try {
+            translations = collectSelectedSloganTranslations();
+        } catch (err) {
+            show(String(err.message || err));
+            if (err && err.focusEl && typeof err.focusEl.focus === 'function') {
+                err.focusEl.focus();
+            }
+            return;
+        }
+        const sf = (lastSnapshot && Array.isArray(lastSnapshot.locales)) ? lastSnapshot.locales : [];
+        const displayed = editorBaseIdForSubmit();
         const j = await jpost({
             action: 'create_preview_release',
             slot_version_ids: draft,
             translations: translations,
-            default_locale: lastLocales.indexOf('en') >= 0 ? 'en' : (lastLocales[0] || 'en'),
+            base_identity_version_id: displayed,
+            default_locale: sf.indexOf('en') >= 0 ? 'en' : (sf[0] || 'en'),
             change_note: el('biNote').value
         });
         if (!j.success) { show(j.message || 'تعذر إنشاء المعاينة'); return; }
@@ -313,7 +527,7 @@ $biSlotCodes = orange_brand_identity_slot_codes();
         });
         if (!j.success) { show(j.message || 'تعذر تسجيل المراجعة'); return; }
         show('سُجّلت مراجعة ' + key);
-        render(j.data);
+        render(j.data, { preserveSlogan: true });
         renderPreviewFrames(lastPreviewRelease, lastPreviewToken);
     });
     window.addEventListener('message', (ev) => {

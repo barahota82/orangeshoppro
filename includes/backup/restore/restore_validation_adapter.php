@@ -180,17 +180,92 @@ function orange_restore_validation_adapter_build_staging_drv_report(
  * @param array<string, mixed> $importPlan
  * @return array{ok:bool,errors:list<string>,warnings:list<string>,id_checks:list<array<string,mixed>>,row_count_checks:list<array<string,mixed>>,database:string}
  */
+/**
+ * @param list<array<string, mixed>> $expectedRows
+ * @param list<int> $permissionAdminIds
+ * @return list<string>
+ */
+function orange_restore_validation_adapter_country_slice_witness_errors(
+    PDO $pdo,
+    int $countryId,
+    array $permissionAdminIds,
+    array $expectedRows,
+    string $tableName
+): array {
+    $scopeLike = '%\_c' . (string) $countryId;
+    if ($tableName === 'admins') {
+        $st = $pdo->prepare(
+            'SELECT * FROM `admins` WHERE `country_id` IS NULL OR `country_id` <> ? ORDER BY `id`'
+        );
+        $st->execute([$countryId]);
+    } elseif ($tableName === 'document_sequences') {
+        $st = $pdo->prepare(
+            'SELECT * FROM `document_sequences` WHERE `scope` NOT LIKE ? ESCAPE \'\\\\\' ORDER BY `scope`'
+        );
+        $st->execute([$scopeLike]);
+    } elseif ($tableName === 'admin_permissions') {
+        if ($permissionAdminIds === []) {
+            $queried = $pdo->query(
+                'SELECT * FROM `admin_permissions` ORDER BY `admin_id`, `resource_key`'
+            );
+            $actual = $queried !== false ? ($queried->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+            if (orange_restore_validation_adapter_rowset_canon($actual) !== orange_restore_validation_adapter_rowset_canon($expectedRows)) {
+                return ['Slice witness mismatch for admin_permissions.'];
+            }
+
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($permissionAdminIds), '?'));
+        $st = $pdo->prepare(
+            'SELECT * FROM `admin_permissions` WHERE `admin_id` NOT IN (' . $placeholders . ') ORDER BY `admin_id`, `resource_key`'
+        );
+        $st->execute($permissionAdminIds);
+    } else {
+        return ['Slice witness is not defined for ' . $tableName . '.'];
+    }
+
+    $actual = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if (orange_restore_validation_adapter_rowset_canon($actual) !== orange_restore_validation_adapter_rowset_canon($expectedRows)) {
+        return ['Slice witness mismatch for ' . $tableName . '.'];
+    }
+
+    return [];
+}
+
+/**
+ * @param list<array<string, mixed>> $rows
+ */
+function orange_restore_validation_adapter_rowset_canon(array $rows): string
+{
+    $canon = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $item = [];
+        foreach ($row as $column => $value) {
+            $item[(string) $column] = $value === null ? null : (string) $value;
+        }
+        ksort($item);
+        $canon[] = $item;
+    }
+
+    return (string) json_encode($canon);
+}
+
 function orange_restore_validation_adapter_country_staging_postcheck(
     PDO $pdo,
     string $stagingDb,
     string $packagePath,
     array $sourceManifest,
-    array $importPlan
+    array $importPlan,
+    array $sliceWitness = []
 ): array {
     $errors = [];
     $warnings = [];
     $idChecks = [];
     $rowCountChecks = [];
+    $sliceWitnessChecks = [];
 
     orange_restore_log('Country staging post-validation...');
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
@@ -247,9 +322,98 @@ function orange_restore_validation_adapter_country_staging_postcheck(
             continue;
         }
         $quoted = '`' . str_replace('`', '``', $tableName) . '`';
+        $sliceTables = ['admins', 'admin_permissions', 'document_sequences'];
         try {
-            $foundCount = (int) ($pdo->query('SELECT COUNT(*) FROM ' . $quoted)->fetchColumn() ?: 0);
             $expectedCount = (int) $expectedCount;
+            if (in_array($tableName, $sliceTables, true)) {
+                if ($expectedCountryId <= 0 || (int) ($sliceWitness['country_id'] ?? 0) !== $expectedCountryId) {
+                    $errors[] = 'Slice witness missing for ' . $tableName . '.';
+                    $rowCountChecks[] = [
+                        'table' => $tableName,
+                        'mode' => 'country_slice',
+                        'expected_rows' => $expectedCount,
+                        'found_rows' => 0,
+                        'ok' => false,
+                    ];
+                    continue;
+                }
+                if ($tableName === 'admins') {
+                    $countSt = $pdo->prepare('SELECT COUNT(*) FROM ' . $quoted . ' WHERE `country_id` = ?');
+                    $countSt->execute([$expectedCountryId]);
+                } elseif ($tableName === 'document_sequences') {
+                    $countSt = $pdo->prepare(
+                        'SELECT COUNT(*) FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\''
+                    );
+                    $countSt->execute(['%\_c' . (string) $expectedCountryId]);
+                } else {
+                    $sliceAdminIds = [];
+                    if (is_array($expectedIds['admins'] ?? null)) {
+                        foreach ($expectedIds['admins'] as $adminId) {
+                            $adminId = (int) $adminId;
+                            if ($adminId > 0) {
+                                $sliceAdminIds[] = $adminId;
+                            }
+                        }
+                    }
+                    $sliceAdminIds = array_values(array_unique($sliceAdminIds));
+                    if ($sliceAdminIds === []) {
+                        $foundCount = 0;
+                        if ($expectedCount !== 0) {
+                            $errors[] = 'admin_permissions slice missing package admin ids.';
+                        }
+                        $rowCountChecks[] = [
+                            'table' => $tableName,
+                            'mode' => 'country_slice',
+                            'expected_rows' => $expectedCount,
+                            'found_rows' => $foundCount,
+                            'ok' => $foundCount === $expectedCount,
+                        ];
+                        continue;
+                    }
+                    $placeholders = implode(',', array_fill(0, count($sliceAdminIds), '?'));
+                    $countSt = $pdo->prepare(
+                        'SELECT COUNT(*) FROM ' . $quoted . ' WHERE `admin_id` IN (' . $placeholders . ')'
+                    );
+                    $countSt->execute($sliceAdminIds);
+                }
+                $foundCount = (int) ($countSt->fetchColumn() ?: 0);
+                $rowCountChecks[] = [
+                    'table' => $tableName,
+                    'mode' => 'country_slice',
+                    'expected_rows' => $expectedCount,
+                    'found_rows' => $foundCount,
+                    'ok' => $foundCount === $expectedCount,
+                ];
+                if ($foundCount !== $expectedCount) {
+                    $errors[] = 'Row count mismatch for ' . $tableName . ' (expected ' . (string) $expectedCount . ', found ' . (string) $foundCount . ').';
+                }
+                $expectedWitness = is_array($sliceWitness[$tableName] ?? null) ? $sliceWitness[$tableName] : [];
+                $permissionAdminIds = [];
+                if (is_array($sliceWitness['permission_admin_ids'] ?? null)) {
+                    foreach ($sliceWitness['permission_admin_ids'] as $adminId) {
+                        $adminId = (int) $adminId;
+                        if ($adminId > 0) {
+                            $permissionAdminIds[] = $adminId;
+                        }
+                    }
+                }
+                $witnessErrors = orange_restore_validation_adapter_country_slice_witness_errors(
+                    $pdo,
+                    $expectedCountryId,
+                    array_values(array_unique($permissionAdminIds)),
+                    $expectedWitness,
+                    $tableName
+                );
+                $sliceWitnessChecks[] = [
+                    'table' => $tableName,
+                    'ok' => $witnessErrors === [],
+                ];
+                foreach ($witnessErrors as $witnessError) {
+                    $errors[] = $witnessError;
+                }
+                continue;
+            }
+            $foundCount = (int) ($pdo->query('SELECT COUNT(*) FROM ' . $quoted)->fetchColumn() ?: 0);
             $rowCountChecks[] = [
                 'table' => $tableName,
                 'expected_rows' => $expectedCount,
@@ -281,6 +445,7 @@ function orange_restore_validation_adapter_country_staging_postcheck(
         'warnings' => $warnings,
         'id_checks' => $idChecks,
         'row_count_checks' => $rowCountChecks,
+        'slice_witness_checks' => $sliceWitnessChecks,
         'database' => $stagingDb,
     ];
 }

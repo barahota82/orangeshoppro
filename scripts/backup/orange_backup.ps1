@@ -130,41 +130,15 @@ function Read-OrangeDbSettings {
         throw "Missing config.php at $configPath"
     }
     if (-not (Test-Path -LiteralPath $envPath)) {
-        throw "Missing .env.php at $envPath — create it on the server before running backups."
+        throw "Missing .env.php at $envPath - create it on the server before running backups."
     }
 
     $phpExe = Get-PhpExecutable
     if ($phpExe) {
-        $phpSnippet = @'
-declare(strict_types=1);
-$root = getenv('ORANGE_BACKUP_PROJECT_ROOT');
-if ($root === false || $root === '') {
-    fwrite(STDERR, "ORANGE_BACKUP_PROJECT_ROOT not set\n");
-    exit(2);
-}
-chdir($root);
-$envPath = $root . DIRECTORY_SEPARATOR . '.env.php';
-if (!is_file($envPath)) {
-    fwrite(STDERR, "Missing .env.php\n");
-    exit(2);
-}
-$env = require $envPath;
-if (!is_array($env)) {
-    $env = [];
-}
-require $root . DIRECTORY_SEPARATOR . 'config.php';
-echo json_encode([
-    'host' => DB_HOST,
-    'name' => DB_NAME,
-    'user' => DB_USER,
-    'pass' => DB_PASS,
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-'@
-
         $prev = $env:ORANGE_BACKUP_PROJECT_ROOT
         $env:ORANGE_BACKUP_PROJECT_ROOT = $ProjectRoot
         try {
-            $json = & $phpExe -r $phpSnippet 2>&1
+            $json = & $phpExe -f (Join-Path $ProjectRoot 'scripts\backup\s13_read_backup_db_settings.php') 2>&1
             if ($LASTEXITCODE -ne 0) {
                 throw "PHP failed to read DB settings: $json"
             }
@@ -474,8 +448,8 @@ function Invoke-RetentionCleanup {
         [int]$RetentionMonthly
     )
 
-    $allDirs = Get-ChildItem -LiteralPath $SnapshotsDir -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}$' }
+    $allDirs = @(Get-ChildItem -LiteralPath $SnapshotsDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}$' })
 
     if (-not $allDirs -or $allDirs.Count -eq 0) {
         Write-Log 'Retention: no prior snapshots to evaluate.'
@@ -509,7 +483,7 @@ function Invoke-RetentionCleanup {
     }
 
     for ($monthOffset = 0; $monthOffset -lt [Math]::Max(1, $RetentionMonthly); $monthOffset++) {
-        $monthStart = New-Object DateTime($now.Year, $now.Month, 1).AddMonths(-1 * $monthOffset)
+        $monthStart = (New-Object DateTime($now.Year, $now.Month, 1)).AddMonths(-1 * $monthOffset)
         $monthEnd = $monthStart.AddMonths(1)
         $newest = $allDirs |
             Where-Object { $_.LastWriteTime -ge $monthStart -and $_.LastWriteTime -lt $monthEnd } |
@@ -606,12 +580,13 @@ try {
     $dumpArgs = @(
         "--defaults-extra-file=$clientDefaultsFile",
         '--single-transaction',
+        '--no-tablespaces',
         '--routines',
         '--triggers',
         '--events',
         '--hex-blob',
         '--default-character-set=utf8mb4',
-        '--result-file=' + $rawSqlFile,
+        ('--result-file=' + $rawSqlFile),
         $db.Name
     )
 

@@ -92,20 +92,7 @@ try {
             orange_brand_identity_current_slot_id_map($control)
         );
         $defaultLocale = orange_brand_identity_runtime_normalize_ui_locale((string) ($data['default_locale'] ?? 'en'));
-        $trIn = $data['translations'] ?? [];
-        $translations = [];
-        if (is_array($trIn)) {
-            foreach ($trIn as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
-                $translations[] = [
-                    'locale' => (string) ($row['locale'] ?? ''),
-                    'text_key' => (string) ($row['text_key'] ?? 'STOREFRONT_SLOGAN'),
-                    'text_value' => (string) ($row['text_value'] ?? ''),
-                ];
-            }
-        }
+        $translations = orange_brand_identity_admin_prepare_preview_translations($control, $data);
         $iid = orange_brand_identity_create_identity_version(
             $control,
             $defaultLocale,
@@ -131,7 +118,7 @@ try {
             'preview_token' => $token,
             'visual_review_complete' => false,
             'reused_slot_version_ids' => $norm,
-            'data' => orange_brand_identity_admin_snapshot($control),
+            'data' => orange_brand_identity_admin_snapshot($control, $rid),
         ]);
     }
 
@@ -201,5 +188,16 @@ try {
 
     json_response(['success' => false, 'code' => 'unknown_action', 'message' => 'إجراء غير معروف'], 422);
 } catch (Throwable $e) {
+    if ($e instanceof RuntimeException) {
+        $code = $e->getMessage();
+        $mapped = orange_brand_identity_admin_error_message($code);
+        if ($mapped !== $code) {
+            json_response([
+                'success' => false,
+                'code' => $code,
+                'message' => $mapped,
+            ], 422);
+        }
+    }
     orange_admin_api_catch($e, 'تعذر تنفيذ هوية العلامة');
 }

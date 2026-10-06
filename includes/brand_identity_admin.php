@@ -10,6 +10,88 @@ declare(strict_types=1);
 require_once __DIR__ . '/brand_identity_runtime.php';
 
 /**
+ * Dropdown catalogue rows. Authority is the language reference, not
+ * storefront_lang_options(). Storefront-enabled is a badge only.
+ * $configuredAdminLocale is presentation-only. Null means unknown; Arabic is not assumed.
+ *
+ * @return list<array{code:string,label:string,is_english:bool,is_country_admin:bool,is_storefront_enabled:bool,roles:list<string>}>
+ */
+function orange_brand_identity_slogan_editor_rows(PDO $controlPdo, ?string $configuredAdminLocale = null): array
+{
+    $ref = orange_brand_identity_language_reference($controlPdo);
+    $enabled = [];
+    try {
+        $enabled = orange_brand_identity_approved_locales($controlPdo);
+    } catch (Throwable $e) {
+        $enabled = [];
+    }
+    $admin = $configuredAdminLocale !== null && $configuredAdminLocale !== ''
+        ? orange_brand_identity_normalize_locale_code($configuredAdminLocale)
+        : null;
+    $rows = [];
+    foreach ($ref['entries'] as $entry) {
+        $code = $entry['code'];
+        $isEn = $code === 'en';
+        $isAdmin = $admin !== null && $code === $admin;
+        $isSf = in_array($code, $enabled, true);
+        $roles = [];
+        if ($isAdmin) {
+            $roles[] = 'لغة أدمن الدولة';
+        }
+        if ($isEn) {
+            $roles[] = 'الإنجليزية';
+        }
+        if ($isSf) {
+            $roles[] = 'واجهة المتجر';
+        }
+        $rows[] = [
+            'code' => $code,
+            'label' => $entry['label'],
+            'native' => $entry['native'] ?? $entry['label'],
+            'is_english' => $isEn,
+            'is_country_admin' => $isAdmin,
+            'is_storefront_enabled' => $isSf,
+            'roles' => $roles,
+            'role_text' => $roles !== [] ? implode(' · ', $roles) : '',
+        ];
+    }
+
+    return $rows;
+}
+
+/**
+ * Presentation-only: configured country Admin locale if already stored.
+ * Does not create ctrl_locales, does not invent a catalogue, and does not
+ * default to Arabic when the configuration is missing.
+ */
+function orange_brand_identity_slogan_configured_admin_locale(PDO $controlPdo, int $countryId = 0): ?string
+{
+    if ($countryId <= 0) {
+        return null;
+    }
+    try {
+        $st = $controlPdo->prepare('SELECT locale_code FROM ctrl_country_locales WHERE country_id = ? AND is_default_admin = 1 LIMIT 1');
+        $st->execute([$countryId]);
+        $raw = $st->fetchColumn();
+        if ($raw === false) {
+            return null;
+        }
+        $norm = orange_brand_identity_normalize_locale_code((string) $raw);
+        if ($norm === null) {
+            return null;
+        }
+        $approved = orange_brand_identity_approved_locales($controlPdo);
+        if (!in_array($norm, $approved, true)) {
+            return null;
+        }
+
+        return $norm;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
  * @return list<string>
  */
 function orange_brand_identity_visual_review_required_keys(): array
@@ -46,6 +128,54 @@ function orange_brand_identity_preview_surfaces(): array
 function orange_brand_identity_api_permission_page(): string
 {
     return 'brand_identity';
+}
+
+/**
+ * Server-side slogan payload for create_preview_release: same merge base the
+ * editor displays. Client base IDs are validated against that source only.
+ *
+ * @param array<string, mixed> $data
+ * @return list<array{locale:string,text_key:string,text_value:string}>
+ */
+function orange_brand_identity_admin_error_message(string $code): string
+{
+    return match ($code) {
+        'BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH' => 'مصدر نص الشعار لم يعد صالحاً. لم يُحفظ شيء. أعد فتح المصدر ثم حاول مرة أخرى.',
+        'BRAND_IDENTITY_SLOGAN_LOCALE_REQUIRED' => 'يوجد نص شعار بلا لغة مختارة. اختر اللغة قبل إنشاء المعاينة.',
+        'BRAND_IDENTITY_LANGUAGE_REFERENCE_UNAVAILABLE' => 'مرجع اللغات غير قابل للاستخدام حالياً. لا يمكن حفظ شعار جديد.',
+        'BRAND_IDENTITY_UNSUPPORTED_LOCALE' => 'اللغة غير مدعومة في مرجع اللغات.',
+        'BRAND_IDENTITY_DUPLICATE_LOCALE' => 'لا تكرر اللغة نفسها في صفّين.',
+        default => $code,
+    };
+}
+
+function orange_brand_identity_admin_prepare_preview_translations(PDO $controlPdo, array $data): array
+{
+    orange_brand_identity_assert_language_reference_writable($controlPdo);
+    if (!array_key_exists('base_identity_version_id', $data)
+        && !array_key_exists('displayed_identity_version_id', $data)) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    $clientBase = array_key_exists('base_identity_version_id', $data)
+        ? $data['base_identity_version_id']
+        : $data['displayed_identity_version_id'];
+    $baseId = orange_brand_identity_resolve_displayed_merge_base($controlPdo, $clientBase);
+    $trIn = $data['translations'] ?? [];
+    $incoming = [];
+    if (is_array($trIn)) {
+        foreach ($trIn as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $incoming[] = [
+                'locale' => (string) ($row['locale'] ?? ''),
+                'text_key' => (string) ($row['text_key'] ?? 'STOREFRONT_SLOGAN'),
+                'text_value' => (string) ($row['text_value'] ?? ''),
+            ];
+        }
+    }
+
+    return orange_brand_identity_merge_identity_translations($controlPdo, $incoming, $baseId);
 }
 
 function orange_brand_identity_visual_review_dir(): string
@@ -332,7 +462,7 @@ function orange_brand_identity_audit_recent(PDO $controlPdo, int $limit = 40): a
 /**
  * @return array<string, mixed>
  */
-function orange_brand_identity_admin_snapshot(PDO $controlPdo): array
+function orange_brand_identity_admin_snapshot(PDO $controlPdo, ?int $focusReleaseId = null): array
 {
     $cur = orange_brand_identity_current_release($controlPdo);
     $slots = [];
@@ -370,11 +500,9 @@ function orange_brand_identity_admin_snapshot(PDO $controlPdo): array
         ];
         $archives[$code] = orange_brand_identity_slot_version_archive($controlPdo, $code);
     }
-    $identity = $cur ? orange_brand_identity_current_identity_version($controlPdo) : null;
-    $translations = [];
-    if (is_array($identity)) {
-        $translations = orange_brand_identity_identity_translations($controlPdo, (int) $identity['id']);
-    }
+    $textSource = orange_brand_identity_editor_text_source($controlPdo, $focusReleaseId);
+    $identity = is_array($textSource['identity'] ?? null) ? $textSource['identity'] : null;
+    $translations = is_array($textSource['translations'] ?? null) ? $textSource['translations'] : [];
     $hist = $controlPdo->query(
         'SELECT id, identity_version_id, state, note, current_flag, created_at, activated_at, archived_at
          FROM orange_brand_releases ORDER BY id DESC LIMIT 40'
@@ -390,16 +518,46 @@ function orange_brand_identity_admin_snapshot(PDO $controlPdo): array
         ? orange_brand_identity_visual_review_load($previewRid, $controlPdo)
         : orange_brand_identity_visual_review_empty(0);
 
+    $countryId = 0;
+    if (function_exists('db') && function_exists('orange_admin_context_country_id')) {
+        try {
+            $countryId = (int) orange_admin_context_country_id(db());
+        } catch (Throwable $e) {
+            $countryId = 0;
+        }
+    }
+    $configuredAdmin = orange_brand_identity_slogan_configured_admin_locale($controlPdo, $countryId);
+    $localeRows = orange_brand_identity_slogan_editor_rows($controlPdo, $configuredAdmin);
+    $reference = orange_brand_identity_language_reference($controlPdo);
+    $storefrontLocales = [];
+    try {
+        $storefrontLocales = orange_brand_identity_approved_locales($controlPdo);
+    } catch (Throwable $e) {
+        $storefrontLocales = [];
+    }
+
     return [
         'current_release' => $cur,
         'identity' => $identity,
         'slots' => $slots,
         'slot_archives' => $archives,
         'translations' => $translations,
+        'displayed_identity_version_id' => (int) ($textSource['identity_version_id'] ?? 0),
+        'displayed_release_id' => (int) ($textSource['release_id'] ?? 0),
+        'displayed_source_kind' => (string) ($textSource['kind'] ?? 'none'),
         'history' => $hist ? $hist->fetchAll(PDO::FETCH_ASSOC) : [],
         'audit' => orange_brand_identity_audit_recent($controlPdo),
         'slot_codes' => orange_brand_identity_slot_codes(),
-        'locales' => orange_brand_identity_approved_locales($controlPdo),
+        'locales' => $storefrontLocales,
+        'locale_rows' => $localeRows,
+        'language_reference' => $reference['entries'],
+        'language_reference_source' => $reference['source'],
+        'language_reference_pending' => $reference['pending'],
+        'language_reference_write_blocked' => !empty($reference['write_blocked']),
+        'language_reference_state' => (string) ($reference['state'] ?? ''),
+        'language_reference_notice_ar' => orange_brand_identity_language_reference_notice_ar($reference),
+        'configured_admin_locale' => $configuredAdmin,
+        'locale_authority' => 'language_reference',
         'draft_slot_version_ids' => $draftIds,
         'preview_release_id' => $previewRid,
         'visual_review' => $review,

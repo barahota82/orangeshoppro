@@ -54,6 +54,7 @@ function orange_backup_registry_table_definitions(): array
         // --- Global reference (shared catalog / platform) ---
         'countries' => $g(1, true),
         'report_line_master' => $g(2, true),
+        'orange_language_reference' => $g(9, true),
         'color_dictionary' => $g(10),
         'pattern_dictionary' => $g(11),
         'size_families' => $g(12),

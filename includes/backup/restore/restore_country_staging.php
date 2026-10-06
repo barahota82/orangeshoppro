@@ -151,7 +151,24 @@ function orange_restore_country_staging_run(array $options): array
         $stagingDirty = true;
 
         $pdo = orange_restore_connect_staging_pdo($projectRoot, $env);
-        orange_restore_country_staging_clear_tables($pdo, $stagingDb, $importPlan['delete_order_tables']);
+        $idSnapshotPath = $packagePath . DIRECTORY_SEPARATOR . 'id_snapshot.json';
+        $idSnapshotRaw = is_file($idSnapshotPath)
+            ? (json_decode((string) file_get_contents($idSnapshotPath), true) ?: [])
+            : [];
+        $packageAdminIds = [];
+        $snapshotTables = is_array($idSnapshotRaw['tables'] ?? null) ? $idSnapshotRaw['tables'] : [];
+        if (is_array($snapshotTables['admins'] ?? null)) {
+            foreach ($snapshotTables['admins'] as $snapshotAdminId) {
+                $packageAdminIds[] = (int) $snapshotAdminId;
+            }
+        }
+        $clearMeta = orange_restore_country_staging_clear_tables(
+            $pdo,
+            $stagingDb,
+            $importPlan['delete_order_tables'],
+            $countryId,
+            $packageAdminIds
+        );
 
         $sqlResult = orange_restore_sql_runner_import_country_chunks(
             $pdo,
@@ -162,6 +179,11 @@ function orange_restore_country_staging_run(array $options): array
         if (!$sqlResult['ok']) {
             throw new RuntimeException((string) ($sqlResult['error'] ?? 'Country SQL import failed'));
         }
+        orange_restore_country_staging_apply_sequence_floors(
+            $pdo,
+            $stagingDb,
+            is_array($clearMeta['sequence_floors'] ?? null) ? $clearMeta['sequence_floors'] : []
+        );
 
         $uploadsPath = $packagePath . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
         $uploadsResult = orange_restore_uploads_applicator_extract($uploadsPath, $stagingUploads);
@@ -175,7 +197,8 @@ function orange_restore_country_staging_run(array $options): array
             $stagingDb,
             $packagePath,
             $manifest,
-            $importPlan
+            $importPlan,
+            is_array($clearMeta['slice_witness'] ?? null) ? $clearMeta['slice_witness'] : []
         );
         $stagingDrv = orange_restore_validation_adapter_build_country_staging_drv_report(
             is_array($precheck['drv']) ? $precheck['drv'] : [],
@@ -381,7 +404,9 @@ function orange_restore_country_staging_build_import_plan(
         return ['ok' => false, 'error' => 'dependency_graph.json invalid', 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => false];
     }
 
-    $expectedGraph = orange_country_export_build_dependency_graph($registry);
+    $boundaryMatrix = orange_country_boundary_matrix_load($projectRoot);
+    $restoreBatches = orange_country_boundary_matrix_restore_batches($boundaryMatrix);
+    $expectedGraph = orange_country_export_build_dependency_graph_c3($boundaryMatrix, $registry, $restoreBatches);
     $graphError = orange_restore_country_staging_validate_dependency_graph($packageGraph, $expectedGraph);
     if ($graphError !== null) {
         return ['ok' => false, 'error' => $graphError, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => false];
@@ -397,17 +422,22 @@ function orange_restore_country_staging_build_import_plan(
         return ['ok' => false, 'error' => 'No SQL chunks in package', 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
     }
 
-    $exportableTables = [];
-    foreach (orange_backup_registry_exportable_tables($registry) as $entry) {
-        $exportableTables[$entry['table']] = $entry['meta'];
+    $matrixTables = is_array($boundaryMatrix['tables'] ?? null) ? $boundaryMatrix['tables'] : [];
+    $policyTables = [];
+    foreach ($matrixTables as $tableName => $matrixMeta) {
+        if (!is_string($tableName) || !is_array($matrixMeta) || !(bool) ($matrixMeta['exportable'] ?? false)) {
+            continue;
+        }
+        if (in_array($tableName, ORANGE_CRP_NEVER_EXPORT_TABLES, true)) {
+            continue;
+        }
+        $policyTables[$tableName] = $matrixMeta;
     }
 
     $preamble = null;
     $postamble = null;
     /** @var array<string, string> $tableFiles */
     $tableFiles = [];
-    /** @var array<int, string> $prefixOwners */
-    $prefixOwners = [];
 
     foreach ($sqlFiles as $sqlFile) {
         $parsed = orange_restore_country_staging_parse_sql_chunk($sqlFile);
@@ -425,13 +455,7 @@ function orange_restore_country_staging_build_import_plan(
         }
 
         $tableName = $parsed['table'];
-        $prefixInt = (int) ($parsed['prefix_int'] ?? (int) $parsed['prefix']);
-        if (isset($prefixOwners[$prefixInt]) && $prefixOwners[$prefixInt] !== $tableName) {
-            return ['ok' => false, 'error' => 'Duplicate SQL chunk numeric prefix: ' . $prefixInt, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
-        }
-        $prefixOwners[$prefixInt] = $tableName;
-
-        if (!isset($exportableTables[$tableName])) {
+        if (!isset($policyTables[$tableName])) {
             return ['ok' => false, 'error' => 'SQL chunk references non-exportable or global table: ' . $tableName, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
         }
 
@@ -446,21 +470,30 @@ function orange_restore_country_staging_build_import_plan(
         $tableFiles[$tableName] = $sqlFile;
     }
 
-    $restoreOrderError = orange_restore_country_staging_validate_restore_order($tableFiles, $exportableTables, $packageGraph);
+    $sortedTables = [];
+    for ($batch = 1; $batch <= 6; $batch++) {
+        $batchTables = $restoreBatches[$batch] ?? [];
+        sort($batchTables, SORT_STRING);
+        foreach ($batchTables as $batchTable) {
+            if (isset($tableFiles[$batchTable])) {
+                $sortedTables[] = $batchTable;
+            }
+        }
+    }
+    foreach (array_keys($tableFiles) as $tableName) {
+        if (!in_array($tableName, $sortedTables, true)) {
+            return ['ok' => false, 'error' => 'SQL chunk is outside restore batches: ' . $tableName, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
+        }
+    }
+
+    $rankMeta = [];
+    foreach ($sortedTables as $position => $tableName) {
+        $rankMeta[$tableName] = ['restore_order' => $position];
+    }
+    $restoreOrderError = orange_restore_country_staging_validate_restore_order($tableFiles, $rankMeta, $packageGraph);
     if ($restoreOrderError !== null) {
         return ['ok' => false, 'error' => $restoreOrderError, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
     }
-
-    $sortedTables = array_keys($tableFiles);
-    usort($sortedTables, static function (string $a, string $b) use ($exportableTables): int {
-        $ao = (int) ($exportableTables[$a]['restore_order'] ?? 0);
-        $bo = (int) ($exportableTables[$b]['restore_order'] ?? 0);
-        if ($ao === $bo) {
-            return strcmp($a, $b);
-        }
-
-        return $ao <=> $bo;
-    });
 
     $importFiles = [];
     if ($preamble !== null) {
@@ -473,16 +506,16 @@ function orange_restore_country_staging_build_import_plan(
         $importFiles[] = $postamble;
     }
 
-    $deleteOrderTables = $sortedTables;
-    usort($deleteOrderTables, static function (string $a, string $b) use ($exportableTables): int {
-        $ao = (int) ($exportableTables[$a]['delete_order'] ?? 0);
-        $bo = (int) ($exportableTables[$b]['delete_order'] ?? 0);
-        if ($ao === $bo) {
-            return strcmp($b, $a);
+    $deleteOrderTables = [];
+    for ($batch = 6; $batch >= 1; $batch--) {
+        $batchTables = $restoreBatches[$batch] ?? [];
+        rsort($batchTables, SORT_STRING);
+        foreach ($batchTables as $batchTable) {
+            if (isset($tableFiles[$batchTable])) {
+                $deleteOrderTables[] = $batchTable;
+            }
         }
-
-        return $bo <=> $ao;
-    });
+    }
 
     return [
         'ok' => true,
@@ -602,25 +635,199 @@ function orange_restore_country_staging_scan_sql_file_forbidden(string $sqlPath)
 }
 
 /**
- * Clear only CRP tables in registry delete_order before import (staging-only).
+ * Clear CRP tables in delete_order before import (staging-only).
+ * admins, admin_permissions, and document_sequences are country-slice deletes.
+ * Every other listed table stays a full-table DELETE.
  *
  * @param list<string> $tables
+ * @param list<int> $packageAdminIds
+ * @return array{
+ *   sequence_floors:array<string,int>,
+ *   slice_witness:array<string,mixed>
+ * }
  */
-function orange_restore_country_staging_clear_tables(PDO $pdo, string $stagingDb, array $tables): void
-{
+function orange_restore_country_staging_clear_tables(
+    PDO $pdo,
+    string $stagingDb,
+    array $tables,
+    int $countryId = 0,
+    array $packageAdminIds = []
+): array {
+    $sliceWitness = [
+        'country_id' => $countryId,
+        'permission_admin_ids' => [],
+        'admins' => [],
+        'admin_permissions' => [],
+        'document_sequences' => [],
+    ];
+    $result = [
+        'sequence_floors' => [],
+        'slice_witness' => $sliceWitness,
+    ];
     if ($tables === []) {
-        return;
+        return $result;
     }
+
+    $scopedTables = ['admins', 'admin_permissions', 'document_sequences'];
+    $needsCountry = false;
+    foreach ($tables as $tableName) {
+        if (in_array($tableName, $scopedTables, true)) {
+            $needsCountry = true;
+            break;
+        }
+    }
+    if ($needsCountry && $countryId <= 0) {
+        throw new RuntimeException('country_id required before scoped country clear.');
+    }
+
+    $packageAdminIds = array_values(array_unique(array_filter(
+        array_map(static fn ($id): int => (int) $id, $packageAdminIds),
+        static fn (int $id): bool => $id > 0
+    )));
 
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
     orange_restore_log('Country staging table clear... START');
+
+    if (in_array('admins', $tables, true) && $packageAdminIds !== []) {
+        $placeholders = implode(',', array_fill(0, count($packageAdminIds), '?'));
+        $collision = $pdo->prepare(
+            'SELECT `id`, `country_id` FROM `admins` WHERE `id` IN (' . $placeholders . ')'
+        );
+        $collision->execute($packageAdminIds);
+        while ($row = $collision->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $existingCountry = $row['country_id'];
+            if ($existingCountry === null || (int) $existingCountry !== $countryId) {
+                throw new RuntimeException(
+                    'admin_id_collision: admins.id=' . (int) ($row['id'] ?? 0)
+                    . ' is outside country_id=' . (string) $countryId
+                );
+            }
+        }
+    }
+
+    $scopeLike = '%\_c' . (string) $countryId;
+    $deleteAdminIds = $packageAdminIds;
+    if (in_array('admins', $tables, true) || in_array('admin_permissions', $tables, true)) {
+        $targetAdmins = $pdo->prepare('SELECT `id` FROM `admins` WHERE `country_id` = ?');
+        $targetAdmins->execute([$countryId]);
+        while ($row = $targetAdmins->fetch(PDO::FETCH_ASSOC)) {
+            if (is_array($row)) {
+                $deleteAdminIds[] = (int) ($row['id'] ?? 0);
+            }
+        }
+        $deleteAdminIds = array_values(array_unique(array_filter(
+            $deleteAdminIds,
+            static fn (int $id): bool => $id > 0
+        )));
+    }
+
+    if (in_array('admins', $tables, true)) {
+        $witnessAdmins = $pdo->prepare(
+            'SELECT * FROM `admins` WHERE `country_id` IS NULL OR `country_id` <> ? ORDER BY `id`'
+        );
+        $witnessAdmins->execute([$countryId]);
+        $sliceWitness['admins'] = $witnessAdmins->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+    if (in_array('admin_permissions', $tables, true)) {
+        if ($deleteAdminIds === []) {
+            $witnessPermissions = $pdo->query(
+                'SELECT * FROM `admin_permissions` ORDER BY `admin_id`, `resource_key`'
+            );
+            $sliceWitness['admin_permissions'] = $witnessPermissions !== false
+                ? ($witnessPermissions->fetchAll(PDO::FETCH_ASSOC) ?: [])
+                : [];
+        } else {
+            $placeholders = implode(',', array_fill(0, count($deleteAdminIds), '?'));
+            $witnessPermissions = $pdo->prepare(
+                'SELECT * FROM `admin_permissions` WHERE `admin_id` NOT IN (' . $placeholders . ') ORDER BY `admin_id`, `resource_key`'
+            );
+            $witnessPermissions->execute($deleteAdminIds);
+            $sliceWitness['admin_permissions'] = $witnessPermissions->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+    }
+    if (in_array('document_sequences', $tables, true)) {
+        $floors = $pdo->prepare(
+            'SELECT `scope`, `last_value` FROM `document_sequences` WHERE `scope` LIKE ? ESCAPE \'\\\\\''
+        );
+        $floors->execute([$scopeLike]);
+        $sequenceFloors = [];
+        while ($row = $floors->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $scope = (string) ($row['scope'] ?? '');
+            if ($scope !== '') {
+                $sequenceFloors[$scope] = (int) ($row['last_value'] ?? 0);
+            }
+        }
+        $result['sequence_floors'] = $sequenceFloors;
+        $witnessSequences = $pdo->prepare(
+            'SELECT * FROM `document_sequences` WHERE `scope` NOT LIKE ? ESCAPE \'\\\\\' ORDER BY `scope`'
+        );
+        $witnessSequences->execute([$scopeLike]);
+        $sliceWitness['document_sequences'] = $witnessSequences->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+    $sliceWitness['permission_admin_ids'] = $deleteAdminIds;
+    $sliceWitness['country_id'] = $countryId;
+    $result['slice_witness'] = $sliceWitness;
+
     $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
     foreach ($tables as $tableName) {
         orange_restore_staging_assert_safe_target($pdo, $stagingDb);
         $quoted = '`' . str_replace('`', '``', $tableName) . '`';
+        if ($tableName === 'admins') {
+            $delete = $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE `country_id` = ?');
+            $delete->execute([$countryId]);
+            continue;
+        }
+        if ($tableName === 'admin_permissions') {
+            if ($deleteAdminIds === []) {
+                continue;
+            }
+            $placeholders = implode(',', array_fill(0, count($deleteAdminIds), '?'));
+            $delete = $pdo->prepare(
+                'DELETE FROM ' . $quoted . ' WHERE `admin_id` IN (' . $placeholders . ')'
+            );
+            $delete->execute($deleteAdminIds);
+            continue;
+        }
+        if ($tableName === 'document_sequences') {
+            $delete = $pdo->prepare(
+                'DELETE FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\''
+            );
+            $delete->execute([$scopeLike]);
+            continue;
+        }
         $pdo->exec('DELETE FROM ' . $quoted);
     }
     $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
     orange_restore_log('Country staging table clear... OK (tables=' . (string) count($tables) . ')');
+
+    return $result;
+}
+
+/**
+ * Keep a restored document_sequences counter at least as high as the pre-delete value.
+ *
+ * @param array<string, int> $floors
+ */
+function orange_restore_country_staging_apply_sequence_floors(PDO $pdo, string $stagingDb, array $floors): void
+{
+    if ($floors === []) {
+        return;
+    }
+    orange_restore_staging_assert_safe_target($pdo, $stagingDb);
+    $update = $pdo->prepare(
+        'UPDATE `document_sequences` SET `last_value` = GREATEST(`last_value`, ?) WHERE `scope` = ?'
+    );
+    foreach ($floors as $scope => $lastValue) {
+        if (!is_string($scope) || $scope === '') {
+            continue;
+        }
+        $update->execute([(int) $lastValue, $scope]);
+    }
 }

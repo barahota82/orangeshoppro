@@ -109,6 +109,524 @@ function orange_brand_identity_approved_locales(PDO $controlPdo): array
     return $codes;
 }
 
+/**
+ * Proposed initial seed only — not a world catalogue and not Storefront enablement.
+ * Used when orange_language_reference is absent. Do not treat this as completeness.
+ *
+ * @return list<array{code:string,label:string,native:string,aliases:list<string>,dir:string}>
+ */
+function orange_brand_identity_language_reference_seed_entries(): array
+{
+    return [
+        ['code' => 'ar', 'label' => 'Arabic', 'native' => 'العربية', 'aliases' => [], 'dir' => 'rtl'],
+        ['code' => 'en', 'label' => 'English', 'native' => 'English', 'aliases' => [], 'dir' => 'ltr'],
+        ['code' => 'fil', 'label' => 'Filipino', 'native' => 'Filipino', 'aliases' => ['tl'], 'dir' => 'ltr'],
+        ['code' => 'hi', 'label' => 'Hindi', 'native' => 'हिन्दी', 'aliases' => [], 'dir' => 'ltr'],
+    ];
+}
+
+/**
+ * Isolated tests may bind extra labeled reference rows. Ordinary runtime must not.
+ *
+ * @param list<array<string, mixed>>|null $entries
+ */
+function orange_brand_identity_bind_language_reference(?array $entries): void
+{
+    if ($entries === null) {
+        unset($GLOBALS['ORANGE_BRAND_IDENTITY_LANGUAGE_REFERENCE']);
+
+        return;
+    }
+    $GLOBALS['ORANGE_BRAND_IDENTITY_LANGUAGE_REFERENCE'] = $entries;
+}
+
+/**
+ * Expected list of supported alias strings. Wrong JSON shape, non-strings, or invalid codes are malformed.
+ *
+ * @return list<string>|null
+ */
+function orange_brand_identity_decode_aliases_json(string $json): ?array
+{
+    $decoded = json_decode($json);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    $out = [];
+    foreach ($decoded as $item) {
+        if (!is_string($item) || orange_brand_identity_normalize_locale_code($item) === null) {
+            return null;
+        }
+        $out[] = $item;
+    }
+
+    return $out;
+}
+
+/**
+ * @param array<string, mixed> $raw
+ * @return array{code:string,label:string,native:string,aliases:list<string>,dir:string}|null
+ */
+function orange_brand_identity_normalize_language_reference_entry(array $raw): ?array
+{
+    $code = orange_brand_identity_normalize_locale_code((string) ($raw['code'] ?? $raw['locale'] ?? $raw['locale_code'] ?? ''));
+    if ($code === null) {
+        return null;
+    }
+    if (array_key_exists('aliases', $raw)) {
+        $rawAliases = $raw['aliases'];
+    } elseif (array_key_exists('aliases_json', $raw)) {
+        $rawAliases = orange_brand_identity_decode_aliases_json((string) $raw['aliases_json']);
+        if ($rawAliases === null) {
+            return null;
+        }
+    } else {
+        $rawAliases = [];
+    }
+    if (!is_array($rawAliases) || !array_is_list($rawAliases)) {
+        return null;
+    }
+    $aliases = [];
+    foreach ($rawAliases as $alias) {
+        if (!is_string($alias)) {
+            return null;
+        }
+        $n = orange_brand_identity_normalize_locale_code($alias);
+        if ($n === null) {
+            return null;
+        }
+        if ($n !== $code) {
+            $aliases[] = $n;
+        }
+    }
+    $label = trim((string) ($raw['label'] ?? $raw['display_name_en'] ?? $raw['display_name_native'] ?? $code));
+    $native = trim((string) ($raw['native'] ?? $raw['display_name_native'] ?? $label));
+
+    return [
+        'code' => $code,
+        'label' => $label !== '' ? $label : $code,
+        'native' => $native !== '' ? $native : $code,
+        'aliases' => array_values(array_unique($aliases)),
+        'dir' => ((string) ($raw['dir'] ?? '')) === 'rtl' ? 'rtl' : 'ltr',
+    ];
+}
+
+/**
+ * @return array{source:string,pending:bool,write_blocked:bool,state:string,entries:list<array{code:string,label:string,native:string,aliases:list<string>,dir:string}>}
+ */
+function orange_brand_identity_language_reference_pack(
+    string $source,
+    bool $pending,
+    bool $writeBlocked,
+    string $state,
+    array $entries
+): array {
+    return [
+        'source' => $source,
+        'pending' => $pending,
+        'write_blocked' => $writeBlocked,
+        'state' => $state,
+        'entries' => $entries,
+    ];
+}
+
+/**
+ * @return array{sqlstate:string,driver_code:int}
+ */
+function orange_brand_identity_language_reference_direct_error_identity(PDOException $e): array
+{
+    $info = is_array($e->errorInfo) ? $e->errorInfo : [];
+
+    return [
+        'sqlstate' => (string) ($info[0] ?? ''),
+        'driver_code' => (int) ($info[1] ?? 0),
+    ];
+}
+
+function orange_brand_identity_language_reference_is_missing_table(PDO $pdo, PDOException $e): bool
+{
+    $id = orange_brand_identity_language_reference_direct_error_identity($e);
+    $driver = orange_brand_identity_driver($pdo);
+    if ($driver === 'mysql') {
+        return $id['driver_code'] === 1146 || $id['sqlstate'] === '42S02';
+    }
+    if ($driver === 'sqlite') {
+        $msg = $e->getMessage();
+
+        return $id['driver_code'] === 1
+            && $id['sqlstate'] === 'HY000'
+            && (
+                str_contains($msg, 'no such table: orange_language_reference')
+                || str_contains($msg, "no such table: 'orange_language_reference'")
+            );
+    }
+
+    return false;
+}
+
+function orange_brand_identity_language_reference_metadata_count(PDO $pdo): ?int
+{
+    try {
+        if (orange_brand_identity_driver($pdo) === 'sqlite') {
+            $st = $pdo->query(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'orange_language_reference'"
+            );
+
+            return $st !== false ? (int) $st->fetchColumn() : null;
+        }
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = ?'
+        );
+        $st->execute(['orange_language_reference']);
+
+        return (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Direct read of the intended table. Metadata COUNT is recorded only.
+ * Absence is MariaDB 1146 / 42S02 (or the SQLite missing-table identity for that table).
+ *
+ * @return array{presence:string,reason:string,metadata_count:?int,sqlstate:string,driver_code:int}
+ */
+function orange_brand_identity_language_reference_table_probe(PDO $controlPdo): array
+{
+    orange_brand_identity_require_control_pdo($controlPdo);
+    $metadataCount = orange_brand_identity_language_reference_metadata_count($controlPdo);
+    try {
+        $st = $controlPdo->query('SELECT 1 FROM orange_language_reference LIMIT 1');
+        if ($st === false) {
+            return [
+                'presence' => 'unreadable',
+                'reason' => 'query_false',
+                'metadata_count' => $metadataCount,
+                'sqlstate' => '',
+                'driver_code' => 0,
+            ];
+        }
+
+        return [
+            'presence' => 'present',
+            'reason' => 'direct_read_ok',
+            'metadata_count' => $metadataCount,
+            'sqlstate' => '00000',
+            'driver_code' => 0,
+        ];
+    } catch (PDOException $e) {
+        $id = orange_brand_identity_language_reference_direct_error_identity($e);
+        if (orange_brand_identity_language_reference_is_missing_table($controlPdo, $e)) {
+            return [
+                'presence' => 'absent',
+                'reason' => 'missing_table',
+                'metadata_count' => $metadataCount,
+                'sqlstate' => $id['sqlstate'],
+                'driver_code' => $id['driver_code'],
+            ];
+        }
+        $reason = $id['driver_code'] === 1142 ? 'access_denied_1142' : 'other_error';
+
+        return [
+            'presence' => 'unreadable',
+            'reason' => $reason,
+            'metadata_count' => $metadataCount,
+            'sqlstate' => $id['sqlstate'],
+            'driver_code' => $id['driver_code'],
+        ];
+    } catch (Throwable $e) {
+        return [
+            'presence' => 'unreadable',
+            'reason' => 'other_error',
+            'metadata_count' => $metadataCount,
+            'sqlstate' => '',
+            'driver_code' => 0,
+        ];
+    }
+}
+
+/**
+ * present | absent | unreadable. Absence is never inferred from metadata COUNT=0.
+ */
+function orange_brand_identity_language_reference_table_presence(PDO $controlPdo): string
+{
+    return orange_brand_identity_language_reference_table_probe($controlPdo)['presence'];
+}
+
+/**
+ * A readable view or other non-base object is not the approved application table.
+ * Unknown metadata after a successful direct read is not treated as absence.
+ */
+function orange_brand_identity_language_reference_object_kind(PDO $controlPdo): string
+{
+    orange_brand_identity_require_control_pdo($controlPdo);
+    try {
+        if (orange_brand_identity_driver($controlPdo) === 'sqlite') {
+            $st = $controlPdo->query(
+                "SELECT type FROM sqlite_master WHERE name = 'orange_language_reference' LIMIT 1"
+            );
+            $type = $st !== false ? strtolower((string) $st->fetchColumn()) : '';
+            if ($type === 'table') {
+                return 'base_table';
+            }
+            if ($type === 'view') {
+                return 'view';
+            }
+
+            return $type !== '' ? 'other' : 'unknown';
+        }
+        $st = $controlPdo->query(
+            "SELECT TABLE_TYPE FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orange_language_reference' LIMIT 1"
+        );
+        if ($st === false) {
+            return 'unknown';
+        }
+        $type = strtoupper((string) $st->fetchColumn());
+        if ($type === 'BASE TABLE') {
+            return 'base_table';
+        }
+        if ($type === 'VIEW' || $type === 'SYSTEM VIEW') {
+            return 'view';
+        }
+
+        return $type !== '' ? 'other' : 'unknown';
+    } catch (Throwable $e) {
+        return 'unknown';
+    }
+}
+
+/**
+ * Dropdown / slogan-row authority. Distinct from storefront_lang_options().
+ * Test bind is isolated and labeled. An absent table may use the pending seed.
+ * An installed empty/inactive/invalid/unreadable table never falls back to seed.
+ * Does not read Control ctrl_locales and does not create the table on reads.
+ *
+ * @return array{source:string,pending:bool,write_blocked:bool,state:string,entries:list<array{code:string,label:string,native:string,aliases:list<string>,dir:string}>}
+ */
+function orange_brand_identity_language_reference(PDO $controlPdo): array
+{
+    orange_brand_identity_require_control_pdo($controlPdo);
+    $out = [];
+    $seen = [];
+    $add = static function (array $raw) use (&$out, &$seen): void {
+        $entry = orange_brand_identity_normalize_language_reference_entry($raw);
+        if ($entry === null || isset($seen[$entry['code']])) {
+            return;
+        }
+        $seen[$entry['code']] = true;
+        $out[] = $entry;
+    };
+    if (isset($GLOBALS['ORANGE_BRAND_IDENTITY_LANGUAGE_REFERENCE'])
+        && is_array($GLOBALS['ORANGE_BRAND_IDENTITY_LANGUAGE_REFERENCE'])) {
+        foreach ($GLOBALS['ORANGE_BRAND_IDENTITY_LANGUAGE_REFERENCE'] as $raw) {
+            if (is_array($raw)) {
+                $add($raw);
+            }
+        }
+        if ($out !== []) {
+            return orange_brand_identity_language_reference_pack('test_bind', true, false, 'test_bind', $out);
+        }
+    }
+
+    $presence = orange_brand_identity_language_reference_table_presence($controlPdo);
+    if ($presence === 'unreadable') {
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_unreadable',
+            false,
+            true,
+            'unreadable',
+            []
+        );
+    }
+    if ($presence === 'absent') {
+        foreach (orange_brand_identity_language_reference_seed_entries() as $raw) {
+            $add($raw);
+        }
+
+        return orange_brand_identity_language_reference_pack(
+            'proposal_seed_uninstalled',
+            true,
+            false,
+            'absent',
+            $out
+        );
+    }
+
+    $objectKind = orange_brand_identity_language_reference_object_kind($controlPdo);
+    if ($objectKind !== 'base_table') {
+        if ($objectKind === 'view' || $objectKind === 'other') {
+            return orange_brand_identity_language_reference_pack(
+                'orange_language_reference_incompatible',
+                false,
+                true,
+                'incompatible_object',
+                []
+            );
+        }
+
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_unreadable',
+            false,
+            true,
+            'unknown_object',
+            []
+        );
+    }
+
+    try {
+        $st = $controlPdo->query(
+            'SELECT locale_code AS code, label_en AS label, label_native AS native, aliases_json, dir, is_active
+             FROM orange_language_reference
+             ORDER BY sort_order ASC, id ASC'
+        );
+        if ($st === false) {
+            throw new RuntimeException('BRAND_IDENTITY_LANGUAGE_REFERENCE_UNAVAILABLE');
+        }
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_unreadable',
+            false,
+            true,
+            'unreadable',
+            []
+        );
+    }
+
+    if ($rows === []) {
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_empty',
+            false,
+            true,
+            'empty',
+            []
+        );
+    }
+
+    $activeRaw = [];
+    foreach ($rows as $row) {
+        if ((int) ($row['is_active'] ?? 0) !== 1) {
+            continue;
+        }
+        $decoded = orange_brand_identity_decode_aliases_json((string) ($row['aliases_json'] ?? ''));
+        if ($decoded === null) {
+            return orange_brand_identity_language_reference_pack(
+                'orange_language_reference_invalid',
+                false,
+                true,
+                'invalid',
+                []
+            );
+        }
+        $row['aliases'] = $decoded;
+        $activeRaw[] = $row;
+    }
+    if ($activeRaw === []) {
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_inactive',
+            false,
+            true,
+            'inactive',
+            []
+        );
+    }
+    $installed = [];
+    $seenCodes = [];
+    $seenAliases = [];
+    $mixedInvalid = false;
+    foreach ($activeRaw as $row) {
+        $entry = orange_brand_identity_normalize_language_reference_entry($row);
+        if ($entry === null) {
+            $mixedInvalid = true;
+            continue;
+        }
+        if (isset($seenCodes[$entry['code']]) || isset($seenAliases[$entry['code']])) {
+            $mixedInvalid = true;
+            continue;
+        }
+        foreach ($entry['aliases'] as $alias) {
+            if (isset($seenCodes[$alias]) || isset($seenAliases[$alias])) {
+                $mixedInvalid = true;
+            }
+            $seenAliases[$alias] = true;
+        }
+        $seenCodes[$entry['code']] = true;
+        $installed[] = $entry;
+    }
+    if ($mixedInvalid || $installed === []) {
+        return orange_brand_identity_language_reference_pack(
+            'orange_language_reference_invalid',
+            false,
+            true,
+            'invalid',
+            []
+        );
+    }
+
+    return orange_brand_identity_language_reference_pack(
+        'orange_language_reference',
+        false,
+        false,
+        'ready',
+        $installed
+    );
+}
+
+function orange_brand_identity_language_reference_notice_ar(array $reference): string
+{
+    $source = (string) ($reference['source'] ?? '');
+    if ($source === 'proposal_seed_uninstalled' || !empty($reference['pending'])) {
+        if ($source === 'test_bind') {
+            return 'مرجع اللغات هنا للتجربة المحلية فقط، وليس المرجع المثبّت.';
+        }
+
+        return 'مرجع اللغات غير مثبت بعد. تظهر حالياً اللغات الأربع الأولى فقط: العربية والإنجليزية والفلبينية والهندية، بانتظار تثبيت المرجع. هذا لا يفعّل لغات الزائر.';
+    }
+    if (!empty($reference['write_blocked'])) {
+        return 'مرجع اللغات مثبت لكن غير قابل للاستخدام حالياً. لا يمكن حفظ شعار جديد. النصوص المحفوظة سابقاً تبقى كما هي.';
+    }
+
+    return '';
+}
+
+function orange_brand_identity_assert_language_reference_writable(PDO $controlPdo): void
+{
+    $ref = orange_brand_identity_language_reference($controlPdo);
+    if (!empty($ref['write_blocked'])) {
+        throw new RuntimeException('BRAND_IDENTITY_LANGUAGE_REFERENCE_UNAVAILABLE');
+    }
+}
+
+/**
+ * @return list<string>
+ */
+function orange_brand_identity_reference_locale_codes(PDO $controlPdo): array
+{
+    $codes = [];
+    foreach (orange_brand_identity_language_reference($controlPdo)['entries'] as $entry) {
+        $codes[] = $entry['code'];
+        foreach ($entry['aliases'] as $alias) {
+            $codes[] = $alias;
+        }
+    }
+
+    return array_values(array_unique($codes));
+}
+
+function orange_brand_identity_assert_reference_locale(PDO $controlPdo, string $locale): void
+{
+    orange_brand_identity_assert_language_reference_writable($controlPdo);
+    $loc = orange_brand_identity_normalize_locale_code($locale);
+    if ($loc === null) {
+        throw new RuntimeException('BRAND_IDENTITY_UNSUPPORTED_LOCALE');
+    }
+    $codes = orange_brand_identity_reference_locale_codes($controlPdo);
+    if (!in_array($loc, $codes, true)) {
+        throw new RuntimeException('BRAND_IDENTITY_UNSUPPORTED_LOCALE');
+    }
+}
+
 function orange_brand_identity_assert_slot_code(string $slotCode): void
 {
     if (!in_array($slotCode, orange_brand_identity_slot_codes(), true)) {
@@ -715,7 +1233,7 @@ function orange_brand_identity_put_translation(
     $ver = orange_brand_identity_identity_version($pdo, $identityVersionId);
     orange_brand_identity_assert_not_terminal_overwrite((string) $ver['state']);
     orange_brand_identity_assert_mutable_draft((string) $ver['state'], 'BRAND_IDENTITY_IMMUTABLE_RECORD');
-    orange_brand_identity_assert_locale($pdo, $locale);
+    orange_brand_identity_assert_reference_locale($pdo, $locale);
     orange_brand_identity_assert_text_key($textKey);
     $locale = (string) orange_brand_identity_normalize_locale_code($locale);
     $find = $pdo->prepare(
@@ -749,6 +1267,271 @@ function orange_brand_identity_identity_translations(PDO $controlPdo, int $ident
     $st->execute([$identityVersionId]);
 
     return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * Merge a partial slogan/text request onto the displayed identity version.
+ * Incoming rows overwrite the same locale+key, including an intentional empty
+ * clear. Omitted eligible locales keep the displayed-base wording. Historical
+ * locales that are no longer eligible are omitted from the new payload and
+ * remain on the old version. Newly submitted unsupported locales fail closed.
+ *
+ * @param list<array{locale?:string,text_key?:string,text_value?:string}> $incoming
+ * @return list<array{locale:string,text_key:string,text_value:string}>
+ */
+function orange_brand_identity_merge_identity_translations(
+    PDO $controlPdo,
+    array $incoming,
+    ?int $previousIdentityVersionId
+): array
+{
+    orange_brand_identity_assert_language_reference_writable($controlPdo);
+    $reference = orange_brand_identity_reference_locale_codes($controlPdo);
+    $merged = [];
+    $incomingCodes = [];
+    if ($previousIdentityVersionId !== null && $previousIdentityVersionId > 0) {
+        foreach (orange_brand_identity_identity_translations($controlPdo, $previousIdentityVersionId) as $row) {
+            $loc = orange_brand_identity_normalize_locale_code((string) ($row['locale'] ?? ''));
+            $key = (string) ($row['text_key'] ?? '');
+            if ($loc === null || $key === '') {
+                continue;
+            }
+            if (!in_array($loc, $reference, true)) {
+                continue;
+            }
+            $merged[$loc . "\0" . $key] = [
+                'locale' => $loc,
+                'text_key' => $key,
+                'text_value' => (string) ($row['text_value'] ?? ''),
+            ];
+        }
+    }
+    foreach ($incoming as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $raw = trim((string) ($row['locale'] ?? ''));
+        $text = (string) ($row['text_value'] ?? '');
+        if ($raw === '') {
+            if (trim($text) !== '') {
+                throw new RuntimeException('BRAND_IDENTITY_SLOGAN_LOCALE_REQUIRED');
+            }
+            continue;
+        }
+        $loc = orange_brand_identity_normalize_locale_code($raw);
+        $key = (string) ($row['text_key'] ?? 'STOREFRONT_SLOGAN');
+        if ($loc === null || $key === '' || !in_array($loc, $reference, true)) {
+            throw new RuntimeException('BRAND_IDENTITY_UNSUPPORTED_LOCALE');
+        }
+        if (isset($incomingCodes[$loc . "\0" . $key])) {
+            throw new RuntimeException('BRAND_IDENTITY_DUPLICATE_LOCALE');
+        }
+        $incomingCodes[$loc . "\0" . $key] = true;
+        $merged[$loc . "\0" . $key] = [
+            'locale' => $loc,
+            'text_key' => $key,
+            'text_value' => $text,
+        ];
+    }
+
+    return array_values($merged);
+}
+
+/**
+ * Accept only a nonnegative integer ID in canonical form.
+ * Missing/empty returns null. Decimal, exponent, boolean, negative and junk throw.
+ */
+function orange_brand_identity_parse_nonnegative_int_id(mixed $raw): ?int
+{
+    if ($raw === null) {
+        return null;
+    }
+    if (is_bool($raw) || is_float($raw) || is_array($raw) || is_object($raw)) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    if (is_int($raw)) {
+        if ($raw < 0) {
+            throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+        }
+
+        return $raw;
+    }
+    if (!is_string($raw)) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    $s = trim($raw);
+    if ($s === '') {
+        return null;
+    }
+    if (!preg_match('/^(0|[1-9][0-9]*)$/', $s)) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    if (strlen($s) > 10) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    $n = (int) $s;
+    if ((string) $n !== $s && $s !== '0') {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+
+    return $n;
+}
+
+function orange_brand_identity_latest_identity_version_id(PDO $controlPdo): int
+{
+    $pdo = orange_brand_identity_require_control_pdo($controlPdo);
+    $st = $pdo->query('SELECT id FROM orange_brand_identity_versions ORDER BY id DESC LIMIT 1');
+
+    return (int) ($st !== false ? $st->fetchColumn() : 0);
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function orange_brand_identity_latest_preview_ready_release(PDO $controlPdo): ?array
+{
+    $pdo = orange_brand_identity_require_control_pdo($controlPdo);
+    $st = $pdo->query("SELECT * FROM orange_brand_releases WHERE state = 'PREVIEW_READY' ORDER BY id DESC LIMIT 1");
+    $row = $st !== false ? $st->fetch(PDO::FETCH_ASSOC) : false;
+
+    return is_array($row) ? $row : null;
+}
+
+/**
+ * Identity/release whose slogan text the editor must display and merge onto.
+ * Active current release wins over a newer abandoned preview. With no active
+ * release, the latest PREVIEW_READY release is the editable draft.
+ *
+ * @return array{
+ *   kind:string,
+ *   identity_version_id:int,
+ *   release_id:int,
+ *   identity:?array<string, mixed>,
+ *   translations:list<array<string, mixed>>
+ * }
+ */
+function orange_brand_identity_editor_text_source(PDO $controlPdo, ?int $focusReleaseId = null): array
+{
+    $empty = [
+        'kind' => 'none',
+        'identity_version_id' => 0,
+        'release_id' => 0,
+        'identity' => null,
+        'translations' => [],
+    ];
+    if ($focusReleaseId !== null && $focusReleaseId > 0) {
+        try {
+            $focusRel = orange_brand_identity_release($controlPdo, $focusReleaseId);
+            $focusState = (string) ($focusRel['state'] ?? '');
+            $iid = (int) ($focusRel['identity_version_id'] ?? 0);
+            if ($iid > 0 && ($focusState === 'PREVIEW_READY' || $focusState === 'DRAFT')) {
+                $ident = orange_brand_identity_identity_version($controlPdo, $iid);
+                $idState = (string) ($ident['state'] ?? '');
+                if ($idState === 'PREVIEW_READY' || $idState === 'DRAFT') {
+                    return [
+                        'kind' => 'focused_preview',
+                        'identity_version_id' => $iid,
+                        'release_id' => (int) ($focusRel['id'] ?? 0),
+                        'identity' => $ident,
+                        'translations' => orange_brand_identity_identity_translations($controlPdo, $iid),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            /* fall through to default displayed source */
+        }
+    }
+    $activeRel = orange_brand_identity_current_release($controlPdo);
+    if (is_array($activeRel)) {
+        $iid = (int) ($activeRel['identity_version_id'] ?? 0);
+        if ($iid > 0) {
+            $ident = orange_brand_identity_identity_version($controlPdo, $iid);
+
+            return [
+                'kind' => 'active',
+                'identity_version_id' => $iid,
+                'release_id' => (int) ($activeRel['id'] ?? 0),
+                'identity' => $ident,
+                'translations' => orange_brand_identity_identity_translations($controlPdo, $iid),
+            ];
+        }
+    }
+    $previewRel = orange_brand_identity_latest_preview_ready_release($controlPdo);
+    if (!is_array($previewRel)) {
+        return $empty;
+    }
+    $iid = (int) ($previewRel['identity_version_id'] ?? 0);
+    if ($iid <= 0) {
+        return $empty;
+    }
+    $ident = orange_brand_identity_identity_version($controlPdo, $iid);
+    $state = (string) ($ident['state'] ?? '');
+    if ($state !== 'PREVIEW_READY' && $state !== 'DRAFT') {
+        return $empty;
+    }
+
+    return [
+        'kind' => 'preview_draft',
+        'identity_version_id' => $iid,
+        'release_id' => (int) ($previewRel['id'] ?? 0),
+        'identity' => $ident,
+        'translations' => orange_brand_identity_identity_translations($controlPdo, $iid),
+    ];
+}
+
+function orange_brand_identity_preview_release_for_identity(PDO $controlPdo, int $identityVersionId): ?array
+{
+    if ($identityVersionId <= 0) {
+        return null;
+    }
+    $pdo = orange_brand_identity_require_control_pdo($controlPdo);
+    $st = $pdo->prepare(
+        "SELECT * FROM orange_brand_releases
+         WHERE identity_version_id = ? AND state = 'PREVIEW_READY'
+         ORDER BY id DESC LIMIT 1"
+    );
+    $st->execute([$identityVersionId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+
+    return is_array($row) ? $row : null;
+}
+
+function orange_brand_identity_resolve_displayed_merge_base(PDO $controlPdo, mixed $clientBaseId): ?int
+{
+    $src = orange_brand_identity_editor_text_source($controlPdo);
+    $serverId = (int) $src['identity_version_id'];
+    if ($clientBaseId === null || (is_string($clientBaseId) && trim($clientBaseId) === '')) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    $client = orange_brand_identity_parse_nonnegative_int_id($clientBaseId);
+    if ($client === null) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    if ($client === 0) {
+        if ($serverId > 0) {
+            throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+        }
+
+        return null;
+    }
+    try {
+        $ver = orange_brand_identity_identity_version($controlPdo, $client);
+    } catch (RuntimeException $e) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    $state = (string) ($ver['state'] ?? '');
+    if (!in_array($state, ['ACTIVE', 'PREVIEW_READY', 'DRAFT'], true)) {
+        throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
+    }
+    if ($client === $serverId) {
+        return $client;
+    }
+    if (($state === 'PREVIEW_READY' || $state === 'DRAFT')
+        && orange_brand_identity_preview_release_for_identity($controlPdo, $client) !== null) {
+        return $client;
+    }
+
+    throw new RuntimeException('BRAND_IDENTITY_DISPLAYED_SOURCE_MISMATCH');
 }
 
 function orange_brand_identity_persist_identity_row(PDO $controlPdo, array $row): void
