@@ -167,7 +167,7 @@
             + '<label for="base-text">اللغة الأساسية <span id="base-code"></span></label>'
             + '<input id="base-text" type="text">'
             + '<label for="slug">Slug</label>'
-            + '<input id="slug" type="text" dir="ltr">'
+            + '<input id="slug" type="text" dir="ltr" disabled>'
             + '<label for="sort_order">الترتيب</label>'
             + '<input id="sort_order" type="number" value="0">'
             + '<button type="button" id="translations-button">الترجمات</button>'
@@ -178,6 +178,12 @@
         var baseInput = root.querySelector('#base-text');
         var panel = root.querySelector('#translations-panel');
         var slugInput = root.querySelector('#slug');
+
+        function applyAutoSlug(text) {
+            if (!autoSlug) return;
+            var next = slugify(text);
+            if (next !== '') slugInput.value = next;
+        }
 
         function localesNow() {
             return panelLocales(roles, active);
@@ -253,7 +259,7 @@
                     paintStatuses();
                     invalidateNow();
                     if (code === 'en' && roles.base !== 'en') {
-                        if (autoSlug) slugInput.value = slugify(input.value);
+                        applyAutoSlug(input.value);
                         clearTimeout(timer);
                         timer = setTimeout(function () {
                             sendSuggest(baseInput.value, [], { correctedEnglish: input.value });
@@ -324,7 +330,7 @@
                 };
                 var input = panel.querySelector('.locale-field[data-locale="' + code + '"]');
                 if (input) input.value = item.text || '';
-                if (code === 'en' && autoSlug) slugInput.value = slugify(item.text || '');
+                if (code === 'en') applyAutoSlug(item.text || '');
                 if (code === 'en') englishPivot = item.text || '';
             });
         }
@@ -433,15 +439,12 @@
 
         baseInput.addEventListener('input', function () {
             invalidateNow();
-            if (roles.base === 'en' && autoSlug) slugInput.value = slugify(baseInput.value);
+            if (roles.base === 'en') applyAutoSlug(baseInput.value);
             clearTimeout(timer);
             var snapshot = baseInput.value;
             timer = setTimeout(function () {
                 sendSuggest(snapshot, []);
             }, debounceMs);
-        });
-        slugInput.addEventListener('input', function () {
-            autoSlug = false;
         });
         root.querySelector('#translations-button').addEventListener('click', function () {
             panel.hidden = !panel.hidden;
@@ -477,7 +480,7 @@
                 baseInput.value = record.base_text || '';
                 slugInput.value = record.slug || '';
                 root.querySelector('#sort_order').value = String(record.sort_order || 0);
-                autoSlug = !record.slug;
+                autoSlug = true;
                 drawer = {};
                 known = {};
                 var locales = record.locales || {};

@@ -6,7 +6,6 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/country_provision.php';
-require_once __DIR__ . '/../../includes/admin_password_policy.php';
 require_once __DIR__ . '/../../includes/orange_department_integration.php';
 
 $pdo = orange_admin_page_pdo();
@@ -104,36 +103,10 @@ foreach ($countries as $c) {
             <li><?php echo (int) ($editProvision['accounts_count'] ?? 0) > 0 ? '✓' : '○'; ?> دليل حسابات (<?php echo (int) ($editProvision['accounts_count'] ?? 0); ?>)</li>
             <li><?php echo (int) ($editProvision['gl_settings_count'] ?? 0) > 0 ? '✓' : '○'; ?> إعدادات GL (<?php echo (int) ($editProvision['gl_settings_count'] ?? 0); ?>)</li>
             <li><?php echo !empty($editProvision['has_governorate']) ? '✓' : '○'; ?> محافظة توصيل</li>
-            <li><?php echo (int) ($editProvision['team_users_count'] ?? 0) > 0 ? '✓' : '○'; ?> مستخدمو فريق (<?php echo (int) ($editProvision['team_users_count'] ?? 0); ?>)</li>
         </ul>
     </div>
     <?php endif; ?>
 </div>
-
-<?php if ($editRow): ?>
-<div class="card">
-    <h3>مستخدم فريق الدولة</h3>
-    <p class="page-subtitle" style="margin-top:0;">يُقفل على هذه الدولة فقط — لا يرى مبدّل الدول في الهيدر.</p>
-    <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
-        <div>
-            <label for="ctry_team_user">اسم الدخول</label>
-            <input type="text" id="ctry_team_user" autocomplete="off" dir="ltr">
-        </div>
-        <div>
-            <label for="ctry_team_name">الاسم الظاهر</label>
-            <input type="text" id="ctry_team_name" autocomplete="off">
-        </div>
-        <div id="ctry_team_pass_wrap">
-            <label for="ctry_team_pass">كلمة المرور</label>
-            <input type="password" id="ctry_team_pass" autocomplete="new-password">
-            <p class="card-hint" style="margin:6px 0 0;font-size:13px;line-height:1.55;"><?php echo htmlspecialchars(orange_admin_password_policy_hint_ar(), ENT_QUOTES, 'UTF-8'); ?></p>
-        </div>
-    </div>
-    <div class="admin-form-actions" style="margin-top:12px;">
-        <button type="button" onclick="createCountryTeamUser(<?php echo (int) $editRow['id']; ?>)">إنشاء مستخدم الفريق</button>
-    </div>
-</div>
-<?php endif; ?>
 
 <div class="card">
     <h3>القائمة</h3>
@@ -310,28 +283,6 @@ async function runCountryProvision(countryId) {
     }
 }
 
-async function createCountryTeamUser(countryId) {
-    if (!countryId) return;
-    var username = document.getElementById('ctry_team_user').value.trim();
-    var password = document.getElementById('ctry_team_pass').value;
-    if (window.OrangeAdminPasswordPolicy) {
-        var pwdErr = window.OrangeAdminPasswordPolicy.validate(password, username);
-        if (pwdErr) { alert(pwdErr); return; }
-    }
-    var res = await postJSON('/admin/api/countries/manage.php', {
-        action: 'create_team_user',
-        country_id: countryId,
-        username: username,
-        display_name: document.getElementById('ctry_team_name').value.trim(),
-        password: password
-    });
-    alert(res.message || (res.success ? 'تم' : 'فشل'));
-    if (res.success) {
-        document.getElementById('ctry_team_pass').value = '';
-        window.location.reload();
-    }
-}
-
 async function saveCountry() {
     var tz = document.getElementById('ctry_timezone').value.trim();
     if (!tz) {
@@ -358,18 +309,6 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     scheduleCountryDerive();
 });
 </script>
-<?php if ($editRow): ?>
-<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_password_policy.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
-<script>
-if (window.OrangeAdminPasswordPolicy) {
-    window.OrangeAdminPasswordPolicy.attachToolbar({
-        inputId: 'ctry_team_pass',
-        usernameInputId: 'ctry_team_user',
-        wrapId: 'ctry_team_pass_wrap'
-    });
-}
-</script>
-<?php endif; ?>
 <?php if ($editRow): ?>
 <?php $ctryLocale = orange_department_integration_page_state($pdo, (int) $editRow['id']); ?>
 <div class="card" id="country-locale-roles">
