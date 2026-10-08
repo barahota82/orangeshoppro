@@ -4,6 +4,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/department_countries.php';
 require_once __DIR__ . '/../../../includes/orange_department_integration.php';
+require_once __DIR__ . '/../lib/translate_names_lib.php';
+require_once __DIR__ . '/../../../includes/orange_department_suggest_service.php';
 require_admin_api();
 
 try {
@@ -19,8 +21,9 @@ try {
         json_response(['success' => false, 'message' => 'غير مصرح'], 401);
     }
     $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
-    $result = orange_department_integration_handle($pdo, $admin, 'update', $data, $countryId, 'orange_translate_names_gtr_fetch');
+    $fetch = 'orange_department_suggest_provider_fetch';
+    $result = orange_department_integration_handle($pdo, $admin, 'suggest', $data, $countryId, $fetch);
     json_response($result['body'], (int) $result['status']);
 } catch (Throwable $e) {
-    orange_admin_api_catch($e, 'تعذر تحديث القسم');
+    orange_admin_api_catch($e, 'تعذر طلب الترجمة');
 }

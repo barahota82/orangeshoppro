@@ -636,8 +636,8 @@ function orange_restore_country_staging_scan_sql_file_forbidden(string $sqlPath)
 
 /**
  * Clear CRP tables in delete_order before import (staging-only).
- * admins, admin_permissions, and document_sequences are country-slice deletes.
- * Every other listed table stays a full-table DELETE.
+ * admins, admin_permissions, document_sequences, and orange_country_locale_role
+ * are country-slice deletes. Every other listed table stays a full-table DELETE.
  *
  * @param list<string> $tables
  * @param list<int> $packageAdminIds
@@ -659,6 +659,7 @@ function orange_restore_country_staging_clear_tables(
         'admins' => [],
         'admin_permissions' => [],
         'document_sequences' => [],
+        'orange_country_locale_role' => [],
     ];
     $result = [
         'sequence_floors' => [],
@@ -668,7 +669,7 @@ function orange_restore_country_staging_clear_tables(
         return $result;
     }
 
-    $scopedTables = ['admins', 'admin_permissions', 'document_sequences'];
+    $scopedTables = ['admins', 'admin_permissions', 'document_sequences', 'orange_country_locale_role'];
     $needsCountry = false;
     foreach ($tables as $tableName) {
         if (in_array($tableName, $scopedTables, true)) {
@@ -770,6 +771,13 @@ function orange_restore_country_staging_clear_tables(
         $witnessSequences->execute([$scopeLike]);
         $sliceWitness['document_sequences'] = $witnessSequences->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
+    if (in_array('orange_country_locale_role', $tables, true)) {
+        $witnessRoles = $pdo->prepare(
+            'SELECT * FROM `orange_country_locale_role` WHERE `country_id` <> ? ORDER BY `country_id`, `locale_code`, `role`'
+        );
+        $witnessRoles->execute([$countryId]);
+        $sliceWitness['orange_country_locale_role'] = $witnessRoles->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
     $sliceWitness['permission_admin_ids'] = $deleteAdminIds;
     $sliceWitness['country_id'] = $countryId;
     $result['slice_witness'] = $sliceWitness;
@@ -799,6 +807,11 @@ function orange_restore_country_staging_clear_tables(
                 'DELETE FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\''
             );
             $delete->execute([$scopeLike]);
+            continue;
+        }
+        if ($tableName === 'orange_country_locale_role') {
+            $delete = $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE `country_id` = ?');
+            $delete->execute([$countryId]);
             continue;
         }
         $pdo->exec('DELETE FROM ' . $quoted);

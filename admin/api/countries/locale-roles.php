@@ -18,9 +18,9 @@ try {
     if (!is_array($admin)) {
         json_response(['success' => false, 'message' => 'غير مصرح'], 401);
     }
-    $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
-    $result = orange_department_integration_handle($pdo, $admin, 'update', $data, $countryId, 'orange_translate_names_gtr_fetch');
+    $contextCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    $result = orange_department_integration_save_locale_roles($pdo, $admin, $data, $contextCountryId);
     json_response($result['body'], (int) $result['status']);
 } catch (Throwable $e) {
-    orange_admin_api_catch($e, 'تعذر تحديث القسم');
+    orange_admin_api_catch($e, 'تعذر حفظ أدوار اللغات');
 }

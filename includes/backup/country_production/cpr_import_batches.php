@@ -56,6 +56,7 @@ function orange_cpr_import_batch_tables_map(): array
             'loyalty_ledger',
             'loyalty_settings',
             'opening_stock_voucher',
+            'orange_country_locale_role',
             'orange_edit_lock_registry',
             'orange_gl_setting_alloc',
             'payment_methods',

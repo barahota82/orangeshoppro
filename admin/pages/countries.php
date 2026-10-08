@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/country_provision.php';
 require_once __DIR__ . '/../../includes/admin_password_policy.php';
+require_once __DIR__ . '/../../includes/orange_department_integration.php';
 
 $pdo = orange_admin_page_pdo();
 $countries = orange_countries_admin_list($pdo);
@@ -368,6 +369,47 @@ if (window.OrangeAdminPasswordPolicy) {
     });
 }
 </script>
+<?php endif; ?>
+<?php if ($editRow): ?>
+<?php $ctryLocale = orange_department_integration_page_state($pdo, (int) $editRow['id']); ?>
+<div class="card" id="country-locale-roles">
+    <h3>أدوار لغات المحتوى</h3>
+    <p class="card-hint"><?php echo htmlspecialchars((string) $ctryLocale['notice'], ENT_QUOTES, 'UTF-8'); ?></p>
+    <p class="card-hint">حفظ الاختيار لا يفعّل قائمة لغات الزائر ولا يغيّر لغة واجهة البرنامج، ولا يفعّل لغة خامسة للعملاء.</p>
+    <?php if (empty($ctryLocale['tables_present'])): ?>
+    <p>لا يُعرض نموذج الحفظ لأن الجداول غير موجودة. فتح الصفحة لا ينشئها ولا يفترض أن الدولة عربية.</p>
+    <?php elseif ($ctryLocale['active'] === []): ?>
+    <p>مرجع اللغات لا يضم لغة نشطة يمكن اختيارها. لا يُفترض العربية.</p>
+    <?php else: ?>
+    <div id="locale-role-grid" style="direction:rtl;">
+        <?php foreach ($ctryLocale['active'] as $localeCode): ?>
+        <fieldset style="margin:0 0 12px;padding:8px 12px;">
+            <legend><?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?></legend>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="base" <?php echo ($ctryLocale['base'] ?? '') === $localeCode ? 'checked' : ''; ?>> الأساس</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="content" <?php echo in_array($localeCode, $ctryLocale['content'], true) ? 'checked' : ''; ?>> المحتوى</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="admin_ui" <?php echo in_array($localeCode, $ctryLocale['admin_ui'], true) ? 'checked' : ''; ?>> واجهة الإدارة</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="customer" <?php echo in_array($localeCode, $ctryLocale['customer'], true) ? 'checked' : ''; ?>> العميل</label>
+        </fieldset>
+        <?php endforeach; ?>
+    </div>
+    <button type="button" id="locale-roles-save">حفظ أدوار اللغات</button>
+    <script>
+    document.getElementById('locale-roles-save').addEventListener('click', async function () {
+        var assignments = [];
+        document.querySelectorAll('#locale-role-grid input[type="checkbox"]:checked').forEach(function (box) {
+            assignments.push({ locale: box.getAttribute('data-locale'), role: box.getAttribute('data-role') });
+        });
+        var res = await postJSON('/admin/api/countries/locale-roles.php', {
+            action: 'save_roles',
+            country_id: <?php echo (int) $editRow['id']; ?>,
+            assignments: assignments
+        });
+        alert(res.message || (res.success ? 'تم' : 'فشل'));
+        if (res.success) window.location.reload();
+    });
+    </script>
+    <?php endif; ?>
+</div>
 <?php endif; ?>
 <style>
 .ctry-form-grid {

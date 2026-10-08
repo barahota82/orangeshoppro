@@ -220,6 +220,11 @@ function orange_restore_validation_adapter_country_slice_witness_errors(
             'SELECT * FROM `admin_permissions` WHERE `admin_id` NOT IN (' . $placeholders . ') ORDER BY `admin_id`, `resource_key`'
         );
         $st->execute($permissionAdminIds);
+    } elseif ($tableName === 'orange_country_locale_role') {
+        $st = $pdo->prepare(
+            'SELECT * FROM `orange_country_locale_role` WHERE `country_id` <> ? ORDER BY `country_id`, `locale_code`, `role`'
+        );
+        $st->execute([$countryId]);
     } else {
         return ['Slice witness is not defined for ' . $tableName . '.'];
     }
@@ -293,6 +298,9 @@ function orange_restore_validation_adapter_country_staging_postcheck(
         if (!is_string($tableName) || !is_array($ids) || $ids === []) {
             continue;
         }
+        if ($tableName === 'orange_country_locale_role') {
+            continue;
+        }
         if (!in_array($tableName, $importPlan['tables'] ?? [], true)) {
             continue;
         }
@@ -322,7 +330,7 @@ function orange_restore_validation_adapter_country_staging_postcheck(
             continue;
         }
         $quoted = '`' . str_replace('`', '``', $tableName) . '`';
-        $sliceTables = ['admins', 'admin_permissions', 'document_sequences'];
+        $sliceTables = ['admins', 'admin_permissions', 'document_sequences', 'orange_country_locale_role'];
         try {
             $expectedCount = (int) $expectedCount;
             if (in_array($tableName, $sliceTables, true)) {
@@ -338,6 +346,9 @@ function orange_restore_validation_adapter_country_staging_postcheck(
                     continue;
                 }
                 if ($tableName === 'admins') {
+                    $countSt = $pdo->prepare('SELECT COUNT(*) FROM ' . $quoted . ' WHERE `country_id` = ?');
+                    $countSt->execute([$expectedCountryId]);
+                } elseif ($tableName === 'orange_country_locale_role') {
                     $countSt = $pdo->prepare('SELECT COUNT(*) FROM ' . $quoted . ' WHERE `country_id` = ?');
                     $countSt->execute([$expectedCountryId]);
                 } elseif ($tableName === 'document_sequences') {

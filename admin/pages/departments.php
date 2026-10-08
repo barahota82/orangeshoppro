@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/department_countries.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/orange_department_integration.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -21,6 +22,8 @@ if ($depCountryLabel === '') {
     $depCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
 }
 $depCountryActiveMap = orange_department_countries_active_map($pdo, $depCountryId);
+$depLocalePage = orange_department_integration_page_state($pdo, (int) $depCountryId);
+$depLocaleConfigured = ($depLocalePage['mode'] ?? '') === 'configured';
 
 $hasDepartmentsTable = (bool)$pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
 $departments = [];
@@ -73,7 +76,34 @@ if ($hasDepartmentsTable) {
 </div>
 <?php endif; ?>
 
-<?php if ($depCanManageGlobal): ?>
+<?php if ($depCanManageGlobal && !$depLocaleConfigured): ?>
+<div class="card" style="border:1px solid #e2e8f0;background:#f8fafc;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><?php echo htmlspecialchars((string) $depLocalePage['notice'], ENT_QUOTES, 'UTF-8'); ?></p>
+</div>
+<?php endif; ?>
+
+<?php if ($depCanManageGlobal && $depLocaleConfigured): ?>
+<div class="card">
+    <h3>إضافة / تعديل قسم</h3>
+    <p class="card-hint">الحقل الظاهر هو اللغة الأساسية فقط. بقية لغات المحتوى والإنجليزية المرجعية داخل «الترجمات». أعمدة الجدول تبقى أعمدة التخزين القديمة ولا يتغير معناها مع اسم الخانة.</p>
+    <div id="dept-locale-app"></div>
+</div>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/js/content_locale_panel.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.DEPT_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => [
+        'mode' => 'configured',
+        'base' => $depLocalePage['base'],
+        'content' => $depLocalePage['content'],
+        'admin_ui' => $depLocalePage['admin_ui'],
+        'customer' => $depLocalePage['customer'],
+    ],
+    'active' => $depLocalePage['active'],
+    'country_id' => (int) $depCountryId,
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+</script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/js/department_locale_bind.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<?php elseif ($depCanManageGlobal): ?>
 <div class="card">
     <h3>إضافة / تعديل قسم</h3>
     <input type="hidden" id="dept_record_id" value="0">
@@ -167,7 +197,8 @@ if ($hasDepartmentsTable) {
                                 <button type="button" class="btn-secondary dep-btn-reorder" onclick="moveDepartmentRow(this,'down')" aria-label="أسفل">↓</button>
                             </div>
                             <div class="dep-ops-main">
-                                <button type="button" class="btn-secondary dep-edit-btn" data-dep-json="<?php echo htmlspecialchars(json_encode([
+                                <button type="button" class="btn-secondary dep-edit-btn" data-dep-json="<?php
+                                $depEditPayload = [
                                     'id' => $depId,
                                     'name_ar' => (string)$dep['name_ar'],
                                     'name_en' => (string)$dep['name_en'],
@@ -175,7 +206,19 @@ if ($hasDepartmentsTable) {
                                     'name_hi' => (string)$dep['name_hi_safe'],
                                     'slug' => (string)$dep['slug'],
                                     'sort_order' => (int)$dep['sort_order'],
-                                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
+                                ];
+                                if ($depLocaleConfigured) {
+                                    $depLocaleView = orange_department_locale_read($pdo, (int) $depCountryId, $depId);
+                                    $depEditPayload['locale_view'] = [
+                                        'id' => $depId,
+                                        'base_text' => orange_department_base_text_from_read($depLocaleView),
+                                        'slug' => (string) $dep['slug'],
+                                        'sort_order' => (int) $dep['sort_order'],
+                                        'locales' => $depLocaleView['locales'],
+                                    ];
+                                }
+                                echo htmlspecialchars(json_encode($depEditPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS), ENT_QUOTES, 'UTF-8');
+                                ?>">تعديل</button>
                                 <?php if ($depCountryId > 0): ?>
                                 <button type="button" class="dep-btn-toggle-country" onclick="toggleDepartmentCountry(<?php echo $depId; ?>, <?php echo $depCountryActive ? 1 : 0; ?>)">
                                     <?php echo $depCountryActive ? 'إخفاء هنا' : 'تفعيل هنا'; ?>
@@ -398,6 +441,7 @@ async function saveDepartmentsOrder() {
     if (res.success) location.reload();
 }
 
+if (document.getElementById('name_ar') && document.getElementById('slug')) {
 document.getElementById('slug').addEventListener('input', () => { autoSlugTouched = true; });
 document.getElementById('name_en').addEventListener('input', onDepartmentNameEnInput);
 document.getElementById('name_ar').addEventListener('input', scheduleAutoTranslate);
@@ -406,6 +450,7 @@ document.getElementById('name_ar').addEventListener('change', () => {
     if (!ar) return;
     translateDepartment({ silent: true, forceFromArabic: true });
 });
+}
 
 const translateBtnDep = document.querySelector('.dep-form-actions button.btn-secondary');
 if (translateBtnDep) {
@@ -613,7 +658,13 @@ if (translateBtnDep) {
         const btn = orangeAdminClosest(ev, '.dep-edit-btn');
         if (!btn || !btn.dataset.depJson) return;
         try {
-            editDepartment(JSON.parse(btn.dataset.depJson));
+            const parsed = JSON.parse(btn.dataset.depJson);
+            if (window.OrangeDeptLocaleUi && parsed.locale_view) {
+                window.OrangeDeptLocaleUi.openRecord(parsed.locale_view);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                editDepartment(parsed);
+            }
         } catch (err) {
             alert('تعذر قراءة بيانات القسم للتعديل');
         }

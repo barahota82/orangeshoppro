@@ -1,14 +1,14 @@
 {
     "registry_version": "1.0",
     "schema_revision": 124,
-    "generated_at": "2026-09-29T10:30:29+00:00",
+    "generated_at": "2026-10-08T01:15:24+00:00",
     "generated_by": "scripts/backup/build_table_registry.php",
     "do_not_edit": "Generated only — regenerate with build_table_registry.php",
-    "table_count": 125,
+    "table_count": 127,
     "ownership_summary": {
         "global": 40,
-        "country_owned": 52,
-        "dependent": 28,
+        "country_owned": 53,
+        "dependent": 29,
         "excluded_ephemeral": 5
     },
     "tables": {
@@ -916,6 +916,37 @@
             },
             "parent_dependency": null,
             "uploads_linked": true,
+            "integrity_critical": false
+        },
+        "orange_content_locale_text": {
+            "ownership_type": "dependent",
+            "export_order": 43,
+            "delete_order": 43,
+            "restore_order": 43,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Department name rows only (entity_kind=department joined to departments). Other entity kinds are outside this rule. No country column. Not a country-package table.",
+                "sql": "SELECT t.id FROM orange_content_locale_text t INNER JOIN departments d ON d.id = t.entity_id WHERE t.entity_kind = 'department'"
+            },
+            "parent_dependency": {
+                "table": "departments",
+                "foreign_key": "entity_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_country_locale_role": {
+            "ownership_type": "country_owned",
+            "export_order": 87,
+            "delete_order": 487,
+            "restore_order": 87,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
             "integrity_critical": false
         },
         "orange_country_screen_copy_log": {

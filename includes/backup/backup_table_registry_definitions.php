@@ -73,6 +73,21 @@ function orange_backup_registry_table_definitions(): array
         'catalog_attribute_options' => $g(25),
         'product_types' => $g(26),
         'departments' => $g(30),
+        // Department name rows follow the global department parent.
+        // entity_kind is required; entity_id alone is not a country key.
+        // This table stays out of the country replace plan.
+        'orange_content_locale_text' => orange_backup_registry_row(
+            'dependent',
+            43,
+            [
+                'type' => 'custom_sql',
+                'description' => 'Department name rows only (entity_kind=department joined to departments). Other entity kinds are outside this rule. No country column. Not a country-package table.',
+                'sql' => "SELECT t.id FROM orange_content_locale_text t INNER JOIN departments d ON d.id = t.entity_id WHERE t.entity_kind = 'department'",
+            ],
+            ['table' => 'departments', 'foreign_key' => 'entity_id', 'nullable' => false],
+            false,
+            false
+        ),
         'catalog_sections' => $g(31),
         'catalog_categories' => $g(32),
         'catalog_subcategories' => $g(33),
@@ -131,6 +146,7 @@ function orange_backup_registry_table_definitions(): array
         'delivery_areas' => $c(62),
         'delivery_agents' => $c(63),
         'department_countries' => $c(64),
+        'orange_country_locale_role' => $c(87),
         'analytical_dimension' => $c(65),
         'loyalty_settings' => $c(66),
         'payment_methods' => $c(67),
@@ -284,4 +300,20 @@ function orange_backup_registry_table_definitions(): array
     ksort($tables, SORT_STRING);
 
     return $tables;
+}
+
+/**
+ * Department locale rows travel with departments. Other entity kinds stay out.
+ *
+ * @param array<string, mixed> $row
+ * @param list<int> $departmentIds
+ */
+function orange_backup_content_locale_text_in_department_scope(array $row, array $departmentIds): bool
+{
+    if ((string) ($row['entity_kind'] ?? '') !== 'department') {
+        return false;
+    }
+    $entityId = (int) ($row['entity_id'] ?? 0);
+
+    return $entityId > 0 && in_array($entityId, $departmentIds, true);
 }

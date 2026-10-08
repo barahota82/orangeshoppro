@@ -9,7 +9,7 @@
                          "journal_entries",
                          "orange_country_screen_copy_log"
                      ],
-    "mutate_table_count":  81,
+    "mutate_table_count":  82,
     "tables":  {
                    "accounts":  {
                                     "classification":  "Country Scoped",
@@ -362,6 +362,15 @@
                                                       "special_handler":  null,
                                                       "exportable":  true
                                                   },
+                   "orange_country_locale_role":  {
+                                                    "classification":  "Country Scoped",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  1,
+                                                    "delete_batch":  6,
+                                                    "ownership_resolver":  "direct_country_id",
+                                                    "special_handler":  null,
+                                                    "exportable":  true
+                                                },
                    "orange_company_documents":  {
                                                     "classification":  "Country Scoped",
                                                     "restore_mode":  "replace",
