@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/storefront_promo_messages.php';
+require_once __DIR__ . '/../../includes/orange_content_locale_field.php';
 require_once __DIR__ . '/../../includes/cart_promotion_country.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
@@ -39,6 +40,26 @@ $spmCountryLabelJs = [];
 foreach ($spmCountries as $c) {
     $spmCountryLabelJs[(string) $c['id']] = $c['label'];
 }
+$spmCtxCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$spmLocaleReady = false;
+$spmLocaleRoles = ['mode' => 'legacy_unconfigured', 'base' => null, 'content' => [], 'admin_ui' => [], 'customer' => []];
+$spmLocaleActive = [];
+if ($hasTable && $spmCtxCountryId > 0) {
+    try {
+        $spmLocaleReady = orange_content_locale_screen_ready($pdo, $spmCtxCountryId);
+        if ($spmLocaleReady) {
+            $spmLocaleRoles = orange_country_locale_roles_read($pdo, $spmCtxCountryId);
+            $spmLocaleActive = orange_language_reference_active_codes($pdo);
+        }
+    } catch (Throwable $e) {
+        $spmLocaleReady = false;
+    }
+}
+$spmLocaleBoot = [
+    'ready' => $spmLocaleReady,
+    'roles' => $spmLocaleRoles,
+    'active' => $spmLocaleActive,
+];
 ?>
 <div class="page-title">
     <h1>الرسائل التحفيزية للواجهة</h1>
@@ -93,6 +114,9 @@ foreach ($spmCountries as $c) {
             <p class="card-hint" style="margin:4px 0 0;">رقم العرض من شاشة عروض المنتج/الكومبو/BOGO المعنية.</p>
         </div>
     </div>
+    <?php if ($spmLocaleReady): ?>
+    <div id="spm-locale-app" style="margin-top:1rem;"></div>
+    <?php else: ?>
     <div class="form-grid" style="margin-top:1rem;">
         <div>
             <label for="spm_text_ar">النص (عربي)</label>
@@ -114,6 +138,7 @@ foreach ($spmCountries as $c) {
     <div style="margin-top:8px;">
         <button type="button" class="btn-secondary" onclick="spmTranslateFromAr()">ترجمة تلقائية من العربي</button>
     </div>
+    <?php endif; ?>
     <?php $ocpFieldPrefix = 'spm'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
     <div class="admin-form-actions">
         <button type="button" onclick="saveSpm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
@@ -141,8 +166,14 @@ foreach ($spmCountries as $c) {
     </div>
 </div>
 
+<?php if ($spmLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_text_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<?php endif; ?>
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
+var SPM_LOCALE = <?php echo json_encode($spmLocaleBoot, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var spmLocaleApi = null;
 var SPM_SLOTS = <?php echo json_encode($spmSlots, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_OFFER_TYPES = <?php echo json_encode($spmOfferTypes, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_AUDIENCES = <?php echo json_encode($spmAudiences, JSON_UNESCAPED_UNICODE); ?>;
@@ -222,12 +253,23 @@ async function spmTranslateFromAr() {
 }
 window.spmTranslateFromAr = spmTranslateFromAr;
 
+function spmOpenLocale(record) {
+    if (spmLocaleApi) spmLocaleApi.openRecord(record);
+}
 function resetSpmForm() {
     document.getElementById('spm_id').value = '0';
-    document.getElementById('spm_text_ar').value = '';
-    document.getElementById('spm_text_en').value = '';
-    document.getElementById('spm_text_fil').value = '';
-    document.getElementById('spm_text_hi').value = '';
+    if (SPM_LOCALE && SPM_LOCALE.ready) {
+        spmOpenLocale({ id: 0, base_text: '', locales: {} });
+    } else {
+        var ar0 = document.getElementById('spm_text_ar');
+        var en0 = document.getElementById('spm_text_en');
+        var fil0 = document.getElementById('spm_text_fil');
+        var hi0 = document.getElementById('spm_text_hi');
+        if (ar0) ar0.value = '';
+        if (en0) en0.value = '';
+        if (fil0) fil0.value = '';
+        if (hi0) hi0.value = '';
+    }
     document.getElementById('spm_active').checked = true;
     document.getElementById('spm_sort').value = String(spmComputeNextSort());
     var slotEl = document.getElementById('spm_slot');
@@ -247,10 +289,22 @@ function resetSpmForm() {
 
 function editSpm(row) {
     document.getElementById('spm_id').value = String(row.id != null ? row.id : 0);
-    document.getElementById('spm_text_ar').value = row.text_ar != null ? String(row.text_ar) : '';
-    document.getElementById('spm_text_en').value = row.text_en != null ? String(row.text_en) : '';
-    document.getElementById('spm_text_fil').value = row.text_fil != null ? String(row.text_fil) : '';
-    document.getElementById('spm_text_hi').value = row.text_hi != null ? String(row.text_hi) : '';
+    if (SPM_LOCALE && SPM_LOCALE.ready) {
+        spmOpenLocale({
+            id: row.id || 0,
+            base_text: row.base_text != null ? String(row.base_text) : '',
+            locales: row.locales || {}
+        });
+    } else {
+        var ar1 = document.getElementById('spm_text_ar');
+        var en1 = document.getElementById('spm_text_en');
+        var fil1 = document.getElementById('spm_text_fil');
+        var hi1 = document.getElementById('spm_text_hi');
+        if (ar1) ar1.value = row.text_ar != null ? String(row.text_ar) : '';
+        if (en1) en1.value = row.text_en != null ? String(row.text_en) : '';
+        if (fil1) fil1.value = row.text_fil != null ? String(row.text_fil) : '';
+        if (hi1) hi1.value = row.text_hi != null ? String(row.text_hi) : '';
+    }
     document.getElementById('spm_active').checked = parseInt(row.is_active, 10) === 1;
     document.getElementById('spm_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     var slotEl = document.getElementById('spm_slot');
@@ -299,7 +353,7 @@ async function loadSpm() {
         tr.innerHTML =
             '<td>' + escSpm(r.id) + '</td>' +
             '<td>' + escSpm(slotLabel) + '</td>' +
-            '<td>' + escSpm(r.text_ar) + '</td>' +
+            '<td>' + escSpm(r.base_text != null ? r.base_text : r.text_ar) + '</td>' +
             '<td dir="ltr">' + escSpm(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escSpm(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escSpm(r.sort_order) + '</td>' +
@@ -339,17 +393,24 @@ async function saveSpm() {
         offer_type: (document.getElementById('spm_offer_type') || {}).value || '',
         offer_id: parseInt((document.getElementById('spm_offer_id') || {}).value, 10) || 0,
         audience: (document.getElementById('spm_audience') || {}).value || 'all',
-        country_id: cEl ? (parseInt(cEl.value, 10) || 0) : 0,
-        text_ar: document.getElementById('spm_text_ar').value.trim(),
-        text_en: document.getElementById('spm_text_en').value.trim(),
-        text_fil: document.getElementById('spm_text_fil').value.trim(),
-        text_hi: document.getElementById('spm_text_hi').value.trim(),
         is_active: document.getElementById('spm_active').checked ? 1 : 0,
-        is_always_on: ocpIsAlwaysOn('spm') ? 1 : 0,
-        sort_order: parseInt(document.getElementById('spm_sort').value, 10) || 0,
-        valid_from: ocpGetIso('spm_valid_from'),
-        valid_to: ocpGetIso('spm_valid_to')
     };
+    if (cEl) payload.country_id = parseInt(cEl.value, 10) || 0;
+    if (SPM_LOCALE && SPM_LOCALE.ready && spmLocaleApi) {
+        var text = spmLocaleApi.getPayload();
+        payload.base_text = text.base_text || '';
+        payload.locales = text.locales || {};
+        delete payload.country_id;
+    } else {
+        payload.text_ar = (document.getElementById('spm_text_ar') || { value: '' }).value.trim();
+        payload.text_en = (document.getElementById('spm_text_en') || { value: '' }).value.trim();
+        payload.text_fil = (document.getElementById('spm_text_fil') || { value: '' }).value.trim();
+        payload.text_hi = (document.getElementById('spm_text_hi') || { value: '' }).value.trim();
+    }
+    payload.is_always_on = ocpIsAlwaysOn('spm') ? 1 : 0;
+    payload.sort_order = parseInt(document.getElementById('spm_sort').value, 10) || 0;
+    payload.valid_from = ocpGetIso('spm_valid_from');
+    payload.valid_to = ocpGetIso('spm_valid_to');
     var res = await postJSON('/admin/api/storefront_promo_messages/manage.php', payload);
     alert((res && res.message) || (res && res.success ? 'تم الحفظ' : 'فشل'));
     if (res && res.success) {
@@ -368,6 +429,13 @@ async function saveSpm() {
     spmSyncOfferWrap();
     ocpBindAlwaysOn('spm');
     ocpDefaultScheduleDates('spm');
+    if (SPM_LOCALE && SPM_LOCALE.ready && window.OrangeContentLocaleTextBind) {
+        spmLocaleApi = OrangeContentLocaleTextBind.mount(document.getElementById('spm-locale-app'), {
+            roles: SPM_LOCALE.roles,
+            active: SPM_LOCALE.active,
+            record: { id: 0, base_text: '', locales: {} }
+        });
+    }
     loadSpm();
 })();
 </script>

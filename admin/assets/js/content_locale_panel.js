@@ -162,25 +162,38 @@
         var failures = {};
         var englishPivot = '';
         var rowPivot = {};
-        root.innerHTML = ''
+        var showSlug = options.showSlug !== false;
+        var showSort = options.showSort !== false;
+        var showSave = options.showSave !== false;
+        var saveLabel = options.saveLabel || 'حفظ القسم';
+        var html = ''
             + '<span id="translation-transport-note" hidden>تعذر طلب الترجمة</span>'
             + '<label for="base-text">اللغة الأساسية <span id="base-code"></span></label>'
-            + '<input id="base-text" type="text">'
-            + '<label for="slug">Slug</label>'
-            + '<input id="slug" type="text" dir="ltr" disabled>'
-            + '<label for="sort_order">الترتيب</label>'
-            + '<input id="sort_order" type="number" value="0">'
-            + '<button type="button" id="translations-button">الترجمات</button>'
+            + '<input id="base-text" type="text">';
+        if (showSlug) {
+            html += '<label for="slug">Slug</label>'
+                + '<input id="slug" type="text" dir="ltr" disabled>';
+        }
+        if (showSort) {
+            html += '<label for="sort_order">الترتيب</label>'
+                + '<input id="sort_order" type="number" value="0">';
+        }
+        html += '<button type="button" id="translations-button">الترجمات</button>'
             + '<span id="translation-failure-flag" hidden>تعذر بعضها</span>'
-            + '<button type="button" id="translate-button">ترجمة</button>'
-            + '<button type="button" id="save-button">حفظ القسم</button>'
-            + '<div id="translations-panel" hidden></div>';
+            + '<button type="button" id="translate-button">ترجمة</button>';
+        if (showSave) {
+            html += '<button type="button" id="save-button">' + saveLabel + '</button>';
+        }
+        html += '<div id="translations-panel" hidden></div>';
+        root.innerHTML = html;
         var baseInput = root.querySelector('#base-text');
         var panel = root.querySelector('#translations-panel');
-        var slugInput = root.querySelector('#slug');
+        var slugInput = showSlug ? root.querySelector('#slug') : null;
+        var sortInput = showSort ? root.querySelector('#sort_order') : null;
+        var saveButton = showSave ? root.querySelector('#save-button') : null;
 
         function applyAutoSlug(text) {
-            if (!autoSlug) return;
+            if (!autoSlug || !slugInput) return;
             var next = slugify(text);
             if (next !== '') slugInput.value = next;
         }
@@ -454,13 +467,15 @@
             clearTimeout(timer);
             sendSuggest(baseInput.value, []);
         });
-        root.querySelector('#save-button').addEventListener('click', function () {
-            var payload = payloadFromDrawer(baseInput.value, drawer);
-            payload.record_id = recordId;
-            payload.slug = slugInput.value;
-            payload.sort_order = parseInt(root.querySelector('#sort_order').value || '0', 10) || 0;
-            if (options.onSave) options.onSave(payload);
-        });
+        if (saveButton) {
+            saveButton.addEventListener('click', function () {
+                var payload = payloadFromDrawer(baseInput.value, drawer);
+                payload.record_id = recordId;
+                if (slugInput) payload.slug = slugInput.value;
+                if (sortInput) payload.sort_order = parseInt(sortInput.value || '0', 10) || 0;
+                if (options.onSave) options.onSave(payload);
+            });
+        }
 
         return {
             guard: guard,
@@ -478,8 +493,8 @@
                 rowPivot = {};
                 recordId = record.id || 0;
                 baseInput.value = record.base_text || '';
-                slugInput.value = record.slug || '';
-                root.querySelector('#sort_order').value = String(record.sort_order || 0);
+                if (slugInput) slugInput.value = record.slug || '';
+                if (sortInput) sortInput.value = String(record.sort_order || 0);
                 autoSlug = true;
                 drawer = {};
                 known = {};

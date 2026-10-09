@@ -9,6 +9,7 @@ require_once __DIR__ . '/backup_table_registry_lib.php';
 require_once __DIR__ . '/backup_validate.php';
 require_once __DIR__ . '/uploads_collector.php';
 require_once __DIR__ . '/country_boundary_matrix_lib.php';
+require_once __DIR__ . '/content_locale_country_text.php';
 
 const ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION = '2.0';
 const ORANGE_COUNTRY_EXPORT_PACKAGE_TYPE = 'country_recovery';
@@ -196,6 +197,7 @@ function orange_country_export_run(PDO $pdo, array $options): array
             'country_id' => $countryId,
             'generated_at' => gmdate('c'),
             'tables' => $idSnapshot,
+            'content_locale_country_text' => orange_content_locale_country_text_export_rows($pdo, $countryId, $idSnapshot),
         ]);
 
         $health = orange_country_export_build_health([

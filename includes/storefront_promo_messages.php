@@ -12,6 +12,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/orange_content_locale_field.php';
 
 /**
  * الخانات المُسمّاة المدعومة (المفتاح => تسمية عربية للأدمن).
@@ -93,21 +94,14 @@ function orange_storefront_promo_message_slot_valid(string $slot): bool
  *
  * @param array<string,mixed> $row
  */
-function orange_storefront_promo_message_pick_text(array $row, string $lang): string
+function orange_storefront_promo_message_pick_text(array $row, string $lang, ?array $localeRows = null): string
 {
-    $map = [
-        'en' => 'text_en',
-        'fil' => 'text_fil',
-        'hi' => 'text_hi',
-    ];
-    if (isset($map[$lang])) {
-        $v = trim((string) ($row[$map[$lang]] ?? ''));
-        if ($v !== '') {
-            return $v;
-        }
-    }
-
-    return trim((string) ($row['text_ar'] ?? ''));
+    return orange_content_locale_pick($lang, $localeRows, [
+        'ar' => (string) ($row['text_ar'] ?? ''),
+        'en' => (string) ($row['text_en'] ?? ''),
+        'fil' => (string) ($row['text_fil'] ?? ''),
+        'hi' => (string) ($row['text_hi'] ?? ''),
+    ], true);
 }
 
 /**
@@ -131,7 +125,7 @@ function orange_storefront_promo_message_for_slot(
     }
     $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
-        'SELECT text_ar, text_en, text_fil, text_hi
+        'SELECT id, text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
          WHERE slot = ?
            AND is_active = 1
@@ -148,8 +142,9 @@ function orange_storefront_promo_message_for_slot(
     if (!$row) {
         return '';
     }
+    $localeMap = orange_content_locale_rows_for_entities($pdo, 'promo_message', [(int) ($row['id'] ?? 0)]);
 
-    return orange_storefront_promo_message_pick_text($row, $lang);
+    return orange_storefront_promo_message_pick_text($row, $lang, $localeMap[(int) ($row['id'] ?? 0)] ?? null);
 }
 
 /**
@@ -183,7 +178,7 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
     $params[] = $cid;
     $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
-        'SELECT slot, text_ar, text_en, text_fil, text_hi
+        'SELECT id, slot, text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
          WHERE slot IN (' . $placeholders . ')
            AND is_active = 1
@@ -195,13 +190,20 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($params);
-    $out = [];
+    $fetched = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        if (is_array($row)) {
+            $fetched[] = $row;
+        }
+    }
+    $localeMap = orange_content_locale_rows_for_entities($pdo, 'promo_message', array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $fetched));
+    $out = [];
+    foreach ($fetched as $row) {
         $slot = (string) ($row['slot'] ?? '');
         if ($slot === '' || isset($out[$slot])) {
             continue; // أول رسالة لكل خانة فقط
         }
-        $out[$slot] = orange_storefront_promo_message_pick_text($row, $lang);
+        $out[$slot] = orange_storefront_promo_message_pick_text($row, $lang, $localeMap[(int) ($row['id'] ?? 0)] ?? null);
     }
 
     return $out;
@@ -235,7 +237,7 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
     }
     $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
-        'SELECT offer_type, offer_id, text_ar, text_en, text_fil, text_hi
+        'SELECT id, offer_type, offer_id, text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
          WHERE slot = ?
            AND offer_type IS NOT NULL
@@ -249,8 +251,15 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute(['offer_card', $cid]);
-    $out = [];
+    $fetched = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        if (is_array($row)) {
+            $fetched[] = $row;
+        }
+    }
+    $localeMap = orange_content_locale_rows_for_entities($pdo, 'promo_message', array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $fetched));
+    $out = [];
+    foreach ($fetched as $row) {
         $type = (string) ($row['offer_type'] ?? '');
         $oid = (int) ($row['offer_id'] ?? 0);
         if ($type === '' || $oid <= 0) {
@@ -260,7 +269,7 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
         if (isset($out[$key])) {
             continue; // أول رسالة لكل عرض فقط
         }
-        $txt = orange_storefront_promo_message_pick_text($row, $lang);
+        $txt = orange_storefront_promo_message_pick_text($row, $lang, $localeMap[(int) ($row['id'] ?? 0)] ?? null);
         if ($txt !== '') {
             $out[$key] = $txt;
         }
@@ -380,6 +389,23 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
             $item = orange_cart_promo_admin_localize_schedule_row($pdo, $item, $rowCid);
         }
         $out[] = $item;
+    }
+    if ($out !== [] && orange_content_locale_screen_ready($pdo, $cid)) {
+        $localeMap = orange_content_locale_rows_for_entities($pdo, 'promo_message', array_map(static fn (array $item): int => (int) $item['id'], $out));
+        $roles = orange_country_locale_roles_read($pdo, $cid);
+        $base = (string) ($roles['base'] ?? '');
+        foreach ($out as $index => $item) {
+            $stored = $localeMap[(int) $item['id']] ?? [];
+            $effective = orange_content_locale_field_effective($item, $stored);
+            $baseText = '';
+            if ($base !== '' && isset($effective[$base]) && empty($effective[$base]['virtual'])) {
+                $baseText = (string) ($effective[$base]['text_value'] ?? '');
+            } elseif ($base !== '' && isset(ORANGE_CONTENT_TEXT_COLUMNS[$base])) {
+                $baseText = (string) ($item[ORANGE_CONTENT_TEXT_COLUMNS[$base]] ?? '');
+            }
+            $out[$index]['base_text'] = $baseText;
+            $out[$index]['locales'] = $effective;
+        }
     }
 
     return $out;
