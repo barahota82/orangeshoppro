@@ -229,6 +229,10 @@ function orange_content_locale_field_save(
     array $locales,
     bool $ownTransaction = true
 ): void {
+    $baseText = trim($baseText);
+    if ($baseText === '') {
+        throw new InvalidArgumentException('base_text_required');
+    }
     $roles = orange_country_locale_roles_read($pdo, $countryId);
     if (($roles['mode'] ?? '') !== 'configured') {
         throw new RuntimeException('locale_settings_' . (string) ($roles['mode'] ?? 'missing'));

@@ -193,12 +193,15 @@ function orange_country_export_run(PDO $pdo, array $options): array
 
         orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', $dependencyGraph);
         orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'table_inventory.json', $tableInventory);
-        orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', [
+        $idSnapshotPayload = [
             'country_id' => $countryId,
             'generated_at' => gmdate('c'),
             'tables' => $idSnapshot,
-            'content_locale_country_text' => orange_content_locale_country_text_export_rows($pdo, $countryId, $idSnapshot),
-        ]);
+        ];
+        if (orange_content_locale_country_text_table_ready($pdo)) {
+            $idSnapshotPayload['content_locale_country_text'] = orange_content_locale_country_text_export_rows($pdo, $countryId, $idSnapshot);
+        }
+        orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', $idSnapshotPayload);
 
         $health = orange_country_export_build_health([
             'country_id' => $countryId,

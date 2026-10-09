@@ -165,11 +165,14 @@ function orange_restore_country_staging_run(array $options): array
         require_once dirname(__DIR__) . '/content_locale_country_text.php';
         $localePlan = null;
         if (orange_content_locale_country_restore_decision($idSnapshotRaw) === 'restore') {
-            $localePlan = orange_content_locale_country_text_plan(
-                $pdo,
-                $countryId,
-                $idSnapshotRaw['content_locale_country_text']
-            );
+            $snapshotLocaleRows = $idSnapshotRaw['content_locale_country_text'];
+            if ($snapshotLocaleRows !== [] || orange_content_locale_country_text_table_ready($pdo)) {
+                $localePlan = orange_content_locale_country_text_plan(
+                    $pdo,
+                    $countryId,
+                    $snapshotLocaleRows
+                );
+            }
         }
         $clearMeta = orange_restore_country_staging_clear_tables(
             $pdo,

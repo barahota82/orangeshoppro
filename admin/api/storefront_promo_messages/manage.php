@@ -56,6 +56,46 @@ function spm_iso_or_null(?string $v, bool $endOfDay = false, ?PDO $pdo = null, i
     return $endOfDay ? $range['valid_to'] : $range['valid_from'];
 }
 
+function spm_offer_belongs_to_country(PDO $pdo, string $offerType, int $offerId, int $countryId): bool
+{
+    if ($offerId <= 0 || $countryId <= 0) {
+        return false;
+    }
+    if ($offerType === 'product') {
+        if (!orange_table_exists($pdo, 'offers') || !orange_table_exists($pdo, 'products')) {
+            return true;
+        }
+        $countrySql = orange_table_has_column($pdo, 'products', 'country_id')
+            ? ' AND p.country_id = ?'
+            : '';
+        $st = $pdo->prepare('SELECT o.id FROM offers o INNER JOIN products p ON p.id = o.product_id WHERE o.id = ?' . $countrySql . ' LIMIT 1');
+        $params = [$offerId];
+        if ($countrySql !== '') {
+            $params[] = $countryId;
+        }
+        $st->execute($params);
+
+        return (bool) $st->fetchColumn();
+    }
+    $table = $offerType === 'combo'
+        ? 'cart_combo_promotions'
+        : ($offerType === 'bogo' ? 'cart_bogo_promotions' : '');
+    if ($table === '' || !orange_table_exists($pdo, $table)) {
+        return true;
+    }
+    $countrySql = orange_table_has_column($pdo, $table, 'country_id')
+        ? ' AND country_id = ?'
+        : '';
+    $st = $pdo->prepare('SELECT id FROM ' . $table . ' WHERE id = ?' . $countrySql . ' LIMIT 1');
+    $params = [$offerId];
+    if ($countrySql !== '') {
+        $params[] = $countryId;
+    }
+    $st->execute($params);
+
+    return (bool) $st->fetchColumn();
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -150,12 +190,8 @@ try {
                 'bogo' => 'cart_bogo_promotions',
             ];
             $offerTable = $offerTableMap[$offerTypeRaw];
-            if (orange_table_exists($pdo, $offerTable)) {
-                $chkOffer = $pdo->prepare('SELECT id FROM ' . $offerTable . ' WHERE id = ? LIMIT 1');
-                $chkOffer->execute([$offerIdRaw]);
-                if (!$chkOffer->fetchColumn()) {
-                    json_response(['success' => false, 'message' => 'رقم العرض غير موجود للنوع المحدّد'], 422);
-                }
+            if (orange_table_exists($pdo, $offerTable) && !spm_offer_belongs_to_country($pdo, $offerTypeRaw, $offerIdRaw, $ctxCid)) {
+                json_response(['success' => false, 'message' => 'رقم العرض غير موجود في دولة السياق'], 422);
             }
             $offerType = $offerTypeRaw;
             $offerId = $offerIdRaw;
