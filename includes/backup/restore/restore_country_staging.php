@@ -162,6 +162,15 @@ function orange_restore_country_staging_run(array $options): array
                 $packageAdminIds[] = (int) $snapshotAdminId;
             }
         }
+        require_once dirname(__DIR__) . '/content_locale_country_text.php';
+        $localePlan = null;
+        if (orange_content_locale_country_restore_decision($idSnapshotRaw) === 'restore') {
+            $localePlan = orange_content_locale_country_text_plan(
+                $pdo,
+                $countryId,
+                $idSnapshotRaw['content_locale_country_text']
+            );
+        }
         $clearMeta = orange_restore_country_staging_clear_tables(
             $pdo,
             $stagingDb,
@@ -178,6 +187,9 @@ function orange_restore_country_staging_run(array $options): array
         );
         if (!$sqlResult['ok']) {
             throw new RuntimeException((string) ($sqlResult['error'] ?? 'Country SQL import failed'));
+        }
+        if (is_array($localePlan)) {
+            orange_content_locale_country_text_commit($pdo, $localePlan);
         }
         orange_restore_country_staging_apply_sequence_floors(
             $pdo,

@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/storefront_promo_messages.php';
+require_once __DIR__ . '/../../../includes/orange_content_locale_field.php';
+require_once __DIR__ . '/../../../includes/storefront_promo_locale_save.php';
 require_admin_api();
 
 /**
@@ -66,6 +68,7 @@ try {
     if (!is_array($data) || count($data) === 0) {
         $data = $_POST;
     }
+    unset($data['country_id'], $data['full_access'], $data['actor']);
     $action = trim((string) ($data['action'] ?? 'list'));
     // Current Country Context فقط — بلا fallback لدولة افتراضية/ثابتة (NULL ≠ Global).
     $ctxCid = (int) orange_admin_context_country_id($pdo);
@@ -101,8 +104,9 @@ try {
         if (!orange_storefront_promo_message_slot_valid($slot)) {
             json_response(['success' => false, 'message' => 'خانة العرض غير صالحة'], 422);
         }
+        $localeSave = orange_content_locale_screen_ready($pdo, $ctxCid) && array_key_exists('base_text', $data);
         $textAr = spm_clip((string) ($data['text_ar'] ?? ''));
-        if ($textAr === '') {
+        if (!$localeSave && $textAr === '') {
             json_response(['success' => false, 'message' => 'نص الرسالة بالعربي مطلوب'], 422);
         }
         $textEn = spm_clip((string) ($data['text_en'] ?? ''));
@@ -168,6 +172,24 @@ try {
 
         // إنشاء: دولة السياق. تعديل: دولة السجل إن وُجدت؛ صف NULL قديم يُنسَب للسياق.
         $countryToStore = $ctxCid;
+        if ($localeSave) {
+            try {
+                $id = orange_storefront_promo_locale_save($pdo, $ctxCid, $id, [
+                    'slot' => $slot,
+                    'audience' => $audience,
+                    'offer_type' => $offerType,
+                    'offer_id' => $offerId,
+                    'is_active' => $isActive,
+                    'is_always_on' => $isAlwaysOn,
+                    'valid_from' => $validFrom,
+                    'valid_to' => $validTo,
+                ], spm_clip((string) ($data['base_text'] ?? '')), is_array($data['locales'] ?? null) ? $data['locales'] : []);
+            } catch (Throwable $e) {
+                $code = $e instanceof RuntimeException || $e instanceof InvalidArgumentException ? $e->getMessage() : 'server_error';
+                json_response(['success' => false, 'code' => $code, 'message' => 'تعذر حفظ نص الرسالة'], 422);
+            }
+            json_response(['success' => true, 'message' => 'تم الحفظ', 'id' => $id]);
+        }
 
         if ($id > 0) {
             $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
@@ -266,7 +288,7 @@ try {
             ]);
         }
 
-        json_response(['success' => true, 'message' => 'تم الحفظ']);
+        json_response(['success' => true, 'message' => 'تم الحفظ', 'id' => $id]);
     }
 
     if ($action === 'delete') {
@@ -297,10 +319,21 @@ try {
                     : 'هذا السجل يخص دولة أخرى',
             ], 403);
         }
-        $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ? AND country_id = ?');
-        $st->execute([$id, $ctxCid]);
-        if ($st->rowCount() < 1) {
-            json_response(['success' => false, 'code' => 'country_mismatch', 'message' => 'تعذّر الحذف ضمن دولة السياق'], 403);
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ? AND country_id = ?');
+            $st->execute([$id, $ctxCid]);
+            if ($st->rowCount() < 1) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'code' => 'country_mismatch', 'message' => 'تعذّر الحذف ضمن دولة السياق'], 403);
+            }
+            orange_content_locale_field_delete($pdo, 'promo_message', $id);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
         json_response(['success' => true, 'message' => 'تم الحذف']);
     }

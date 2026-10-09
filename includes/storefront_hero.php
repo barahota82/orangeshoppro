@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/admin_settings_country.php';
+require_once __DIR__ . '/orange_content_locale_field.php';
 
 function orange_storefront_copy_has_country_column(PDO $pdo): bool
 {
@@ -104,11 +105,23 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang, ?int
                 );
                 $st->execute(['home_hero']);
             }
+            $fetched = [];
             while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
                 if (!is_array($row)) {
                     break;
                 }
-                $t = orange_storefront_copy_text_for_lang($row, $lang);
+                $fetched[] = $row;
+            }
+            $localeMap = orange_content_locale_rows_for_entities($pdo, 'copy_line', array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $fetched));
+            foreach ($fetched as $row) {
+                $values = [
+                    'ar' => (string) ($row['text_ar'] ?? ''),
+                    'en' => (string) ($row['text_en'] ?? ''),
+                    'fil' => (string) ($row['text_fil'] ?? ''),
+                    'hi' => (string) ($row['text_hi'] ?? ''),
+                ];
+                $entityLocales = $localeMap[(int) ($row['id'] ?? 0)] ?? null;
+                $t = orange_content_locale_pick($lang, is_array($entityLocales) ? $entityLocales : null, $values, false);
                 if ($t !== '') {
                     $out[] = $t;
                 }

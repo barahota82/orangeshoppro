@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../../includes/storefront_hero.php';
+require_once __DIR__ . '/../../../includes/orange_content_locale_field.php';
+require_once __DIR__ . '/../../../includes/storefront_copy_locale_save.php';
 
 require_admin_api();
 
@@ -86,6 +88,7 @@ try {
     }
 
     $data = storefront_copy_req_data();
+    unset($data['country_id'], $data['full_access'], $data['actor']);
     $action = trim((string) ($data['action'] ?? ''));
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
     $copyScoped = orange_storefront_copy_has_country_column($pdo);
@@ -115,6 +118,25 @@ try {
         $scope = storefront_copy_norm_scope($data['scope'] ?? '');
         if ($scope === null) {
             json_response(['success' => false, 'message' => 'نطاق غير صالح'], 422);
+        }
+        if ($scope === 'header_tagline') {
+            json_response(['success' => false, 'code' => 'header_tagline_not_editable_here', 'message' => 'تحرير شعار الهيدر ليس من هذه الشاشة'], 422);
+        }
+        if ($scope === 'home_hero' && orange_content_locale_screen_ready($pdo, $ctxCountryId) && array_key_exists('base_text', $data)) {
+            $id = (int) ($data['id'] ?? 0);
+            $isActive = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
+            $baseText = storefront_copy_line_str($data['base_text'] ?? '');
+            $locales = is_array($data['locales'] ?? null) ? $data['locales'] : [];
+            try {
+                $id = orange_storefront_copy_locale_save($pdo, $ctxCountryId, $id, $isActive, $baseText, $locales, $copyScoped);
+            } catch (Throwable $e) {
+                if ($e instanceof RuntimeException && $e->getMessage() === 'entity_missing') {
+                    json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
+                }
+                $code = $e instanceof RuntimeException || $e instanceof InvalidArgumentException ? $e->getMessage() : 'server_error';
+                json_response(['success' => false, 'code' => $code, 'message' => 'تعذر حفظ جملة البانر'], 422);
+            }
+            json_response(['success' => true, 'message' => 'تم حفظ التعديلات', 'id' => $id]);
         }
         $id = (int) ($data['id'] ?? 0);
         $isActive = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
@@ -176,6 +198,9 @@ try {
         if ($scope === null || $id <= 0 || ($dir !== 'up' && $dir !== 'down')) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
         }
+        if ($scope === 'header_tagline') {
+            json_response(['success' => false, 'code' => 'header_tagline_not_editable_here', 'message' => 'تحرير شعار الهيدر ليس من هذه الشاشة'], 422);
+        }
         $ids = storefront_copy_ordered_ids_for_scope($pdo, $scope, $ctxCountryId);
         if ($ids === []) {
             json_response(['success' => false, 'message' => 'لا توجد بيانات'], 404);
@@ -223,12 +248,27 @@ try {
         if ($id <= 0 || $scope === null) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
         }
-        if ($copyScoped) {
-            $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ?');
-            $st->execute([$id, $ctxCountryId, $scope]);
-        } else {
-            $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND scope = ?');
-            $st->execute([$id, $scope]);
+        if ($scope === 'header_tagline') {
+            json_response(['success' => false, 'code' => 'header_tagline_not_editable_here', 'message' => 'تحرير شعار الهيدر ليس من هذه الشاشة'], 422);
+        }
+        $pdo->beginTransaction();
+        try {
+            if ($copyScoped) {
+                $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ?');
+                $st->execute([$id, $ctxCountryId, $scope]);
+            } else {
+                $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND scope = ?');
+                $st->execute([$id, $scope]);
+            }
+            if ($st->rowCount() > 0 && $scope === 'home_hero') {
+                orange_content_locale_field_delete($pdo, 'copy_line', $id);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
         json_response(['success' => true, 'message' => 'تم الحذف']);
     }
@@ -239,6 +279,9 @@ try {
         $isActive = (int) ($data['is_active'] ?? -1);
         if ($id <= 0 || $scope === null || ($isActive !== 0 && $isActive !== 1)) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
+        }
+        if ($scope === 'header_tagline') {
+            json_response(['success' => false, 'code' => 'header_tagline_not_editable_here', 'message' => 'تحرير شعار الهيدر ليس من هذه الشاشة'], 422);
         }
         if ($copyScoped) {
             $chk = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ? LIMIT 1');
