@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_sizing_dictionary.php';
+require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -78,15 +79,30 @@ $hasTree = orange_table_exists($pdo, 'product_types')
 /** @param array<string, mixed> $r */
 $branchLabel = static function (array $r): string {
     $p = [];
-    foreach (['dept_ar', 'sec_ar', 'cat_ar'] as $k) {
-        $v = trim((string) ($r[$k] ?? ''));
+    $dept = trim((string) ($r['dept_ar'] ?? ''));
+    if ($dept !== '') {
+        $p[] = $dept;
+    }
+    foreach ([['sec_shown', 'sec_ar', 'sec_en'], ['cat_shown', 'cat_ar', 'cat_en']] as $keys) {
+        if (array_key_exists($keys[0], $r)) {
+            $v = trim((string) $r[$keys[0]]);
+        } else {
+            $v = trim((string) ($r[$keys[1]] ?? ''));
+            if ($v === '') {
+                $v = trim((string) ($r[$keys[2]] ?? ''));
+            }
+        }
         if ($v !== '') {
             $p[] = $v;
         }
     }
-    $sub = trim((string) ($r['sub_ar'] ?? ''));
-    if ($sub === '') {
-        $sub = trim((string) ($r['sub_en'] ?? ''));
+    if (array_key_exists('sub_shown', $r)) {
+        $sub = trim((string) $r['sub_shown']);
+    } else {
+        $sub = trim((string) ($r['sub_ar'] ?? ''));
+        if ($sub === '') {
+            $sub = trim((string) ($r['sub_en'] ?? ''));
+        }
     }
     if ($sub === '') {
         $sub = (string) ($r['sub_slug'] ?? '');
@@ -103,6 +119,26 @@ $branchLabel = static function (array $r): string {
 
 $subOptions = [];
 $typesList = [];
+$ptCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$ptBaseMaps = [
+    'catalog_section' => [],
+    'catalog_category' => [],
+    'catalog_subcategory' => [],
+    'product_type' => [],
+];
+$ptMapsReady = $hasTree && orange_content_locale_screen_ready($pdo, $ptCountryId);
+if ($ptMapsReady) {
+    foreach (array_keys($ptBaseMaps) as $ptKind) {
+        $ptBaseMaps[$ptKind] = orange_catalog_name_locale_label_map($pdo, $ptCountryId, $ptKind);
+    }
+}
+$ptApplyShown = static function (array $row, string $shownKey, string $kind, int $id) use ($ptMapsReady, $ptBaseMaps): array {
+    if ($ptMapsReady && $id > 0 && array_key_exists($id, $ptBaseMaps[$kind])) {
+        $row[$shownKey] = $ptBaseMaps[$kind][$id];
+    }
+
+    return $row;
+};
 
 if ($hasTree) {
     try {
@@ -150,6 +186,9 @@ if ($hasTree) {
             if ($sid <= 0) {
                 continue;
             }
+            $r = $ptApplyShown($r, 'sub_shown', 'catalog_subcategory', $sid);
+            $r = $ptApplyShown($r, 'cat_shown', 'catalog_category', (int) ($r['cc_id'] ?? 0));
+            $r = $ptApplyShown($r, 'sec_shown', 'catalog_section', (int) ($r['sec_id'] ?? 0));
             $subOptions[] = [
                 'id' => $sid,
                 'label' => $branchLabel($r),
@@ -168,9 +207,9 @@ if ($hasTree) {
                     pt.expected_commercial_kind_key, pt.expected_sizing_category_key,
                     pt.default_advisory_sizing_guide_id,
                     pt.sort_order, pt.is_active,
-                    csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
-                    cc.name_ar AS cat_ar, cc.name_en AS cat_en,
-                    cs.name_ar AS sec_ar, cs.name_en AS sec_en,
+                    csub.id AS sub_id, csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
+                    cc.id AS cat_id, cc.name_ar AS cat_ar, cc.name_en AS cat_en,
+                    cs.id AS sec_id, cs.name_ar AS sec_ar, cs.name_en AS sec_en,
                     d.name_ar AS dept_ar, d.name_en AS dept_en
              FROM product_types pt
              INNER JOIN catalog_subcategories csub ON csub.id = pt.catalog_subcategory_id
@@ -185,11 +224,40 @@ if ($hasTree) {
             if (! is_array($trow)) {
                 continue;
             }
+            $trow = $ptApplyShown($trow, 'sub_shown', 'catalog_subcategory', (int) ($trow['catalog_subcategory_id'] ?? 0));
+            $trow = $ptApplyShown($trow, 'cat_shown', 'catalog_category', (int) ($trow['cat_id'] ?? 0));
+            $trow = $ptApplyShown($trow, 'sec_shown', 'catalog_section', (int) ($trow['sec_id'] ?? 0));
             $trow['_branch'] = $branchLabel($trow);
         }
         unset($trow);
     } catch (Throwable $e) {
         $typesList = [];
+    }
+}
+
+$ptLocaleReady = false;
+$ptLocaleRoles = ['mode' => 'legacy_unconfigured', 'base' => null, 'content' => [], 'admin_ui' => [], 'customer' => []];
+$ptLocaleActive = [];
+if ($hasTree) {
+    $ptLocaleReady = orange_content_locale_screen_ready($pdo, $ptCountryId);
+    if ($ptLocaleReady) {
+        $ptLocaleRoles = orange_country_locale_roles_read($pdo, $ptCountryId);
+        try {
+            $ptLocaleActive = orange_language_reference_active_codes($pdo);
+        } catch (Throwable $e) {
+            $ptLocaleActive = [];
+        }
+        $typesList = orange_catalog_name_locale_overlay($pdo, 'product_type', $typesList);
+        $ptBags = orange_catalog_name_locale_rows_for($pdo, 'product_type', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $typesList));
+        $ptBase = (string) ($ptLocaleRoles['base'] ?? '');
+        foreach ($typesList as &$trow) {
+            if (!is_array($trow)) {
+                continue;
+            }
+            $tid = (int) ($trow['id'] ?? 0);
+            $trow['locale_view'] = orange_catalog_name_locale_panel_state($trow, $ptBags[$tid] ?? [], $ptBase);
+        }
+        unset($trow);
     }
 }
 
@@ -324,6 +392,9 @@ if ($subOptionsJson === false) {
             </select>
         </div>
         <?php endif; ?>
+        <?php if ($ptLocaleReady): ?>
+        <div id="pt-locale-app" style="grid-column:1 / -1;"></div>
+        <?php endif; ?>
         <div class="pt-ar">
             <label for="pt_name_ar">الاسم العربي</label>
             <input type="text" id="pt_name_ar" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -343,7 +414,7 @@ if ($subOptionsJson === false) {
     </div>
     <div class="actions pt-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveProductType()" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="translatePtNames({ forceFromArabic: true })" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary pt-legacy-translate" onclick="translatePtNames({ forceFromArabic: true })" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetPtForm()" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>
@@ -375,7 +446,7 @@ if ($subOptionsJson === false) {
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo (int) ($row['id'] ?? 0); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['_branch'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php $ptShown = array_key_exists('locale_view', $row) ? (string) ($row['locale_view']['base_text'] ?? '') : (string) ($row['name_ar'] ?? ''); echo htmlspecialchars($ptShown, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php
                             $eck = trim((string) ($row['expected_commercial_kind_key'] ?? ''));
@@ -400,7 +471,8 @@ if ($subOptionsJson === false) {
                                 'default_advisory_sizing_guide_id' => (int) ($row['default_advisory_sizing_guide_id'] ?? 0),
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                                 'is_active' => (int) ($row['is_active'] ?? 1),
-                            ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
+                                'locale_view' => $row['locale_view'] ?? null,
+                            ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -553,6 +625,9 @@ if ($subOptionsJson === false) {
     padding-inline: 12px;
 }
 .pt-form-actions { justify-content: flex-end; }
+<?php if ($ptLocaleReady): ?>
+.pt-ar, .pt-en, .pt-fil, .pt-hi, .pt-legacy-translate { display: none !important; }
+<?php endif; ?>
 @media (max-width: 860px) {
     .pt-form-grid {
         grid-template-columns: 1fr;
@@ -577,6 +652,22 @@ if ($subOptionsJson === false) {
 }
 </style>
 
+<?php if ($ptLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.PT_LOCALE_READY = true;
+window.PT_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $ptLocaleRoles,
+    'active' => $ptLocaleActive,
+    'mounts' => [[
+        'key' => 'pt',
+        'rootId' => 'pt-locale-app',
+        'idPrefix' => 'pt-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+</script>
+<?php endif; ?>
 <script>
 const ptSubOptions = <?php echo $subOptionsJson; ?>;
 /** ترتيب ضمن الفرع التالي (MAX+1) من بيانات الصفحة — لعرض رقمي بدل «تلقائي». */
@@ -651,17 +742,26 @@ function ptSecSlugForSelectedSubcategory() {
 }
 
 /** قسم داخلي (catalog_sections.slug) ثم الاسم الإنجليزي — يطابق حدود save.php للطول والأحرف. */
-function refreshPtSlugFromEnglish() {
+function refreshPtSlugFromEnglish(englishOverride) {
     var slugEl = document.getElementById('pt_slug');
     var enEl = document.getElementById('pt_name_en');
-    if (!slugEl || slugEl.disabled || !enEl) {
+    if (!slugEl || slugEl.disabled) {
+        return;
+    }
+    if (!enEl && englishOverride == null) {
         return;
     }
     var secPart = ptSlugify(ptSecSlugForSelectedSubcategory());
-    var enPart = ptSlugify(enEl.value.trim());
+    var enPart = ptSlugify(englishOverride != null ? String(englishOverride) : enEl.value.trim());
     var combined = [secPart, enPart].filter(Boolean).join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     if (combined.length > 191) {
         combined = combined.slice(0, 191).replace(/[-_]+$/g, '');
+    }
+    if (!combined) {
+        var idEl = document.getElementById('pt_id');
+        if (idEl && (parseInt(idEl.value || '0', 10) || 0) > 0 && slugEl.value.trim()) {
+            return;
+        }
     }
     slugEl.value = combined;
 }
@@ -846,6 +946,7 @@ function resetPtForm() {
         });
     }
     ptApplyDefaultSortForNewRecord();
+    if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('pt');
 }
 
 function editProductType(p) {
@@ -884,6 +985,7 @@ function editProductType(p) {
             refreshPtSlugFromEnglish();
         }
     }
+    if (window.OrangeCatalogNameLocale && p.locale_view) window.OrangeCatalogNameLocale.open('pt', p.locale_view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -959,8 +1061,14 @@ async function saveProductType() {
         const sortRaw = document.getElementById('pt_sort').value.trim();
         const sortParsed = sortRaw === '' ? 0 : (parseInt(sortRaw, 10) || 0);
         const nameEnTrim = document.getElementById('pt_name_en').value.trim();
-        refreshPtSlugFromEnglish();
         var slugEl = document.getElementById('pt_slug');
+        if (window.PT_LOCALE_READY) {
+            if (!(recordId > 0 && slugEl && String(slugEl.value || '').trim() !== '')) {
+                refreshPtSlugFromEnglish(window.OrangeCatalogNameLocale ? window.OrangeCatalogNameLocale.english('pt') : '');
+            }
+        } else {
+            refreshPtSlugFromEnglish();
+        }
         const slugSync = slugEl && !slugEl.disabled ? String(slugEl.value || '').trim() : ptSlugify(nameEnTrim);
         const payload = {
             catalog_subcategory_id: subId,
@@ -984,6 +1092,7 @@ async function saveProductType() {
             sort_order: sortParsed,
             is_active: parseInt(document.getElementById('pt_active').value || '1', 10) ? 1 : 0
         };
+        if (window.PT_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('pt'));
         if (recordId > 0) payload.id = recordId;
         const res = await postJSON('/admin/api/product_types/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
@@ -1000,7 +1109,7 @@ async function saveProductType() {
 (function () {
     var arEl = document.getElementById('pt_name_ar');
     var enEl = document.getElementById('pt_name_en');
-    if (arEl) {
+    if (!window.PT_LOCALE_READY && arEl) {
         arEl.addEventListener('input', schedulePtAutoTranslate);
         arEl.addEventListener('change', function () {
             if (arEl.value.trim()) {
@@ -1008,7 +1117,7 @@ async function saveProductType() {
             }
         });
     }
-    if (enEl) {
+    if (!window.PT_LOCALE_READY && enEl) {
         enEl.addEventListener('input', function () {
             refreshPtSlugFromEnglish();
             schedulePtTranslateFromEnglish();
@@ -1017,7 +1126,14 @@ async function saveProductType() {
     var subSel = document.getElementById('pt_catalog_subcategory_id');
     if (subSel) {
         subSel.addEventListener('change', function () {
-            refreshPtSlugFromEnglish();
+            if (window.PT_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                var idEl = document.getElementById('pt_id');
+                if (!idEl || (parseInt(idEl.value || '0', 10) || 0) <= 0) {
+                    refreshPtSlugFromEnglish(window.OrangeCatalogNameLocale.english('pt'));
+                }
+            } else {
+                refreshPtSlugFromEnglish();
+            }
             ptApplyDefaultSortForNewRecord();
         });
     }
@@ -1025,6 +1141,12 @@ async function saveProductType() {
         sessionStorage.removeItem('orange_pt_prefill_sub');
     } catch (eClr) { /* ignore */ }
     ptInitSizingHierarchySelects();
+    if (window.PT_LOCALE_READY && window.OrangeCatalogNameLocale && window.PT_LOCALE_BOOT) {
+        window.PT_LOCALE_BOOT.mounts[0].onEnglish = function (text) {
+            refreshPtSlugFromEnglish(text);
+        };
+        window.OrangeCatalogNameLocale.bind(window.PT_LOCALE_BOOT);
+    }
     var tbody = document.getElementById('orange-pt-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {

@@ -166,31 +166,34 @@
         var showSort = options.showSort !== false;
         var showSave = options.showSave !== false;
         var saveLabel = options.saveLabel || 'حفظ القسم';
+        var idPrefix = String(options.idPrefix || '');
+        function eid(name) { return idPrefix + name; }
+        function q(name) { return root.querySelector('#' + eid(name)); }
         var html = ''
-            + '<span id="translation-transport-note" hidden>تعذر طلب الترجمة</span>'
-            + '<label for="base-text">اللغة الأساسية <span id="base-code"></span></label>'
-            + '<input id="base-text" type="text">';
+            + '<span id="' + eid('translation-transport-note') + '" hidden>تعذر طلب الترجمة</span>'
+            + '<label for="' + eid('base-text') + '">اللغة الأساسية <span id="' + eid('base-code') + '"></span></label>'
+            + '<input id="' + eid('base-text') + '" type="text">';
         if (showSlug) {
-            html += '<label for="slug">Slug</label>'
-                + '<input id="slug" type="text" dir="ltr" disabled>';
+            html += '<label for="' + eid('slug') + '">Slug</label>'
+                + '<input id="' + eid('slug') + '" type="text" dir="ltr" disabled>';
         }
         if (showSort) {
-            html += '<label for="sort_order">الترتيب</label>'
-                + '<input id="sort_order" type="number" value="0">';
+            html += '<label for="' + eid('sort_order') + '">الترتيب</label>'
+                + '<input id="' + eid('sort_order') + '" type="number" value="0">';
         }
-        html += '<button type="button" id="translations-button">الترجمات</button>'
-            + '<span id="translation-failure-flag" hidden>تعذر بعضها</span>'
-            + '<button type="button" id="translate-button">ترجمة</button>';
+        html += '<button type="button" id="' + eid('translations-button') + '">الترجمات</button>'
+            + '<span id="' + eid('translation-failure-flag') + '" hidden>تعذر بعضها</span>'
+            + '<button type="button" id="' + eid('translate-button') + '">ترجمة</button>';
         if (showSave) {
-            html += '<button type="button" id="save-button">' + saveLabel + '</button>';
+            html += '<button type="button" id="' + eid('save-button') + '">' + saveLabel + '</button>';
         }
-        html += '<div id="translations-panel" hidden></div>';
+        html += '<div id="' + eid('translations-panel') + '" hidden></div>';
         root.innerHTML = html;
-        var baseInput = root.querySelector('#base-text');
-        var panel = root.querySelector('#translations-panel');
-        var slugInput = showSlug ? root.querySelector('#slug') : null;
-        var sortInput = showSort ? root.querySelector('#sort_order') : null;
-        var saveButton = showSave ? root.querySelector('#save-button') : null;
+        var baseInput = q('base-text');
+        var panel = q('translations-panel');
+        var slugInput = showSlug ? q('slug') : null;
+        var sortInput = showSort ? q('sort_order') : null;
+        var saveButton = showSave ? q('save-button') : null;
 
         function applyAutoSlug(text) {
             if (!autoSlug || !slugInput) return;
@@ -221,10 +224,10 @@
         }
 
         function refreshFlag() {
-            var flag = root.querySelector('#translation-failure-flag');
+            var flag = q('translation-failure-flag');
             var any = Object.keys(failures).length > 0;
             flag.hidden = !(any && panel.hidden);
-            var note = root.querySelector('#translation-transport-note');
+            var note = q('translation-transport-note');
             if (note) note.hidden = !failures.transport;
         }
 
@@ -239,7 +242,7 @@
         function renderPanel() {
             var codes = localesNow();
             panel.innerHTML = '';
-            root.querySelector('#base-code').textContent = roles.base ? '(' + roles.base + ')' : '';
+            q('base-code').textContent = roles.base ? '(' + roles.base + ')' : '';
             codes.forEach(function (code) {
                 var wrap = document.createElement('div');
                 wrap.className = 'locale-row';
@@ -251,6 +254,7 @@
                 input.setAttribute('data-locale', code);
                 var shown = drawer[code] && drawer[code].touched ? drawer[code].text : ((known[code] && known[code].text) || '');
                 input.value = shown || '';
+                input.setAttribute('data-origin', (known[code] && known[code].origin) || '');
                 input.addEventListener('input', function () {
                     var previous = known[code] || {};
                     drawer[code] = {
@@ -273,6 +277,7 @@
                     invalidateNow();
                     if (code === 'en' && roles.base !== 'en') {
                         applyAutoSlug(input.value);
+                        if (typeof options.onEnglishInput === 'function') options.onEnglishInput(input.value);
                         clearTimeout(timer);
                         timer = setTimeout(function () {
                             sendSuggest(baseInput.value, [], { correctedEnglish: input.value });
@@ -397,8 +402,12 @@
                 var staleEnglish = corrected !== null && sha256(englishNow) !== sha256(corrected);
                 return gen !== generation || !guard.accept(ticket) || sha256(baseInput.value) !== ticket.source_hash || staleEnglish;
             }
+            function notify(detail) {
+                if (typeof options.onApplied === 'function') options.onApplied(detail);
+            }
             function rejected() {
                 root.setAttribute('data-last-apply', 'rejected');
+                notify({ applied: false, rejected: true, label: 'rejected', english: '' });
                 return { applied: false, rejected: true, failed: [], kept: [] };
             }
             function transportFailed() {
@@ -406,6 +415,7 @@
                 failures.transport = true;
                 paintStatuses();
                 root.setAttribute('data-last-apply', 'failed');
+                notify({ applied: false, rejected: false, label: 'failed', english: '' });
                 return { applied: false, rejected: false, failed: ['transport'], kept: [] };
             }
             return Promise.resolve().then(function () {
@@ -438,6 +448,13 @@
                 else if (summary.kept.length) label = 'kept';
                 root.setAttribute('data-last-apply', label);
                 if (corrected !== null) englishPivot = corrected;
+                notify({
+                    applied: summary.applied.length > 0,
+                    rejected: false,
+                    label: label,
+                    english: produced,
+                    englishApplied: !!(suggestions.en && suggestions.en.apply === true && String(suggestions.en.text || '') !== '')
+                });
                 return {
                     applied: summary.applied.length > 0,
                     rejected: false,
@@ -453,17 +470,18 @@
         baseInput.addEventListener('input', function () {
             invalidateNow();
             if (roles.base === 'en') applyAutoSlug(baseInput.value);
+            if (typeof options.onBaseInput === 'function') options.onBaseInput(baseInput.value, roles.base);
             clearTimeout(timer);
             var snapshot = baseInput.value;
             timer = setTimeout(function () {
                 sendSuggest(snapshot, []);
             }, debounceMs);
         });
-        root.querySelector('#translations-button').addEventListener('click', function () {
+        q('translations-button').addEventListener('click', function () {
             panel.hidden = !panel.hidden;
             refreshFlag();
         });
-        root.querySelector('#translate-button').addEventListener('click', function () {
+        q('translate-button').addEventListener('click', function () {
             clearTimeout(timer);
             sendSuggest(baseInput.value, []);
         });
@@ -520,7 +538,11 @@
                 renderPanel();
             },
             getPayload: function () {
-                return payloadFromDrawer(baseInput.value, drawer);
+                var payload = payloadFromDrawer(baseInput.value, drawer);
+                if (recordId > 0 && String(baseInput.value || '').trim() === '') {
+                    payload.base_explicit_empty = true;
+                }
+                return payload;
             },
             requestSuggest: function (explicitList) {
                 clearTimeout(timer);

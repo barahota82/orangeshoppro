@@ -10,6 +10,7 @@ declare(strict_types=1);
  *
  * @var array<string,mixed> $admin — من admin/index.php
  */
+require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
 $pdo = db();
 $adminCountryId = orange_admin_context_country_id($pdo);
 $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
@@ -27,7 +28,7 @@ if ($pdoSchemaReady) {
     $deptActiveSql = function_exists('orange_department_country_active_sql')
         ? (' AND (' . orange_department_country_active_sql($pdo, 'd', $adminCountryId) . ')')
         : '';
-    $catSql = 'SELECT ucc.id, ucc.name_ar, ucc.name_en, cs.name_ar AS sec_ar, d.name_ar AS dept_ar,
+    $catSql = 'SELECT ucc.id, ucc.name_ar, ucc.name_en, cs.id AS sec_id, cs.name_ar AS sec_ar, d.name_ar AS dept_ar,
             (SELECT COUNT(*) FROM products p
                 INNER JOIN product_types pt ON pt.id = p.product_type_id
                 INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
@@ -43,6 +44,8 @@ if ($pdoSchemaReady) {
         $pdoCategories = [];
     }
 }
+$pdoCatLabels = $pdoSchemaReady ? orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'catalog_category') : [];
+$pdoSecLabels = $pdoSchemaReady ? orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'catalog_section') : [];
 ?>
 <div class="card">
     <h3 style="margin:0 0 6px;">ترتيب عرض المنتجات في المتجر</h3>
@@ -65,9 +68,17 @@ if ($pdoSchemaReady) {
                 <option value="">— اختر فئة —</option>
                 <?php foreach ($pdoCategories as $c): ?>
                     <?php
+                    $pdoCatId = (int) ($c['id'] ?? 0);
+                    $pdoSecId = (int) ($c['sec_id'] ?? 0);
+                    $pdoCatShown = array_key_exists($pdoCatId, $pdoCatLabels)
+                        ? trim((string) $pdoCatLabels[$pdoCatId])
+                        : (trim((string) ($c['name_ar'] ?? '')) ?: trim((string) ($c['name_en'] ?? '')));
+                    $pdoSecShown = array_key_exists($pdoSecId, $pdoSecLabels)
+                        ? trim((string) $pdoSecLabels[$pdoSecId])
+                        : trim((string) ($c['sec_ar'] ?? ''));
                     $label = trim((string) ($c['dept_ar'] ?? '')) . ' › '
-                        . trim((string) ($c['sec_ar'] ?? '')) . ' › '
-                        . (trim((string) ($c['name_ar'] ?? '')) ?: trim((string) ($c['name_en'] ?? '')))
+                        . $pdoSecShown . ' › '
+                        . $pdoCatShown
                         . ' (' . (int) ($c['cnt'] ?? 0) . ')';
                     ?>
                     <option value="<?php echo (int) $c['id']; ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>

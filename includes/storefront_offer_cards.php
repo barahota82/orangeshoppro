@@ -18,6 +18,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/orange_catalog_name_locale.php';
 require_once __DIR__ . '/cart_promo_schedule.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/cart_promo_products.php';
@@ -398,21 +399,30 @@ function orange_storefront_offer_category_name_map(PDO $pdo, array $catIds, stri
     $placeholders = implode(', ', array_fill(0, count($ids), '?'));
     $st = $pdo->prepare("SELECT $cols FROM catalog_categories WHERE id IN ($placeholders)");
     $st->execute($ids);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $rows = orange_catalog_name_locale_overlay($pdo, 'catalog_category', $rows);
     $map = [];
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
         $cid = (int) ($row['id'] ?? 0);
         if ($cid <= 0) {
             continue;
         }
-        $name = '';
-        if ($lang === 'en' && !empty($row['name_en'])) {
-            $name = (string) $row['name_en'];
-        } elseif ($lang === 'fil' && !empty($row['name_fil'])) {
-            $name = (string) $row['name_fil'];
-        } elseif ($lang === 'hi' && !empty($row['name_hi'])) {
-            $name = (string) $row['name_hi'];
+        $localeNames = isset($row['locale_names']) && is_array($row['locale_names']) ? $row['locale_names'] : [];
+        if (array_key_exists($lang, $localeNames)) {
+            $name = (string) $localeNames[$lang];
+        } elseif ($lang === 'en') {
+            $name = (string) ($row['name_en'] ?? '');
+        } elseif ($lang === 'fil') {
+            $name = (string) ($row['name_fil'] ?? ($row['name_en'] ?? ''));
+        } elseif ($lang === 'hi') {
+            $name = (string) ($row['name_hi'] ?? ($row['name_en'] ?? ''));
+        } else {
+            $name = (string) ($row['name_ar'] ?? '');
         }
-        if ($name === '') {
+        if ($name === '' && !array_key_exists($lang, $localeNames) && $lang !== 'ar') {
             $name = (string) ($row['name_ar'] ?? '');
         }
         $map[$cid] = $name;

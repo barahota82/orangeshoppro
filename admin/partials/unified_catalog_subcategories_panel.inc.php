@@ -35,8 +35,9 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
         </div>
         <div class="uc-sub-slug">
             <label for="uc_sub_slug">slug</label>
-            <input type="text" id="uc_sub_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
+            <input type="text" id="uc_sub_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : 'readonly'; ?>>
         </div>
+        <?php if (!empty($orange_uc['locale_ready'])): ?><div id="uc-sub-locale" style="grid-column:1 / -1;"></div><?php endif; ?>
         <div class="uc-sub-ar">
             <label for="uc_sub_name_ar">الاسم العربي</label>
             <input type="text" id="uc_sub_name_ar" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
@@ -56,7 +57,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn-secondary" onclick="resetUcSubcategory()" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>جديد</button>
-        <button type="button" class="btn-secondary" onclick="translateUc('sub')" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary uc-legacy-translate" onclick="translateUc('sub')" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" onclick="saveUcSubcategory()" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>حفظ التصنيف الفرعي</button>
     </div>
     <?php if ($ucSubFlat !== []): ?>
@@ -70,12 +71,13 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
                 <td><?php echo (int) ($row['id'] ?? 0); ?></td>
                 <td><?php echo htmlspecialchars(trim((string) ($row['dept_label'] ?? '')) . ' ← ' . trim((string) ($row['sec_label'] ?? '')) . ' ← ' . trim((string) ($row['cat_label'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                 <td dir="ltr"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php $ucShown = array_key_exists('locale_view', $row) ? (string) ($row['locale_view']['base_text'] ?? '') : (string) ($row['name_ar'] ?? ''); echo htmlspecialchars($ucShown, ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                 <td><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
                 <td><button type="button" class="btn-secondary uc-edit-sub" data-json="<?php echo htmlspecialchars(json_encode([
                     'id' => (int) ($row['id'] ?? 0),
                     'catalog_category_id' => (int) ($row['catalog_category_id'] ?? 0),
+                    'locale_view' => $row['locale_view'] ?? null,
                     'slug' => (string) ($row['slug'] ?? ''),
                     'name_ar' => (string) ($row['name_ar'] ?? ''),
                     'name_en' => (string) ($row['name_en'] ?? ''),
@@ -83,7 +85,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
                     'name_hi' => (string) ($row['name_hi'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
                     'is_active' => (int) ($row['is_active'] ?? 1),
-                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button></td>
+                ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button></td>
             </tr>
         <?php endforeach; ?>
         </tbody></table>

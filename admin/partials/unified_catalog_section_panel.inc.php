@@ -42,6 +42,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
             <label for="uc_sec_slug">slug</label>
             <input type="text" id="uc_sec_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" readonly <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
+        <?php if (!empty($orange_uc['locale_ready'])): ?><div id="uc-sec-locale" style="grid-column:1 / -1;"></div><?php endif; ?>
         <div class="uc-sec-ar">
             <label for="uc_sec_name_ar">الاسم العربي</label>
             <input type="text" id="uc_sec_name_ar" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
@@ -61,7 +62,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn-secondary" onclick="resetUcSection()" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>جديد</button>
-        <button type="button" class="btn-secondary" onclick="translateUc('sec')" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary uc-legacy-translate" onclick="translateUc('sec')" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" onclick="saveUcSection()" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>حفظ القسم الداخلي</button>
     </div>
     <?php if ($ucSectionsFlat !== []): ?>
@@ -75,7 +76,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
                 <td><?php echo (int) ($row['id'] ?? 0); ?></td>
                 <td><?php echo htmlspecialchars(trim((string) ($row['dept_label'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                 <td dir="ltr"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php $ucShown = array_key_exists('locale_view', $row) ? (string) ($row['locale_view']['base_text'] ?? '') : (string) ($row['name_ar'] ?? ''); echo htmlspecialchars($ucShown, ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                 <td><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
                 <td><button type="button" class="btn-secondary uc-edit-sec" data-json="<?php echo htmlspecialchars(json_encode([
@@ -88,7 +89,8 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
                     'name_hi' => (string) ($row['name_hi'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
                     'is_active' => (int) ($row['is_active'] ?? 1),
-                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button></td>
+                    'locale_view' => $row['locale_view'] ?? null,
+                ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button></td>
             </tr>
         <?php endforeach; ?>
         </tbody></table>

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/orange_catalog_name_locale.php';
 require_once __DIR__ . '/department_countries.php';
 require_once __DIR__ . '/countries.php';
 
@@ -168,6 +169,14 @@ function orange_storefront_unified_nav_for_home(PDO $pdo, ?int $countryId = null
             $catsByDept[$did] = [];
         }
         $catsByDept[$did][] = $cat;
+    }
+
+    $categories = orange_catalog_name_locale_overlay($pdo, 'catalog_category', $categories);
+    foreach ($subcategoriesByCategory as $groupId => $groupRows) {
+        $subcategoriesByCategory[$groupId] = orange_catalog_name_locale_overlay($pdo, 'catalog_subcategory', is_array($groupRows) ? $groupRows : []);
+    }
+    foreach ($catsByDept as $groupId => $groupRows) {
+        $catsByDept[$groupId] = orange_catalog_name_locale_overlay($pdo, 'catalog_category', is_array($groupRows) ? $groupRows : []);
     }
 
     return [

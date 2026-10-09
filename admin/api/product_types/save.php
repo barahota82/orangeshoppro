@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_sizing_dictionary.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/orange_catalog_name_locale.php';
 require_admin_api();
 
 try {
@@ -44,10 +45,26 @@ try {
 
     $subId = (int) ($data['catalog_subcategory_id'] ?? 0);
     $slugRaw = $sanitizeSlug((string) ($data['slug'] ?? ''));
-    $nameAr = trim((string) ($data['name_ar'] ?? ''));
-    $nameEn = trim((string) ($data['name_en'] ?? ''));
-    $nameFil = trim((string) ($data['name_fil'] ?? ''));
-    $nameHi = trim((string) ($data['name_hi'] ?? ''));
+    $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    $localeMode = orange_catalog_name_locale_use_payload($pdo, $countryId, $data);
+    if ($localeMode && trim((string) ($data['base_text'] ?? '')) === '' && !($id > 0 && !empty($data['base_explicit_empty']))) {
+        json_response(['success' => false, 'message' => 'اسم اللغة الأساسية مطلوب.'], 422);
+    }
+    if ($localeMode) {
+        $preview = orange_catalog_name_locale_preview($pdo, $countryId, 'product_type', $id, $data);
+        $nameAr = $preview['name_ar'];
+        $nameEn = $preview['name_en'];
+        $nameFil = $preview['name_fil'];
+        $nameHi = $preview['name_hi'];
+        if ($slugRaw === '') {
+            $slugRaw = $sanitizeSlug(orange_catalog_name_locale_kept_slug($pdo, 'product_types', $id, ''));
+        }
+    } else {
+        $nameAr = trim((string) ($data['name_ar'] ?? ''));
+        $nameEn = trim((string) ($data['name_en'] ?? ''));
+        $nameFil = trim((string) ($data['name_fil'] ?? ''));
+        $nameHi = trim((string) ($data['name_hi'] ?? ''));
+    }
     $expCk = $sanitizeKind32((string) ($data['expected_commercial_kind_key'] ?? ''));
     $expSk = $sanitizeCat64((string) ($data['expected_sizing_category_key'] ?? ''));
     $defaultAdvGuideId = isset($data['default_advisory_sizing_guide_id']) ? (int) $data['default_advisory_sizing_guide_id'] : 0;
@@ -72,12 +89,13 @@ try {
         json_response(['success' => false, 'message' => 'المعرِّف اللاتيني (slug): حرف أو رقم إنجليزي أولًا، ثم أحرف صغيرة وأرقام وشرطة _ أو -.'], 422);
     }
 
-    if ($nameAr === '') {
-        json_response(['success' => false, 'message' => 'الاسم العربي لنوع المنتج مطلوب.'], 422);
+    $allowExplicitEmpty = $localeMode && $id > 0 && !empty($data['base_explicit_empty']);
+    $guard = orange_catalog_name_locale_guard($pdo, $countryId, $localeMode, (string) ($data['base_text'] ?? ''), $nameEn, $nameAr, $nameEn, 'الاسم العربي لنوع المنتج مطلوب.', $allowExplicitEmpty);
+    if ($guard !== null && !$localeMode && $nameAr !== '' && $nameEn === '') {
+        $guard = 'الاسم الإنجليزي مطلوب.';
     }
-
-    if ($nameEn === '') {
-        json_response(['success' => false, 'message' => 'الاسم الإنجليزي مطلوب.'], 422);
+    if ($guard !== null) {
+        json_response(['success' => false, 'message' => $guard], 422);
     }
 
     if ($expSk !== '' && $expCk === '') {
@@ -120,7 +138,10 @@ try {
     $ptRows->execute([$subId]);
     $siblingRows = $ptRows->fetchAll(PDO::FETCH_ASSOC);
     $excludeId = $id > 0 ? $id : null;
-    if (orange_rows_normalized_arabic_conflict(is_array($siblingRows) ? $siblingRows : [], 'id', 'name_ar', $nameAr, $excludeId)) {
+    $typeDup = $localeMode
+        ? orange_catalog_name_locale_names_conflict($pdo, 'product_type', 'catalog_subcategory_id', $subId, $id, (string) (orange_country_locale_roles_read($pdo, $countryId)['base'] ?? ''), (string) ($data['base_text'] ?? ''))
+        : orange_rows_normalized_arabic_conflict(is_array($siblingRows) ? $siblingRows : [], 'id', 'name_ar', $nameAr, $excludeId);
+    if ($typeDup) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
@@ -147,28 +168,30 @@ try {
             json_response(['success' => false, 'message' => 'السجل غير موجود.'], 404);
         }
 
-        $updSql = 'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
+        $updSql = $localeMode
+            ? 'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?,
+                expected_size_scheme_key = ?, expected_commercial_kind_key = ?, expected_sizing_category_key = ?'
+            : 'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
                 expected_size_scheme_key = ?, expected_commercial_kind_key = ?, expected_sizing_category_key = ?';
-        $updParams = [
-            $subId,
-            $slugRaw,
-            $nameAr,
-            $nameEn,
-            $nameFil,
-            $nameHi,
-            '',
-            $expCk,
-            $expSk,
-        ];
+        $updParams = $localeMode
+            ? [$subId, $slugRaw, '', $expCk, $expSk]
+            : [$subId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, '', $expCk, $expSk];
         if ($hasDefaultAdvCol) {
             $updSql .= ', default_advisory_sizing_guide_id = ?';
             $updParams[] = $defaultAdvGuideId;
         }
-        $updSql .= ', sort_order = ?, is_active = ? WHERE id = ? LIMIT 1';
+        $updSql .= ', sort_order = ?, is_active = ? WHERE id = ?';
         $updParams[] = $sortOrder;
         $updParams[] = $active;
         $updParams[] = $id;
+        if ($localeMode) {
+            $pdo->beginTransaction();
+        }
         $pdo->prepare($updSql)->execute($updParams);
+        if ($localeMode) {
+            orange_catalog_name_locale_commit_payload($pdo, $countryId, 'product_type', $id, $data);
+            $pdo->commit();
+        }
         audit_log('product_type_save', 'تحديث نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $id);
         json_response([
             'success' => true,
@@ -181,17 +204,9 @@ try {
     $insCols = 'catalog_subcategory_id, slug, name_ar, name_en, name_fil, name_hi,
             expected_size_scheme_key, expected_commercial_kind_key, expected_sizing_category_key';
     $insPh = '?,?,?,?,?,?,?,?,?';
-    $insParams = [
-        $subId,
-        $slugRaw,
-        $nameAr,
-        $nameEn,
-        $nameFil,
-        $nameHi,
-        '',
-        $expCk,
-        $expSk,
-    ];
+    $insParams = $localeMode
+        ? [$subId, $slugRaw, '', '', '', '', '', $expCk, $expSk]
+        : [$subId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, '', $expCk, $expSk];
     if ($hasDefaultAdvCol) {
         $insCols .= ', default_advisory_sizing_guide_id';
         $insPh .= ',?';
@@ -201,8 +216,15 @@ try {
     $insPh .= ',?,?';
     $insParams[] = $sortOrder;
     $insParams[] = $active;
+    if ($localeMode) {
+        $pdo->beginTransaction();
+    }
     $pdo->prepare('INSERT INTO product_types (' . $insCols . ') VALUES (' . $insPh . ')')->execute($insParams);
     $newId = (int) $pdo->lastInsertId();
+    if ($localeMode) {
+        orange_catalog_name_locale_commit_payload($pdo, $countryId, 'product_type', $newId, $data);
+        $pdo->commit();
+    }
     audit_log('product_type_save', 'إضافة نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $newId);
     json_response([
         'success' => true,
@@ -211,5 +233,8 @@ try {
         'sort_order' => $sortOrder,
     ]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     orange_admin_api_catch($e, 'تعذر حفظ نوع المنتج في الشجرة الموحّدة');
 }

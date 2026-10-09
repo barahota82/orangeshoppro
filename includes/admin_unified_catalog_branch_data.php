@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/orange_catalog_name_locale.php';
 
 /**
  * بيانات شاشات الأدمن لشجرة الكتالوج الموحّد (أقسام داخلية + فئة + تصنيف فرعي قبل أنواع المنتجات).
@@ -161,6 +162,75 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         $nextSortByCategory = [];
     }
 
+    $localeReady = false;
+    $localeRoles = ['mode' => 'legacy_unconfigured', 'base' => null, 'content' => [], 'admin_ui' => [], 'customer' => []];
+    $localeActive = [];
+    $localeCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    if ($localeCountryId > 0 && orange_content_locale_screen_ready($pdo, $localeCountryId)) {
+        $localeReady = true;
+        $localeRoles = orange_country_locale_roles_read($pdo, $localeCountryId);
+        try {
+            $localeActive = orange_language_reference_active_codes($pdo);
+        } catch (Throwable $e) {
+            $localeActive = [];
+        }
+        $base = (string) ($localeRoles['base'] ?? '');
+        $baseCol = ORANGE_CATALOG_NAME_COLUMNS[$base] ?? '';
+        $attach = static function (array $rows, string $kind) use ($pdo, $base): array {
+            $rows = orange_catalog_name_locale_overlay($pdo, $kind, $rows);
+            $bags = orange_catalog_name_locale_rows_for($pdo, $kind, array_map(static fn ($row): int => is_array($row) ? (int) ($row['id'] ?? 0) : 0, $rows));
+            foreach ($rows as $index => $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $id = (int) ($row['id'] ?? 0);
+                $row['locale_view'] = orange_catalog_name_locale_panel_state($row, $bags[$id] ?? [], $base);
+                $rows[$index] = $row;
+            }
+
+            return $rows;
+        };
+        $sectionsFlat = $attach(is_array($sectionsFlat) ? $sectionsFlat : [], 'catalog_section');
+        $categoriesFlat = $attach(is_array($categoriesFlat) ? $categoriesFlat : [], 'catalog_category');
+        $subcatsFlat = $attach(is_array($subcatsFlat) ? $subcatsFlat : [], 'catalog_subcategory');
+        $sectionBaseById = [];
+        foreach ($sectionsFlat as $sectionRow) {
+            if (!is_array($sectionRow) || !isset($sectionRow['locale_view'])) {
+                continue;
+            }
+            $sectionBaseById[(int) ($sectionRow['id'] ?? 0)] = (string) ($sectionRow['locale_view']['base_text'] ?? '');
+        }
+        $categoryBaseById = [];
+        $categorySectionById = [];
+        foreach ($categoriesFlat as $index => $categoryRow) {
+            if (!is_array($categoryRow)) {
+                continue;
+            }
+            $sectionId = (int) ($categoryRow['catalog_section_id'] ?? 0);
+            $categoryId = (int) ($categoryRow['id'] ?? 0);
+            if (array_key_exists($sectionId, $sectionBaseById)) {
+                $categoryRow['sec_label'] = $sectionBaseById[$sectionId];
+            }
+            $categoryBaseById[$categoryId] = (string) ($categoryRow['locale_view']['base_text'] ?? '');
+            $categorySectionById[$categoryId] = $sectionId;
+            $categoriesFlat[$index] = $categoryRow;
+        }
+        foreach ($subcatsFlat as $index => $subRow) {
+            if (!is_array($subRow)) {
+                continue;
+            }
+            $categoryId = (int) ($subRow['catalog_category_id'] ?? 0);
+            $sectionId = $categorySectionById[$categoryId] ?? 0;
+            if (array_key_exists($sectionId, $sectionBaseById)) {
+                $subRow['sec_label'] = $sectionBaseById[$sectionId];
+            }
+            if (array_key_exists($categoryId, $categoryBaseById)) {
+                $subRow['cat_label'] = $categoryBaseById[$categoryId];
+            }
+            $subcatsFlat[$index] = $subRow;
+        }
+    }
+
     $sectionSelectOptions = [];
     foreach ($sectionsFlat as $s) {
         if (! is_array($s)) {
@@ -173,9 +243,14 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         if (! isset($nextSortBySection[$sid])) {
             $nextSortBySection[$sid] = 1;
         }
+        if ($localeReady && isset($s['locale_view'])) {
+            $sectionName = trim((string) ($s['locale_view']['base_text'] ?? ''));
+        } else {
+            $sectionName = trim((string) (($s['name_ar'] ?: $s['name_en']) ?: ($s['slug'] ?? '')));
+        }
         $sectionSelectOptions[] = [
             'id' => $sid,
-            'label' => trim((string) ($s['dept_label'] ?? '')) . ' ← ' . trim((string) (($s['name_ar'] ?: $s['name_en']) ?: $s['slug'] ?? '')),
+            'label' => trim((string) ($s['dept_label'] ?? '')) . ' ← ' . $sectionName,
             'slug' => trim((string) ($s['slug'] ?? '')),
         ];
     }
@@ -192,10 +267,15 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         if (! isset($nextSortByCategory[$cid])) {
             $nextSortByCategory[$cid] = 1;
         }
+        if ($localeReady && isset($c['locale_view'])) {
+            $categoryName = trim((string) ($c['locale_view']['base_text'] ?? ''));
+        } else {
+            $categoryName = trim((string) (($c['name_ar'] ?: $c['name_en']) ?: ($c['slug'] ?? '')));
+        }
         $categorySelectOptions[] = [
             'id' => $cid,
             'label' => trim((string) ($c['dept_label'] ?? '')) . ' ← ' . trim((string) ($c['sec_label'] ?? '')) . ' ← '
-                . trim((string) (($c['name_ar'] ?: $c['name_en']) ?: $c['slug'] ?? '')),
+                . $categoryName,
             'section_slug' => trim((string) ($c['sec_slug'] ?? '')),
             'category_slug' => trim((string) ($c['slug'] ?? '')),
         ];
@@ -220,6 +300,9 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         'deps_empty_for_sections' => $departments === [],
         'sections_empty_for_categories' => $sectionSelectOptions === [],
         'categories_empty_for_subcats' => $categorySelectOptions === [],
+        'locale_ready' => $localeReady,
+        'locale_roles' => $localeRoles,
+        'locale_active' => $localeActive,
         'next_sort_by_department' => $nextSortByDepartment,
         'next_sort_by_section' => $nextSortBySection,
         'next_sort_by_category' => $nextSortByCategory,

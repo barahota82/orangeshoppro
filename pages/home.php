@@ -9,6 +9,10 @@ require_once __DIR__ . '/../config.php';
  */
 function storefront_catalog_label(array $row, string $lang): string
 {
+    if (isset($row['locale_names']) && is_array($row['locale_names']) && array_key_exists($lang, $row['locale_names'])) {
+        return (string) $row['locale_names'][$lang];
+    }
+
     return match ($lang) {
         'ar' => (string)($row['name_ar'] ?? $row['name'] ?? $row['name_en'] ?? ''),
         'fil' => (string)($row['name_fil'] ?? $row['name_en'] ?? $row['name'] ?? ''),

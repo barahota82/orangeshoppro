@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_branch_slug.php';
+require_once __DIR__ . '/../../../includes/orange_catalog_name_locale.php';
 require_admin_api();
 
 try {
@@ -22,18 +23,34 @@ try {
     $id = (int) ($data['id'] ?? 0);
 
     $depId = (int) ($data['department_id'] ?? 0);
-    $nameAr = trim((string) ($data['name_ar'] ?? ''));
-    $nameEn = trim((string) ($data['name_en'] ?? ''));
-    $nameFil = trim((string) ($data['name_fil'] ?? ''));
-    $nameHi = trim((string) ($data['name_hi'] ?? ''));
+    $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    $localeMode = orange_catalog_name_locale_use_payload($pdo, $countryId, $data);
+    if ($localeMode && trim((string) ($data['base_text'] ?? '')) === '' && !($id > 0 && !empty($data['base_explicit_empty']))) {
+        json_response(['success' => false, 'message' => 'اسم اللغة الأساسية مطلوب.'], 422);
+    }
+    if ($localeMode) {
+        $preview = orange_catalog_name_locale_preview($pdo, $countryId, 'catalog_section', $id, $data);
+        $nameAr = $preview['name_ar'];
+        $nameEn = $preview['name_en'];
+        $nameFil = $preview['name_fil'];
+        $nameHi = $preview['name_hi'];
+        $data['slug'] = orange_catalog_name_locale_kept_slug($pdo, 'catalog_sections', $id, (string) ($data['slug'] ?? ''));
+    } else {
+        $nameAr = trim((string) ($data['name_ar'] ?? ''));
+        $nameEn = trim((string) ($data['name_en'] ?? ''));
+        $nameFil = trim((string) ($data['name_fil'] ?? ''));
+        $nameHi = trim((string) ($data['name_hi'] ?? ''));
+    }
     $sortOrder = (int) ($data['sort_order'] ?? 0);
     $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
     if ($depId <= 0) {
         json_response(['success' => false, 'message' => 'اختر القسم (department) الأب.'], 422);
     }
-    if ($nameAr === '' || $nameEn === '') {
-        json_response(['success' => false, 'message' => 'الاسم العربي والإنجليزي مطلوبان.'], 422);
+    $allowExplicitEmpty = $localeMode && $id > 0 && !empty($data['base_explicit_empty']);
+    $guard = orange_catalog_name_locale_guard($pdo, $countryId, $localeMode, (string) ($data['base_text'] ?? ''), $nameEn, $nameAr, $nameEn, 'الاسم العربي والإنجليزي مطلوبان.', $allowExplicitEmpty);
+    if ($guard !== null) {
+        json_response(['success' => false, 'message' => $guard], 422);
     }
 
     $slugResolved = orange_catalog_unified_branch_slug_resolve(
@@ -62,7 +79,10 @@ try {
     $sib = $pdo->prepare('SELECT id, name_ar FROM catalog_sections WHERE department_id = ?');
     $sib->execute([$depId]);
     $sibRows = $sib->fetchAll(PDO::FETCH_ASSOC);
-    if (orange_rows_normalized_arabic_conflict(is_array($sibRows) ? $sibRows : [], 'id', 'name_ar', $nameAr, $id > 0 ? $id : null)) {
+    $sectionDup = $localeMode
+        ? orange_catalog_name_locale_names_conflict($pdo, 'catalog_section', 'department_id', $depId, $id, (string) (orange_country_locale_roles_read($pdo, $countryId)['base'] ?? ''), (string) ($data['base_text'] ?? ''))
+        : orange_rows_normalized_arabic_conflict(is_array($sibRows) ? $sibRows : [], 'id', 'name_ar', $nameAr, $id > 0 ? $id : null);
+    if ($sectionDup) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
@@ -86,22 +106,46 @@ try {
         if (!$ex->fetch()) {
             json_response(['success' => false, 'message' => 'السجل غير موجود.'], 404);
         }
-        $pdo->prepare(
-            'UPDATE catalog_sections SET department_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
-                sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
-        )->execute([$depId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, $sortOrder, $active, $id]);
+        if ($localeMode) {
+            $pdo->beginTransaction();
+            $pdo->prepare(
+                'UPDATE catalog_sections SET department_id = ?, slug = ?, sort_order = ?, is_active = ? WHERE id = ?'
+            )->execute([$depId, $slugRaw, $sortOrder, $active, $id]);
+            orange_catalog_name_locale_commit_payload($pdo, $countryId, 'catalog_section', $id, $data);
+            $pdo->commit();
+        } else {
+            $pdo->prepare(
+                'UPDATE catalog_sections SET department_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
+                    sort_order = ?, is_active = ? WHERE id = ?'
+            )->execute([$depId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, $sortOrder, $active, $id]);
+        }
         audit_log('unified_catalog_section_save', 'تحديث قسم كتالوج موحّد: ' . $slugRaw, 'catalog_sections', $id);
         json_response(['success' => true, 'id' => $id]);
     }
 
-    $pdo->prepare(
-        'INSERT INTO catalog_sections (
-            department_id, slug, name_ar, name_en, name_fil, name_hi, sort_order, is_active
-        ) VALUES (?,?,?,?,?,?,?,?)'
-    )->execute([$depId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, $sortOrder, $active]);
-    $newId = (int) $pdo->lastInsertId();
+    if ($localeMode) {
+        $pdo->beginTransaction();
+        $pdo->prepare(
+            'INSERT INTO catalog_sections (
+                department_id, slug, name_ar, name_en, name_fil, name_hi, sort_order, is_active
+            ) VALUES (?,?,?,?,?,?,?,?)'
+        )->execute([$depId, $slugRaw, '', '', '', '', $sortOrder, $active]);
+        $newId = (int) $pdo->lastInsertId();
+        orange_catalog_name_locale_commit_payload($pdo, $countryId, 'catalog_section', $newId, $data);
+        $pdo->commit();
+    } else {
+        $pdo->prepare(
+            'INSERT INTO catalog_sections (
+                department_id, slug, name_ar, name_en, name_fil, name_hi, sort_order, is_active
+            ) VALUES (?,?,?,?,?,?,?,?)'
+        )->execute([$depId, $slugRaw, $nameAr, $nameEn, $nameFil, $nameHi, $sortOrder, $active]);
+        $newId = (int) $pdo->lastInsertId();
+    }
     audit_log('unified_catalog_section_save', 'إضافة قسم كتالوج موحّد: ' . $slugRaw, 'catalog_sections', $newId);
     json_response(['success' => true, 'id' => $newId]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     orange_admin_api_catch($e, 'تعذر حفظ قسم الشجرة الموحّدة');
 }

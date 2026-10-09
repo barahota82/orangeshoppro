@@ -7,7 +7,30 @@ $catJ = $orange_uc['category_opts_json'] ?? '[]';
 $ucNextDeptJ = json_encode($orange_uc['next_sort_by_department'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
 $ucNextSecJ = json_encode($orange_uc['next_sort_by_section'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
 $ucNextCatJ = json_encode($orange_uc['next_sort_by_category'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
+$ucLocaleReady = !empty($orange_uc['locale_ready']);
 ?>
+<?php if ($ucLocaleReady): ?>
+<style>
+.uc-sec-ar,.uc-sec-en,.uc-sec-fil,.uc-sec-hi,
+.uc-cat-ar,.uc-cat-en,.uc-cat-fil,.uc-cat-hi,
+.uc-sub-ar,.uc-sub-en,.uc-sub-fil,.uc-sub-hi,
+.uc-legacy-translate { display: none !important; }
+</style>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.UC_LOCALE_READY = true;
+window.UC_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $orange_uc['locale_roles'] ?? [],
+    'active' => $orange_uc['locale_active'] ?? [],
+    'mounts' => [
+        ['key' => 'sec', 'rootId' => 'uc-sec-locale', 'idPrefix' => 'sec-'],
+        ['key' => 'cat', 'rootId' => 'uc-cat-locale', 'idPrefix' => 'cat-'],
+        ['key' => 'sub', 'rootId' => 'uc-sub-locale', 'idPrefix' => 'sub-'],
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+</script>
+<?php endif; ?>
 <script>
 const ucSectionOptions = <?php echo $secJ; ?>;
 const ucCategoryOptions = <?php echo $catJ; ?>;
@@ -56,7 +79,7 @@ function ucSlugPrefixForSubcategory() {
     return ucSlugifyLabel(raw);
 }
 
-function refreshUcSlug(which) {
+function refreshUcSlug(which, englishOverride) {
     if (which !== 'sec' && ucSlugManual[which]) {
         return;
     }
@@ -67,10 +90,13 @@ function refreshUcSlug(which) {
     }
     const enEl = document.getElementById(p + 'name_en');
     const slugEl = document.getElementById(p + 'slug');
-    if (!enEl || !slugEl || slugEl.disabled) {
+    if (!slugEl || slugEl.disabled) {
         return;
     }
-    const enSeg = ucSlugifyLabel(enEl.value.trim());
+    if (!enEl && englishOverride == null) {
+        return;
+    }
+    const enSeg = ucSlugifyLabel(englishOverride != null ? String(englishOverride) : enEl.value.trim());
     let next = '';
     if (which === 'cat') {
         const pr = ucSlugPrefixForCategory();
@@ -90,6 +116,12 @@ function refreshUcSlug(which) {
         next = enSeg;
     }
     if (!next) {
+        if (window.UC_LOCALE_READY) {
+            var keepId = document.getElementById(p + 'id');
+            if (keepId && (parseInt(keepId.value || '0', 10) || 0) > 0 && slugEl.value.trim() !== '') {
+                return;
+            }
+        }
         if (which === 'sec' || !ucSlugManual[which]) {
             ucSlugSkipInputEvent = true;
             slugEl.value = '';
@@ -139,6 +171,17 @@ function ucSetSlugValueFromRecord(which, raw) {
 function ucEnsureSlugBeforeSave(prefix, which) {
     const slugEl = document.getElementById(prefix + 'slug');
     if (!slugEl || slugEl.disabled) {
+        return;
+    }
+    if (window.UC_LOCALE_READY) {
+        const idEl = document.getElementById(prefix + 'id');
+        const existing = idEl && (parseInt(idEl.value || '0', 10) || 0) > 0;
+        if (existing && slugEl.value.trim() !== '') {
+            return;
+        }
+        if (!slugEl.value.trim() && window.OrangeCatalogNameLocale) {
+            refreshUcSlug(which, window.OrangeCatalogNameLocale.english(which));
+        }
         return;
     }
     if (!ucSlugManual[which]) {
@@ -321,6 +364,7 @@ function resetUcSection() {
     document.getElementById('uc_sec_active').value = '1';
     ucApplyNextSortForNewSec();
     ucInitSingleParentBranchForms();
+    if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('sec');
 }
 
 function editUcSection(j) {
@@ -333,6 +377,7 @@ function editUcSection(j) {
     document.getElementById('uc_sec_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sec_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sec_active').value = String(j.is_active === 0 ? 0 : 1);
+    if (window.OrangeCatalogNameLocale && j.locale_view) window.OrangeCatalogNameLocale.open('sec', j.locale_view);
     ucScrollToBranchCard('sec');
 }
 
@@ -350,6 +395,7 @@ function saveUcSection() {
         sort_order: parseSortPayload(document.getElementById('uc_sec_sort').value),
         is_active: parseInt(document.getElementById('uc_sec_active').value || '1', 10) ? 1 : 0
     };
+    if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('sec'));
     if (id > 0) payload.id = id;
     ucPost('/admin/api/unified_catalog/save_section.php', payload);
 }
@@ -370,6 +416,7 @@ function resetUcCategory() {
     document.getElementById('uc_cat_active').value = '1';
     ucApplyNextSortForNewCat();
     ucInitSingleParentBranchForms();
+    if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('cat');
 }
 
 function editUcCategory(j) {
@@ -382,6 +429,7 @@ function editUcCategory(j) {
     document.getElementById('uc_cat_name_fil').value = j.name_fil || '';
     document.getElementById('uc_cat_name_hi').value = j.name_hi || '';
     document.getElementById('uc_cat_active').value = String(j.is_active === 0 ? 0 : 1);
+    if (window.OrangeCatalogNameLocale && j.locale_view) window.OrangeCatalogNameLocale.open('cat', j.locale_view);
     ucScrollToBranchCard('cat');
 }
 
@@ -414,6 +462,7 @@ function saveUcCategory() {
         sort_order: parseSortPayload(document.getElementById('uc_cat_sort').value),
         is_active: parseInt(document.getElementById('uc_cat_active').value || '1', 10) ? 1 : 0
     };
+    if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('cat'));
     if (id > 0) payload.id = id;
     ucPost('/admin/api/unified_catalog/save_category.php', payload);
 }
@@ -434,6 +483,7 @@ function resetUcSubcategory() {
     document.getElementById('uc_sub_active').value = '1';
     ucApplyNextSortForNewSub();
     ucInitSingleParentBranchForms();
+    if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('sub');
 }
 
 function editUcSubcategory(j) {
@@ -446,6 +496,7 @@ function editUcSubcategory(j) {
     document.getElementById('uc_sub_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sub_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sub_active').value = String(j.is_active === 0 ? 0 : 1);
+    if (window.OrangeCatalogNameLocale && j.locale_view) window.OrangeCatalogNameLocale.open('sub', j.locale_view);
     ucScrollToBranchCard('sub');
 }
 
@@ -463,6 +514,7 @@ function saveUcSubcategory() {
         sort_order: parseSortPayload(document.getElementById('uc_sub_sort').value),
         is_active: parseInt(document.getElementById('uc_sub_active').value || '1', 10) ? 1 : 0
     };
+    if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('sub'));
     if (id > 0) payload.id = id;
     ucPost('/admin/api/unified_catalog/save_subcategory.php', payload);
 }
@@ -571,6 +623,7 @@ function scheduleUcFromEn(which) {
             try { editUcSubcategory(JSON.parse(b.dataset.json)); } catch (e) { alert('تعذر قراءة البيانات'); }
         }
     });
+    if (!window.UC_LOCALE_READY) {
     [['uc_sec_name_ar', 'sec'], ['uc_cat_name_ar', 'cat'], ['uc_sub_name_ar', 'sub']].forEach(function (pair) {
         var el = document.getElementById(pair[0]);
         if (el) el.addEventListener('input', function () { scheduleUcTranslate(pair[1]); });
@@ -584,6 +637,7 @@ function scheduleUcFromEn(which) {
             });
         }
     });
+    }
     ucBindSlugAuto('cat', 'uc_cat_');
     ucBindSlugAuto('sub', 'uc_sub_');
     var dDept = document.getElementById('uc_sec_department_id');
@@ -594,16 +648,30 @@ function scheduleUcFromEn(which) {
     if (dSec) {
         dSec.addEventListener('change', function () {
             ucApplyNextSortForNewCat();
-            scheduleUcSlugRefresh('cat');
+            if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                refreshUcSlug('cat', window.OrangeCatalogNameLocale.english('cat'));
+            } else {
+                scheduleUcSlugRefresh('cat');
+            }
         });
     }
     var dCat = document.getElementById('uc_sub_category_id');
     if (dCat) {
         dCat.addEventListener('change', function () {
             ucApplyNextSortForNewSub();
-            scheduleUcSlugRefresh('sub');
+            if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                refreshUcSlug('sub', window.OrangeCatalogNameLocale.english('sub'));
+            } else {
+                scheduleUcSlugRefresh('sub');
+            }
         });
     }
     ucInitSingleParentBranchForms();
+    if (window.UC_LOCALE_READY && window.OrangeCatalogNameLocale && window.UC_LOCALE_BOOT) {
+        (window.UC_LOCALE_BOOT.mounts || []).forEach(function (item) {
+            item.onEnglish = function (text) { refreshUcSlug(item.key, text); };
+        });
+        window.OrangeCatalogNameLocale.bind(window.UC_LOCALE_BOOT);
+    }
 })();
 </script>

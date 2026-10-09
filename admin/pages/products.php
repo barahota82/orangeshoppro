@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
+require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -56,6 +57,9 @@ if (orange_table_exists($pdo, 'product_types')) {
         $productTypesForForm = [];
     }
 }
+$productTypeBaseLabels = orange_table_exists($pdo, 'product_types')
+    ? orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'product_type')
+    : [];
 $productTypeDepartmentsForForm = [];
 foreach ($productTypesForForm as $ptRow) {
     if (!is_array($ptRow)) {
@@ -85,16 +89,15 @@ $productTypeTrailsForJs = [];
 if ($catalogNavUnified && orange_table_exists($pdo, 'product_types') && orange_table_exists($pdo, 'catalog_sections')
     && orange_table_exists($pdo, 'departments')) {
     try {
+        $trailSecLabels = orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'catalog_section');
+        $trailCatLabels = orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'catalog_category');
+        $trailSubLabels = orange_catalog_name_locale_label_map($pdo, $adminCountryId, 'catalog_subcategory');
         $trailRows = $pdo->query(
             'SELECT pt.id,
-                CONCAT_WS(
-                    \' ← \',
-                    NULLIF(TRIM(d.name_ar), \'\'),
-                    NULLIF(TRIM(cs.name_ar), \'\'),
-                    NULLIF(TRIM(ucc.name_ar), \'\'),
-                    NULLIF(TRIM(ucs.name_ar), \'\'),
-                    NULLIF(TRIM(pt.name_ar), \'\')
-                ) AS trail_ar
+                NULLIF(TRIM(d.name_ar), \'\') AS dept_ar,
+                cs.id AS sec_id,
+                ucc.id AS cat_id,
+                ucs.id AS sub_id
              FROM product_types pt
              INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
              INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
@@ -110,8 +113,25 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'product_types') && orange_t
             if ($tid <= 0) {
                 continue;
             }
+            $trailParts = [];
+            $deptPart = trim((string) ($tr['dept_ar'] ?? ''));
+            if ($deptPart !== '') {
+                $trailParts[] = $deptPart;
+            }
+            foreach ([
+                [(int) ($tr['sec_id'] ?? 0), $trailSecLabels],
+                [(int) ($tr['cat_id'] ?? 0), $trailCatLabels],
+                [(int) ($tr['sub_id'] ?? 0), $trailSubLabels],
+                [$tid, $productTypeBaseLabels],
+            ] as $trailPiece) {
+                $pieceId = $trailPiece[0];
+                $pieceMap = $trailPiece[1];
+                if ($pieceId > 0 && array_key_exists($pieceId, $pieceMap) && trim((string) $pieceMap[$pieceId]) !== '') {
+                    $trailParts[] = trim((string) $pieceMap[$pieceId]);
+                }
+            }
             $productTypeTrailsForJs[$tid] = [
-                'trail_ar' => trim((string) ($tr['trail_ar'] ?? '')),
+                'trail_ar' => implode(' ← ', $trailParts),
             ];
         }
     } catch (Throwable $e) {
@@ -459,7 +479,15 @@ usort($productNavRows, static function ($a, $b) {
                                 <?php
                                 $ptIdOpt = (int) ($prt['id'] ?? 0);
                                 $ptSlug = htmlspecialchars((string) ($prt['slug'] ?? ''), ENT_QUOTES, 'UTF-8');
-                                $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
+                                if (array_key_exists($ptIdOpt, $productTypeBaseLabels)) {
+                                    $ptRawLabel = trim((string) $productTypeBaseLabels[$ptIdOpt]);
+                                    if ($ptRawLabel === '') {
+                                        $ptRawLabel = '#' . $ptIdOpt;
+                                    }
+                                } else {
+                                    $ptRawLabel = (string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id']));
+                                }
+                                $ptLabel = htmlspecialchars($ptRawLabel, ENT_QUOTES, 'UTF-8');
                                 $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                                 $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                                 $ptDeptIdOpt = (int) ($prt['department_id'] ?? 0);

@@ -214,6 +214,33 @@ try {
     $depOptions = [];
     $catOptions = [];
 }
+require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
+$srCatalogCatLabels = orange_table_exists($pdo, 'catalog_categories')
+    ? orange_catalog_name_locale_label_map($pdo, (int) orange_admin_context_country_id($pdo), 'catalog_category')
+    : [];
+foreach ($catOptions as $srCatIndex => $srCatRow) {
+    if (!is_array($srCatRow)) {
+        continue;
+    }
+    $srCatOptionId = (int) ($srCatRow['id'] ?? 0);
+    if ($srCatOptionId > 0 && array_key_exists($srCatOptionId, $srCatalogCatLabels)) {
+        $catOptions[$srCatIndex]['name_ar'] = $srCatalogCatLabels[$srCatOptionId];
+    }
+}
+$srApplyCatLabel = static function (array $row) use ($srCatalogCatLabels): array {
+    $id = (int) ($row['group_cat_id'] ?? ($row['category_id'] ?? 0));
+    if ($id > 0 && array_key_exists($id, $srCatalogCatLabels)) {
+        $text = (string) $srCatalogCatLabels[$id];
+        if (array_key_exists('category_name', $row)) {
+            $row['category_name'] = $text;
+        }
+        if (array_key_exists('group_cat_name', $row)) {
+            $row['group_cat_name'] = $text;
+        }
+    }
+
+    return $row;
+};
 /* تأكيد اتساق: إن كانت الفئة المختارة لا تتبع القسم المختار، أهمل الفئة. */
 if ($catId > 0 && $depId > 0) {
     $catBelongs = false;
@@ -316,6 +343,7 @@ try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $r = $srApplyCatLabel($r);
             $qty = (int) $r['total_stock'];
             if ($hideZero && $qty <= 0) {
                 continue;
@@ -414,6 +442,7 @@ try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $r = $srApplyCatLabel($r);
             $vid = (int) $r['variant_id'];
             $wstock = (int) $r['qty'];
             $cost = (float) $r['cost'];
@@ -503,6 +532,7 @@ try {
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        ' . $itemCodeExpr . ' AS item_code,
+                       COALESCE(c.id, 0) AS category_id,
                        COALESCE(c.name_ar, \'\') AS category_name,
                        COALESCE(SUM(' . $wq['expr'] . '), 0) AS total_qty,
                        COALESCE(SUM(' . $prevExpr . '), 0) AS prev_qty
@@ -511,7 +541,7 @@ try {
                 INNER JOIN product_variants pv ON pv.product_id = p.id
                 ' . $wq['join'] . '
                 WHERE p.is_active = 1' . $productCountrySql . $filterSql . '
-                GROUP BY p.id, p.name, p.cost, item_code, category_name
+                GROUP BY p.id, p.name, p.cost, item_code, c.id, category_name
                 ORDER BY category_name ASC, p.name ASC, p.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -549,6 +579,7 @@ try {
             $grandQty += $qty;
             $grandValue += $value;
             $grandValuePrev += $valuePrev;
+            $r = $srApplyCatLabel($r);
             $catName = trim((string) $r['category_name']) !== '' ? (string) $r['category_name'] : '—';
             if (!isset($valGroups[$catName])) {
                 $valGroups[$catName] = ['rows' => [], 'sub_value' => 0.0, 'sub_value_prev' => 0.0];
@@ -586,6 +617,7 @@ try {
         $st = $pdo->prepare($sql);
         $st->execute([$lowTh]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $r = $srApplyCatLabel($r);
             $rows[] = [
                 'product_id' => (int) $r['product_id'],
                 'item_code' => (string) $r['item_code'],
