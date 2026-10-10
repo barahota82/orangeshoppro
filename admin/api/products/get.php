@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/orange_product_content_locale.php';
 require_admin_api('GET');
 
 try {
@@ -122,6 +123,10 @@ try {
             }
         }
 
+        if (orange_content_locale_screen_ready($pdo, $adminStockCountryId)) {
+            $product = orange_product_content_locale_attach($pdo, $adminStockCountryId, $product);
+        }
+
         json_response(['success' => true, 'product' => $product]);
     }
 
@@ -139,6 +144,10 @@ try {
         {$catJoinPart}
         ORDER BY p.sort_order ASC, p.id ASC
     ")->fetchAll();
+
+    if (is_array($rows) && orange_content_locale_screen_ready($pdo, $adminStockCountryId)) {
+        $rows = orange_product_content_locale_overlay_list($pdo, $rows);
+    }
 
     json_response(['success' => true, 'products' => $rows]);
 } catch (Throwable $e) {

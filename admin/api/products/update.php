@@ -12,12 +12,30 @@ require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/catalog_polish_phase6.php';
+require_once __DIR__ . '/../../../includes/orange_product_content_locale.php';
 require_admin_api();
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    // Internal preview-copy metadata must never be accepted from a public save payload.
+    if (isset($data['content_locale']) && is_array($data['content_locale'])) {
+        foreach ($data['content_locale'] as &$productLocaleBlock) {
+            if (!is_array($productLocaleBlock) || !isset($productLocaleBlock['locales']) || !is_array($productLocaleBlock['locales'])) {
+                continue;
+            }
+            foreach ($productLocaleBlock['locales'] as &$productLocaleEntry) {
+                if (is_array($productLocaleEntry)) {
+                    unset($productLocaleEntry['preserve'], $productLocaleEntry['origin']);
+                }
+            }
+            unset($productLocaleEntry);
+        }
+        unset($productLocaleBlock);
+    }
+    $adminCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    $productLocaleMode = orange_product_content_locale_use($pdo, $adminCountryId, $data);
 
     $productId = (int)($data['id'] ?? 0);
     if ($productId <= 0) {
@@ -29,14 +47,24 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    if (empty($data['name']) || !isset($data['price']) || !isset($data['cost'])) {
+    $productLocaleColumns = null;
+    if ($productLocaleMode) {
+        try {
+            orange_product_content_locale_assert_pack($pdo, $adminCountryId, $productId, $data['content_locale']);
+        } catch (InvalidArgumentException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+        $productLocaleColumns = orange_product_content_locale_preview_columns($pdo, $adminCountryId, $productId, $data['content_locale']);
+    }
+
+    if (!isset($data['price']) || !isset($data['cost']) || (!$productLocaleMode && empty($data['name']))) {
         json_response(['success' => false, 'message' => 'البيانات الأساسية مطلوبة'], 422);
     }
 
-    $nameEn = trim((string)($data['name_en'] ?? ''));
-    $nameFil = trim((string)($data['name_fil'] ?? ''));
-    $nameHi = trim((string)($data['name_hi'] ?? ''));
-    if ($nameEn === '' || $nameFil === '' || $nameHi === '') {
+    $nameEn = $productLocaleMode ? trim((string) ($productLocaleColumns['name_en'] ?? '')) : trim((string)($data['name_en'] ?? ''));
+    $nameFil = $productLocaleMode ? trim((string) ($productLocaleColumns['name_fil'] ?? '')) : trim((string)($data['name_fil'] ?? ''));
+    $nameHi = $productLocaleMode ? trim((string) ($productLocaleColumns['name_hi'] ?? '')) : trim((string)($data['name_hi'] ?? ''));
+    if (!$productLocaleMode && ($nameEn === '' || $nameFil === '' || $nameHi === '')) {
         json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
     }
 
@@ -50,7 +78,7 @@ try {
         json_response(['success' => false, 'message' => 'نوع المنتج غير صالح'], 422);
     }
 
-    $nameAr = trim((string)$data['name']);
+    $nameAr = $productLocaleMode ? trim((string) ($productLocaleColumns['name'] ?? '')) : trim((string)$data['name']);
     $sizeFamilyId = isset($data['size_family_id']) ? (int)$data['size_family_id'] : 0;
     if ($sizeFamilyId <= 0) {
         $sizeFamilyId = null;
@@ -145,25 +173,31 @@ try {
         $productTypeIdResolved,
         $unifiedNav
     );
-    if (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, $productId)) {
+    if ($productLocaleMode) {
+        $roles = orange_country_locale_roles_read($pdo, $adminCountryId);
+        $baseName = trim((string) ($data['content_locale']['name']['base_text'] ?? ''));
+        if (orange_product_content_locale_name_conflict($pdo, $productTypeIdResolved, $productId, (string) ($roles['base'] ?? ''), $baseName)) {
+            json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
+        }
+    } elseif (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, $productId)) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
-    $seoTitleAr = trim((string)($data['seo_meta_title_ar'] ?? ''));
-    $seoTitleEn = trim((string)($data['seo_meta_title_en'] ?? ''));
-    $seoTitleFil = trim((string)($data['seo_meta_title_fil'] ?? ''));
-    $seoTitleHi = trim((string)($data['seo_meta_title_hi'] ?? ''));
-    $seoDescAr = trim((string)($data['seo_meta_description_ar'] ?? ''));
-    $seoDescEn = trim((string)($data['seo_meta_description_en'] ?? ''));
-    $seoDescFil = trim((string)($data['seo_meta_description_fil'] ?? ''));
-    $seoDescHi = trim((string)($data['seo_meta_description_hi'] ?? ''));
+    $seoTitleAr = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_title_ar'] ?? '') : trim((string)($data['seo_meta_title_ar'] ?? ''));
+    $seoTitleEn = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_title_en'] ?? '') : trim((string)($data['seo_meta_title_en'] ?? ''));
+    $seoTitleFil = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_title_fil'] ?? '') : trim((string)($data['seo_meta_title_fil'] ?? ''));
+    $seoTitleHi = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_title_hi'] ?? '') : trim((string)($data['seo_meta_title_hi'] ?? ''));
+    $seoDescAr = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_description_ar'] ?? '') : trim((string)($data['seo_meta_description_ar'] ?? ''));
+    $seoDescEn = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_description_en'] ?? '') : trim((string)($data['seo_meta_description_en'] ?? ''));
+    $seoDescFil = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_description_fil'] ?? '') : trim((string)($data['seo_meta_description_fil'] ?? ''));
+    $seoDescHi = $productLocaleMode ? (string) ($productLocaleColumns['seo_meta_description_hi'] ?? '') : trim((string)($data['seo_meta_description_hi'] ?? ''));
 
-    $descAr = trim((string)($data['description'] ?? ''));
-    $descEn = trim((string)($data['description_en'] ?? ''));
-    $descFil = trim((string)($data['description_fil'] ?? ''));
-    $descHi = trim((string)($data['description_hi'] ?? ''));
+    $descAr = $productLocaleMode ? (string) ($productLocaleColumns['description'] ?? '') : trim((string)($data['description'] ?? ''));
+    $descEn = $productLocaleMode ? (string) ($productLocaleColumns['description_en'] ?? '') : trim((string)($data['description_en'] ?? ''));
+    $descFil = $productLocaleMode ? (string) ($productLocaleColumns['description_fil'] ?? '') : trim((string)($data['description_fil'] ?? ''));
+    $descHi = $productLocaleMode ? (string) ($productLocaleColumns['description_hi'] ?? '') : trim((string)($data['description_hi'] ?? ''));
 
-    $seoResolved = orange_product_seo_apply_defaults_for_save(
+    $seoResolved = $productLocaleMode ? null : orange_product_seo_apply_defaults_for_save(
         $seoTitleAr,
         $seoTitleEn,
         $seoTitleFil,
@@ -181,14 +215,16 @@ try {
         $descFil,
         $descHi
     );
-    $seoTitleAr = $seoResolved['seo_meta_title_ar'];
-    $seoTitleEn = $seoResolved['seo_meta_title_en'];
-    $seoTitleFil = $seoResolved['seo_meta_title_fil'];
-    $seoTitleHi = $seoResolved['seo_meta_title_hi'];
-    $seoDescAr = $seoResolved['seo_meta_description_ar'];
-    $seoDescEn = $seoResolved['seo_meta_description_en'];
-    $seoDescFil = $seoResolved['seo_meta_description_fil'];
-    $seoDescHi = $seoResolved['seo_meta_description_hi'];
+    if (is_array($seoResolved)) {
+        $seoTitleAr = $seoResolved['seo_meta_title_ar'];
+        $seoTitleEn = $seoResolved['seo_meta_title_en'];
+        $seoTitleFil = $seoResolved['seo_meta_title_fil'];
+        $seoTitleHi = $seoResolved['seo_meta_title_hi'];
+        $seoDescAr = $seoResolved['seo_meta_description_ar'];
+        $seoDescEn = $seoResolved['seo_meta_description_en'];
+        $seoDescFil = $seoResolved['seo_meta_description_fil'];
+        $seoDescHi = $seoResolved['seo_meta_description_hi'];
+    }
 
     $mainImage = trim((string)($data['main_image'] ?? ''));
     $extraImagesIn = $data['extra_images'] ?? null;
@@ -236,6 +272,15 @@ try {
     }
 
     $pdo->beginTransaction();
+    $priorLocaleColumns = null;
+    if ($productLocaleMode) {
+        $priorLoad = $pdo->prepare('SELECT * FROM products WHERE id = ?');
+        $priorLoad->execute([$productId]);
+        $priorRow = $priorLoad->fetch(PDO::FETCH_ASSOC);
+        $priorLocaleColumns = is_array($priorRow)
+            ? orange_product_content_locale_column_snapshot($priorRow)
+            : orange_product_content_locale_blank_columns();
+    }
 
     $normSku = static function ($raw): ?string {
         $s = trim((string) $raw);
@@ -416,6 +461,18 @@ try {
         $barcodeFinal = $bcRes['product_barcode'] ?? null;
     } catch (Throwable $e) {
         $barcodeFinal = null;
+    }
+
+    if ($productLocaleMode) {
+            orange_product_content_locale_save(
+                $pdo,
+                $adminCountryId,
+                $productId,
+                $data['content_locale'],
+                false,
+                is_array($priorLocaleColumns) ? $priorLocaleColumns : orange_product_content_locale_blank_columns(),
+                true
+            );
     }
 
     $pdo->commit();

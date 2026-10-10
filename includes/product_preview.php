@@ -366,6 +366,12 @@ if (! function_exists('orange_preview_delete_draft_row')) {
             if (orange_table_exists($pdo, 'product_channels')) {
                 $pdo->prepare('DELETE FROM product_channels WHERE product_id = ?')->execute([$draftId]);
             }
+            if (function_exists('orange_product_content_locale_delete_entity')) {
+                orange_product_content_locale_delete_entity($pdo, $draftId);
+            } elseif (is_file(__DIR__ . '/orange_product_content_locale.php')) {
+                require_once __DIR__ . '/orange_product_content_locale.php';
+                orange_product_content_locale_delete_entity($pdo, $draftId);
+            }
             $pdo->prepare('DELETE FROM products WHERE id = ? AND is_preview_draft = 1')->execute([$draftId]);
         } catch (Throwable $e) {
             if (function_exists('error_log')) {

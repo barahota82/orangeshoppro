@@ -77,7 +77,12 @@ function orange_storefront_offer_product_display_map(PDO $pdo, array $productIds
 
     $map = [];
     $needImage = [];
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+    $offerCardRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if (is_file(__DIR__ . '/orange_product_content_locale.php')) {
+        require_once __DIR__ . '/orange_product_content_locale.php';
+        orange_product_content_locale_prefetch($pdo, $offerCardRows);
+    }
+    foreach ($offerCardRows as $row) {
         $pid = (int) ($row['id'] ?? 0);
         if ($pid <= 0) {
             continue;
