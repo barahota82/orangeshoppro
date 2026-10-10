@@ -167,12 +167,17 @@
         var showSave = options.showSave !== false;
         var saveLabel = options.saveLabel || 'حفظ القسم';
         var idPrefix = String(options.idPrefix || '');
+        var multiline = options.multiline === true;
+        var maxLength = parseInt(options.maxLength, 10) || 0;
+        var maxAttr = maxLength > 0 ? ' maxlength="' + maxLength + '"' : '';
         function eid(name) { return idPrefix + name; }
         function q(name) { return root.querySelector('#' + eid(name)); }
         var html = ''
             + '<span id="' + eid('translation-transport-note') + '" hidden>تعذر طلب الترجمة</span>'
             + '<label for="' + eid('base-text') + '">اللغة الأساسية <span id="' + eid('base-code') + '"></span></label>'
-            + '<input id="' + eid('base-text') + '" type="text">';
+            + (multiline
+                ? '<textarea id="' + eid('base-text') + '" rows="3"' + maxAttr + '></textarea>'
+                : '<input id="' + eid('base-text') + '" type="text"' + maxAttr + '>');
         if (showSlug) {
             html += '<label for="' + eid('slug') + '">Slug</label>'
                 + '<input id="' + eid('slug') + '" type="text" dir="ltr" disabled>';
@@ -248,8 +253,10 @@
                 wrap.className = 'locale-row';
                 var label = document.createElement('label');
                 label.textContent = code;
-                var input = document.createElement('input');
-                input.type = 'text';
+                var input = document.createElement(multiline ? 'textarea' : 'input');
+                if (!multiline) input.type = 'text';
+                if (multiline) input.rows = 3;
+                if (maxLength > 0) input.maxLength = maxLength;
                 input.className = 'locale-field';
                 input.setAttribute('data-locale', code);
                 var shown = drawer[code] && drawer[code].touched ? drawer[code].text : ((known[code] && known[code].text) || '');
@@ -302,6 +309,9 @@
                     known[code] = { origin: 'cleared', text: '' };
                     input.value = '';
                     invalidateNow();
+                    if (code === 'en' && roles.base !== 'en' && typeof options.onEnglishInput === 'function') {
+                        options.onEnglishInput('');
+                    }
                 });
                 var replaceBtn = document.createElement('button');
                 replaceBtn.type = 'button';

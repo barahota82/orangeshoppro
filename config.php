@@ -1419,6 +1419,13 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
  */
 function storefront_product_display_name(array $product): string
 {
+    $helper = __DIR__ . '/includes/orange_product_content_locale.php';
+    if (is_file($helper)) {
+        require_once $helper;
+        if (function_exists('orange_product_content_locale_display_name')) {
+            return orange_product_content_locale_display_name($product);
+        }
+    }
     $lang = current_lang();
     if ($lang === 'ar') {
         $v = trim((string)($product['name'] ?? ''));
@@ -1451,6 +1458,13 @@ function storefront_product_display_name(array $product): string
  */
 function storefront_product_display_description(array $product): string
 {
+    $helper = __DIR__ . '/includes/orange_product_content_locale.php';
+    if (is_file($helper)) {
+        require_once $helper;
+        if (function_exists('orange_product_content_locale_display_description')) {
+            return orange_product_content_locale_display_description($product);
+        }
+    }
     $lang = current_lang();
     if ($lang === 'ar') {
         $v = trim((string)($product['description'] ?? ''));
@@ -1510,6 +1524,13 @@ function storefront_size_chart_cell_label(array $row): string
  */
 function storefront_product_seo_meta_title(array $product): string
 {
+    $helper = __DIR__ . '/includes/orange_product_content_locale.php';
+    if (is_file($helper)) {
+        require_once $helper;
+        if (function_exists('orange_product_content_locale_display_seo_title')) {
+            return orange_product_content_locale_display_seo_title($product);
+        }
+    }
     $lang = current_lang();
     $key = match ($lang) {
         'ar' => 'seo_meta_title_ar',
@@ -1531,6 +1552,13 @@ function storefront_product_seo_meta_title(array $product): string
  */
 function storefront_product_seo_meta_description(array $product): string
 {
+    $helper = __DIR__ . '/includes/orange_product_content_locale.php';
+    if (is_file($helper)) {
+        require_once $helper;
+        if (function_exists('orange_product_content_locale_display_seo_description')) {
+            return orange_product_content_locale_display_seo_description($product);
+        }
+    }
     $lang = current_lang();
     $key = match ($lang) {
         'ar' => 'seo_meta_description_ar',

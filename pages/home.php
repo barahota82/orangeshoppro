@@ -338,6 +338,24 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment,
     return $parts === [] ? '' : ' ' . implode(' ', $parts);
 };
 
+if (is_file(__DIR__ . '/../includes/orange_product_content_locale.php')) {
+    require_once __DIR__ . '/../includes/orange_product_content_locale.php';
+    $sfProductLocaleRows = [];
+    foreach (['productsLazyRows', 'offersLazyRows', 'productsInitial', 'offersInitial'] as $sfProductLocaleKey) {
+        if (isset(${$sfProductLocaleKey}) && is_array(${$sfProductLocaleKey})) {
+            foreach (${$sfProductLocaleKey} as $sfProductLocaleRow) {
+                if (is_array($sfProductLocaleRow)) {
+                    $sfProductLocaleRows[] = $sfProductLocaleRow;
+                }
+            }
+        }
+    }
+    if (isset($sfPreviewDraftRow) && is_array($sfPreviewDraftRow)) {
+        $sfProductLocaleRows[] = $sfPreviewDraftRow;
+    }
+    orange_product_content_locale_prefetch($pdo, $sfProductLocaleRows);
+}
+
 /** @var list<array{id:int,df:string,imgSrc:string,title:string,price:string,href:string,vl:list<array{c:string,p:string}>}> */
 $lazyForJs = [];
 foreach ($productsLazyRows as $p) {

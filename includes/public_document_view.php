@@ -75,7 +75,14 @@ function orange_public_doc_localized_names(PDO $pdo, array $productIds): array
     try {
         $st = $pdo->prepare("SELECT id, name, name_en, name_fil, name_hi FROM products WHERE id IN ($place)");
         $st->execute($ids);
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (is_file(__DIR__ . '/orange_product_content_locale.php')) {
+            require_once __DIR__ . '/orange_product_content_locale.php';
+        }
+        $docNameRows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if (function_exists('orange_product_content_locale_prefetch')) {
+            orange_product_content_locale_prefetch($pdo, is_array($docNameRows) ? $docNameRows : []);
+        }
+        foreach ($docNameRows as $row) {
             $out[(int) $row['id']] = storefront_product_display_name($row);
         }
     } catch (Throwable $e) {

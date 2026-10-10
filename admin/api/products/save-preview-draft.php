@@ -22,6 +22,7 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/product_preview.php';
 require_once __DIR__ . '/../../../includes/admin_time.php';
+require_once __DIR__ . '/../../../includes/orange_product_content_locale.php';
 require_admin_api();
 
 try {
@@ -140,9 +141,28 @@ try {
 
     $nameAr = trim((string) ($data['name'] ?? ''));
     $hasColumns = orange_table_has_column($pdo, 'products', 'is_preview_draft');
+    $productLocaleMode = orange_product_content_locale_use($pdo, $previewCountryId, $data);
+    $postedLocale = is_array($data['content_locale'] ?? null) ? $data['content_locale'] : [];
+    $previewBaseName = $productLocaleMode ? trim((string) ($postedLocale['name']['base_text'] ?? '')) : '';
+    if ($productLocaleMode && $previewBaseName === '' && $sourceId > 0 && !array_key_exists('name', $postedLocale)) {
+        $srcName = $pdo->prepare('SELECT * FROM products WHERE id = ? AND COALESCE(is_preview_draft, 0) = 0');
+        $srcName->execute([$sourceId]);
+        $srcForName = $srcName->fetch(PDO::FETCH_ASSOC);
+        if (is_array($srcForName)) {
+            $srcRoles = orange_country_locale_roles_read($pdo, $previewCountryId);
+            $srcBase = (string) (($srcRoles['mode'] ?? '') === 'configured' ? ($srcRoles['base'] ?? '') : '');
+            $srcRows = orange_product_content_locale_rows($pdo, $sourceId);
+            $previewBaseName = trim(orange_product_content_locale_base_text(
+                'name',
+                $srcBase,
+                $srcForName,
+                is_array($srcRows['name'] ?? null) ? $srcRows['name'] : []
+            ));
+        }
+    }
 
     /* يُنشأ الكارت الأخضر فقط عند توفّر اسم + نوع منتج + جاهزية الأعمدة. */
-    $canCreateDraft = $hasColumns && $nameAr !== '' && $productTypeId > 0;
+    $canCreateDraft = $hasColumns && $productTypeId > 0 && ($productLocaleMode ? $previewBaseName !== '' : $nameAr !== '');
 
     /*
      * إعادة استخدام صفّ ظِلّ واحد لكل أدمن (يبقى نفس الـid عبر فتحات المعاينة، فلا يتصاعد العدّاد).
@@ -401,6 +421,25 @@ try {
             } catch (Throwable $ae) {
                 /* صفات ناقصة لا تكسر المعاينة */
             }
+        }
+
+        if ($productLocaleMode) {
+            orange_product_content_locale_delete_entity($pdo, $draftId);
+            $previewPack = orange_product_content_locale_preview_pack(
+                $pdo,
+                $previewCountryId,
+                $sourceId,
+                is_array($data['content_locale'] ?? null) ? $data['content_locale'] : []
+            );
+            orange_product_content_locale_save(
+                $pdo,
+                $previewCountryId,
+                $draftId,
+                $previewPack,
+                false,
+                orange_product_content_locale_blank_columns(),
+                false
+            );
         }
 
         $pdo->commit();

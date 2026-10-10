@@ -244,6 +244,10 @@ $advUxDefaultSystem = $advUxSystemsOrdered[0] ?? '';
 $legacySizingReady = !$advisorySizingReady && $sizingChartRows !== [];
 $showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $advisorySizingReady || $legacySizingReady);
 
+if (is_file(__DIR__ . '/../includes/orange_product_content_locale.php')) {
+    require_once __DIR__ . '/../includes/orange_product_content_locale.php';
+    orange_product_content_locale_prefetch($pdo, [$product]);
+}
 $displayName = storefront_product_display_name($product);
 $displayDesc = storefront_product_display_description($product);
 $homeUrl = storefront_url('home', $channelSlug, $lang);

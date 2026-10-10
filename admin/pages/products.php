@@ -10,11 +10,23 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
 require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
+require_once __DIR__ . '/../../includes/orange_product_content_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$productLocaleReady = orange_content_locale_screen_ready($pdo, $adminCountryId);
+$productLocaleRoles = ['mode' => 'legacy_unconfigured', 'base' => null, 'content' => [], 'admin_ui' => [], 'customer' => []];
+$productLocaleActive = [];
+if ($productLocaleReady) {
+    $productLocaleRoles = orange_country_locale_roles_read($pdo, $adminCountryId);
+    try {
+        $productLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $productLocaleActive = [];
+    }
+}
 $prodMoney = orange_admin_currency_context($pdo);
 $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 /* استبعاد صفوف ظِلّ المعاينة (is_preview_draft=1) من قائمة منتجات الأدمن — ليست منتجات محفوظة. */
@@ -502,25 +514,28 @@ usort($productNavRows, static function ($a, $b) {
                         </select>
                     </div>
                 </div>
+                <div id="product_locale_name" class="product-locale-mount"<?php echo $productLocaleReady ? '' : ' hidden'; ?>></div>
+                <div class="product-legacy-locale"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <label>اسم المنتج (العربي)</label>
-                        <input type="text" id="name" required>
+                        <input type="text" id="name"<?php echo $productLocaleReady ? '' : ' required'; ?>>
                     </div>
                     <div>
                         <label>English</label>
-                        <input type="text" id="name_en" required>
+                        <input type="text" id="name_en"<?php echo $productLocaleReady ? '' : ' required'; ?>>
                     </div>
                 </div>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <label>Filipino</label>
-                        <input type="text" id="name_fil" required>
+                        <input type="text" id="name_fil"<?php echo $productLocaleReady ? '' : ' required'; ?>>
                     </div>
                     <div>
                         <label>Hindi</label>
-                        <input type="text" id="name_hi" required>
+                        <input type="text" id="name_hi"<?php echo $productLocaleReady ? '' : ' required'; ?>>
                     </div>
+                </div>
                 </div>
                 <div class="form-grid form-grid-3 product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
@@ -713,20 +728,21 @@ usort($productNavRows, static function ($a, $b) {
         <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">وصف المنتج</h4>
+        <div id="product_locale_description" class="product-locale-mount"<?php echo $productLocaleReady ? '' : ' hidden'; ?>></div>
         <div class="form-grid product-form-tab-basic-grid">
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label>الوصف (عربي)</label>
                 <textarea id="description" rows="3"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label>Description (English)</label>
                 <textarea id="description_en" rows="3"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label>Description (Filipino)</label>
                 <textarea id="description_fil" rows="3"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label>Description (Hindi)</label>
                 <textarea id="description_hi" rows="3"></textarea>
             </div>
@@ -734,38 +750,40 @@ usort($productNavRows, static function ($a, $b) {
                 <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
                 <p class="card-hint" style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#64748b;">
                     للمنتجات المهمة: اكتب عنواناً ووصفاً مخصّصين لنتائج Google ومشاركة الرابط.
-                    <strong>اترك الحقل فارغاً</strong> ليُملأ تلقائياً من اسم المنتج ووصفه عند الحفظ وفي المتجر.
+                    <strong>اترك الحقل فارغاً</strong> ليُعرض تلقائياً من اسم المنتج ووصفه. القيمة المحفوظة تبقى منفصلة عن النص المشتق للعرض.
                 </p>
             </div>
-            <div>
+            <div id="product_locale_seo_title" class="product-locale-mount" style="grid-column:1/-1;"<?php echo $productLocaleReady ? '' : ' hidden'; ?>></div>
+            <div id="product_locale_seo_description" class="product-locale-mount" style="grid-column:1/-1;"<?php echo $productLocaleReady ? '' : ' hidden'; ?>></div>
+            <div class="product-legacy-locale"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
                 <input type="text" id="seo_meta_title_ar" maxlength="191">
             </div>
-            <div>
+            <div class="product-legacy-locale"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_title_en">Meta title (English)</label>
                 <input type="text" id="seo_meta_title_en" maxlength="191" lang="en" dir="ltr">
             </div>
-            <div>
+            <div class="product-legacy-locale"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_title_fil">Meta title (Filipino)</label>
                 <input type="text" id="seo_meta_title_fil" maxlength="191" lang="en" dir="ltr">
             </div>
-            <div>
+            <div class="product-legacy-locale"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_title_hi">Meta title (Hindi)</label>
                 <input type="text" id="seo_meta_title_hi" maxlength="191" lang="hi" dir="ltr">
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_description_ar">وصف الميتا (عربي)</label>
                 <textarea id="seo_meta_description_ar" rows="2"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_description_en">Meta description (English)</label>
                 <textarea id="seo_meta_description_en" rows="2" lang="en" dir="ltr"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_description_fil">Meta description (Filipino)</label>
                 <textarea id="seo_meta_description_fil" rows="2" lang="en" dir="ltr"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
+            <div class="product-legacy-locale" style="grid-column:1/-1;"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>
                 <label for="seo_meta_description_hi">Meta description (Hindi)</label>
                 <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
             </div>
@@ -813,6 +831,8 @@ usort($productNavRows, static function ($a, $b) {
                 <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"><?php echo $orangePreviewFullDisabled ? 'لا توجد قناة لهذه الدولة. أنشئ قناة من شاشة قنوات العملاء أولًا.' : ''; ?></span>
             </div>
         </div>
+
+        <iframe id="orangeAdminProductCardPreviewFrame" title="معاينة كارت المنتج" style="width:100%;min-height:420px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;"></iframe>
 
         <div id="orangeMobilePreviewModal" class="orange-mpv-modal" hidden>
             <div class="orange-mpv-backdrop" data-mpv-close></div>
@@ -869,7 +889,7 @@ usort($productNavRows, static function ($a, $b) {
 
         <div class="admin-product-form-actions admin-product-form-actions--bar">
             <div class="actions admin-product-form-actions__buttons">
-                <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
+                <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>ترجمة تلقائية من العربي</button>
                 <button type="button" class="btn" id="btnGenerateVariants" onclick="generateVariants()" disabled>توليد المتغيرات</button>
                 <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()" disabled>حفظ المنتج</button>
                 <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
@@ -912,6 +932,27 @@ usort($productNavRows, static function ($a, $b) {
    وخُفِّف استعلام المنتجات إلى الحد الأدنى (id/كود/باركود/اسم/حالة) لتسريع التحميل مع آلاف المنتجات.
    أداة إعادة ترتيب المنتجات ستُضاف لاحقاً كشاشة/أداة خفيفة منفصلة. */ ?>
 
+<?php if ($productLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/product_content_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.PRODUCT_LOCALE_READY = true;
+window.PRODUCT_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $productLocaleRoles,
+    'active' => $productLocaleActive,
+    'columns' => ORANGE_PRODUCT_CONTENT_FIELDS,
+    'mounts' => [
+        ['key' => 'name', 'rootId' => 'product_locale_name', 'idPrefix' => 'pl-name-', 'multiline' => false, 'maxLength' => 0],
+        ['key' => 'description', 'rootId' => 'product_locale_description', 'idPrefix' => 'pl-desc-', 'multiline' => true, 'maxLength' => 0],
+        ['key' => 'seo_meta_title', 'rootId' => 'product_locale_seo_title', 'idPrefix' => 'pl-seo-title-', 'multiline' => false, 'maxLength' => 191],
+        ['key' => 'seo_meta_description', 'rootId' => 'product_locale_seo_description', 'idPrefix' => 'pl-seo-desc-', 'multiline' => true, 'maxLength' => 500],
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeProductContentLocale) {
+    window.OrangeProductContentLocale.bind(window.PRODUCT_LOCALE_BOOT);
+}
+</script>
+<?php endif; ?>
 <script>
 window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_ADMIN_CURRENCY_UNIT = <?php echo json_encode($prodMoney['unit'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -1241,17 +1282,45 @@ function orangeProductClearGeneratedVariantsMatrixIfNeeded() {
  * يُستعمل لتفعيل زر «توليد المتغيرات» وللتحقق قبل الحفظ — أي نفس الشروط لما قبل المصفوفة.
  * @returns {null|{tab:string,message:string}}
  */
+function orangeProductLocaleNameState() {
+    if (window.PRODUCT_LOCALE_READY === true) {
+        const boot = window.PRODUCT_LOCALE_BOOT || {};
+        const roles = boot.roles || {};
+        const base = String(roles.base || '');
+        const baseEl = document.getElementById('pl-name-base-text');
+        const baseText = baseEl ? String(baseEl.value || '').trim() : '';
+        let english = baseText;
+        if (base !== 'en') {
+            const root = document.getElementById('product_locale_name');
+            const enEl = root ? root.querySelector('.locale-field[data-locale="en"]') : null;
+            english = enEl ? String(enEl.value || '').trim() : '';
+        }
+        return { ready: true, base: base, baseText: baseText, english: english };
+    }
+    return { ready: false, base: '', baseText: '', english: '' };
+}
+
 function orangeProductValidateWizardBeforeMatrix() {
-    const nameFields = [
-        { id: 'name', label: 'الاسم العربي' },
-        { id: 'name_en', label: 'English' },
-        { id: 'name_fil', label: 'Filipino' },
-        { id: 'name_hi', label: 'Hindi' }
-    ];
-    for (let i = 0; i < nameFields.length; i++) {
-        const f = nameFields[i];
-        if (!document.getElementById(f.id).value.trim()) {
-            return { tab: 'basic', message: 'يجب إضافة خانة ' + f.label + ' قبل المتابعة.' };
+    const localeName = orangeProductLocaleNameState();
+    if (localeName.ready) {
+        if (localeName.baseText === '') {
+            return { tab: 'basic', message: 'يجب إضافة اسم اللغة الأساسية قبل المتابعة.' };
+        }
+        if (localeName.base !== 'en' && localeName.english === '') {
+            return { tab: 'basic', message: 'يجب إضافة الإنجليزية المرجعية قبل المتابعة.' };
+        }
+    } else {
+        const nameFields = [
+            { id: 'name', label: 'الاسم العربي' },
+            { id: 'name_en', label: 'English' },
+            { id: 'name_fil', label: 'Filipino' },
+            { id: 'name_hi', label: 'Hindi' }
+        ];
+        for (let i = 0; i < nameFields.length; i++) {
+            const f = nameFields[i];
+            if (!document.getElementById(f.id).value.trim()) {
+                return { tab: 'basic', message: 'يجب إضافة خانة ' + f.label + ' قبل المتابعة.' };
+            }
         }
     }
 
@@ -2079,6 +2148,16 @@ function orangeScheduleProductCardPreviewRefresh() {
 }
 
 function orangeAdminProductCardPreviewTitle() {
+    if (window.PRODUCT_LOCALE_READY === true) {
+        const state = orangeProductLocaleNameState();
+        if (state.baseText) {
+            return state.baseText;
+        }
+        if (state.english) {
+            return state.english;
+        }
+        return '—';
+    }
     const ar = document.getElementById('name') && document.getElementById('name').value.trim();
     if (ar) {
         return ar;
@@ -2992,6 +3071,9 @@ function resetProductForm() {
     document.getElementById('seo_meta_description_en').value = '';
     document.getElementById('seo_meta_description_fil').value = '';
     document.getElementById('seo_meta_description_hi').value = '';
+    if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+        window.OrangeProductContentLocale.reset();
+    }
     if (typeof window.orangeRefreshSeoEffectivePreview === 'function') {
         window.orangeRefreshSeoEffectivePreview();
     }
@@ -3187,6 +3269,9 @@ async function loadProductForEdit(id) {
         document.getElementById('seo_meta_description_en').value = p.seo_meta_description_en || '';
         document.getElementById('seo_meta_description_fil').value = p.seo_meta_description_fil || '';
         document.getElementById('seo_meta_description_hi').value = p.seo_meta_description_hi || '';
+        if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+            window.OrangeProductContentLocale.openAll(p.content_locale || {});
+        }
         if (typeof window.orangeRefreshSeoEffectivePreview === 'function') {
             window.orangeRefreshSeoEffectivePreview();
         }
@@ -4771,6 +4856,9 @@ async function saveProduct() {
     }
 
     const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
+    if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+        window.OrangeProductContentLocale.syncLegacy();
+    }
 
     if (recordId > 0) {
         const payload = {
@@ -4813,6 +4901,9 @@ async function saveProduct() {
             item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
             barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || ''
         };
+        if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+            payload.content_locale = window.OrangeProductContentLocale.bundle();
+        }
         const subEl = document.getElementById('subcategory_id');
         if (subEl) {
             const sv = subEl.value.trim();
@@ -4924,6 +5015,9 @@ async function saveProduct() {
         barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || '',
         variants
     };
+    if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+        payload.content_locale = window.OrangeProductContentLocale.bundle();
+    }
     const subElNew = document.getElementById('subcategory_id');
     if (subElNew) {
         const sv2 = subElNew.value.trim();
@@ -4948,6 +5042,9 @@ async function saveProduct() {
 
 /* معاينة المنتج قبل النشر: يبني حمولة متساهلة (تتحمّل بيانات ناقصة) من النموذج الحالي. */
 function orangeBuildProductPreviewPayload() {
+    if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+        window.OrangeProductContentLocale.syncLegacy();
+    }
     const val = (id) => {
         const el = document.getElementById(id);
         return el ? el.value.trim() : '';
@@ -4996,6 +5093,9 @@ function orangeBuildProductPreviewPayload() {
         extra_images: window.PRODUCT_EXTRA_IMAGES || [],
         variants
     };
+    if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+        payload.content_locale = window.OrangeProductContentLocale.bundle();
+    }
     try { Object.assign(payload, orangeProductSizingSaveFields()); } catch (e) {}
     try { payload.catalog_attribute_values = orangeCollectCatalogAttributePayload(); } catch (e) {}
     try { payload.colorway_images = orangeCollectColorwayImagesPayload(); } catch (e) {}
@@ -5202,10 +5302,12 @@ async function orangeOpenMobilePreview() {
     });
 }());
 
-document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
-document.getElementById('name_en').addEventListener('input', scheduleProductTranslateFromEnglish);
-document.getElementById('description').addEventListener('input', scheduleProductDescriptionAutoTranslate);
-document.getElementById('description_en').addEventListener('input', scheduleProductDescriptionFromEnglish);
+if (!window.PRODUCT_LOCALE_READY) {
+    document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
+    document.getElementById('name_en').addEventListener('input', scheduleProductTranslateFromEnglish);
+    document.getElementById('description').addEventListener('input', scheduleProductDescriptionAutoTranslate);
+    document.getElementById('description_en').addEventListener('input', scheduleProductDescriptionFromEnglish);
+}
 
 function updateProductCatalogHint() {
     const hint = document.getElementById('product_department_hint');
@@ -5562,21 +5664,40 @@ orangeScheduleProductCardPreviewRefresh();
         const descEl = document.getElementById('description');
         const titleEl = document.getElementById('seo_meta_title_ar');
         const metaDescEl = document.getElementById('seo_meta_description_ar');
-        const name = nameEl ? nameEl.value.trim() : '';
-        const descSrc = descEl ? descEl.value.trim() : '';
+        let name = nameEl ? nameEl.value.trim() : '';
+        let descSrc = descEl ? descEl.value.trim() : '';
         let title = titleEl ? titleEl.value.trim() : '';
         let desc = metaDescEl ? metaDescEl.value.trim() : '';
+        let titleSaved = title !== '';
+        let descSaved = desc !== '';
+        if (window.PRODUCT_LOCALE_READY && window.OrangeProductContentLocale) {
+            const namePayload = window.OrangeProductContentLocale.merge('name');
+            const descPayload = window.OrangeProductContentLocale.merge('description');
+            const titlePayload = window.OrangeProductContentLocale.merge('seo_meta_title');
+            const metaPayload = window.OrangeProductContentLocale.merge('seo_meta_description');
+            name = String((namePayload && namePayload.base_text) || '').trim();
+            descSrc = String((descPayload && descPayload.base_text) || '').trim();
+            title = String((titlePayload && titlePayload.base_text) || '').trim();
+            desc = String((metaPayload && metaPayload.base_text) || '').trim();
+            titleSaved = title !== '';
+            descSaved = desc !== '';
+        }
         if (!title && name) title = seoTruncate(name, 191);
         if (!desc && descSrc) desc = seoTruncate(seoPlainFromHtml(descSrc), 160);
-        return { title: title || '—', desc: desc || '—' };
+        return {
+            title: title || '—',
+            desc: desc || '—',
+            titleLabel: titleSaved ? 'عنوان محفوظ' : 'عنوان مشتق للعرض',
+            descLabel: descSaved ? 'وصف محفوظ' : 'وصف مشتق للعرض'
+        };
     }
     function refreshSeoEffectivePreview() {
         const titleNode = document.getElementById('seoEffectivePreviewTitle');
         const descNode = document.getElementById('seoEffectivePreviewDesc');
         if (!titleNode || !descNode) return;
         const eff = seoEffectiveAr();
-        titleNode.textContent = eff.title;
-        descNode.textContent = eff.desc;
+        titleNode.textContent = eff.titleLabel + ': ' + eff.title;
+        descNode.textContent = eff.descLabel + ': ' + eff.desc;
     }
     [
         'name', 'description',
