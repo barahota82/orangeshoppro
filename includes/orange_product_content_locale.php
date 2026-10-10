@@ -195,10 +195,7 @@ function orange_product_content_locale_display_name(array $product): string
     $code = orange_content_locale_code($lang) ?? ($lang === 'ar' ? 'ar' : '');
     orange_product_content_locale_ensure_loaded($product);
     if ($code !== '' && orange_product_content_locale_has_row($product, 'name', $code)) {
-        $direct = orange_product_content_locale_preferred($product, 'name', $code);
-        if ($direct !== '') {
-            return $direct;
-        }
+        return orange_product_content_locale_preferred($product, 'name', $code);
     }
     if ($lang === 'ar' || $code === 'ar') {
         if (!orange_product_content_locale_has_row($product, 'name', 'ar')) {
@@ -242,10 +239,7 @@ function orange_product_content_locale_display_description(array $product): stri
     $code = orange_content_locale_code($lang) ?? ($lang === 'ar' ? 'ar' : '');
     orange_product_content_locale_ensure_loaded($product);
     if ($code !== '' && orange_product_content_locale_has_row($product, 'description', $code)) {
-        $direct = orange_product_content_locale_preferred($product, 'description', $code);
-        if ($direct !== '') {
-            return $direct;
-        }
+        return orange_product_content_locale_preferred($product, 'description', $code);
     }
     if ($lang === 'ar' || $code === 'ar') {
         if (!orange_product_content_locale_has_row($product, 'description', 'ar')) {
@@ -891,6 +885,9 @@ function orange_product_content_locale_assert_pack(PDO $pdo, int $countryId, int
     $roles = orange_country_locale_roles_read($pdo, $countryId);
     if (($roles['mode'] ?? '') !== 'configured') {
         throw new RuntimeException('locale_settings_' . (string) ($roles['mode'] ?? 'missing'));
+    }
+    if (!isset($pack['name']) || !is_array($pack['name'])) {
+        throw new InvalidArgumentException('اسم اللغة الأساسية مطلوب.');
     }
     $base = (string) $roles['base'];
     $preview = orange_product_content_locale_preview_columns($pdo, $countryId, $entityId, $pack);

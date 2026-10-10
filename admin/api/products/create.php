@@ -37,15 +37,14 @@ try {
     }
     $adminCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
     $productLocaleMode = orange_product_content_locale_use($pdo, $adminCountryId, $data);
-    $productLocaleColumns = $productLocaleMode
-        ? orange_product_content_locale_preview_columns($pdo, $adminCountryId, 0, $data['content_locale'])
-        : null;
+    $productLocaleColumns = null;
     if ($productLocaleMode) {
         try {
             orange_product_content_locale_assert_pack($pdo, $adminCountryId, 0, $data['content_locale']);
         } catch (InvalidArgumentException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        $productLocaleColumns = orange_product_content_locale_preview_columns($pdo, $adminCountryId, 0, $data['content_locale']);
     }
 
     if (!isset($data['price']) || !isset($data['cost']) || (!$productLocaleMode && empty($data['name']))) {
