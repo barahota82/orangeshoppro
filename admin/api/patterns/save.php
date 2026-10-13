@@ -45,7 +45,7 @@ try {
         }
     }
 
-    $patRows = $pdo->query('SELECT id, name_ar FROM pattern_dictionary')->fetchAll(PDO::FETCH_ASSOC);
+    $patRows = orange_dictionary_locale_arabic_name_rows($pdo, 'pattern');
     $excludeId = $id > 0 ? $id : null;
     if (orange_rows_normalized_arabic_conflict(is_array($patRows) ? $patRows : [], 'id', 'name_ar', $nameAr, $excludeId)) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
