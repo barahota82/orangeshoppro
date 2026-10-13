@@ -210,6 +210,44 @@ function orange_dictionary_locale_label_map(PDO $pdo, int $countryId, string $ki
     return $out;
 }
 
+/**
+ * @return list<array{id:int,name_ar:string}>
+ */
+function orange_dictionary_locale_arabic_name_rows(PDO $pdo, string $kind): array
+{
+    $spec = orange_dictionary_locale_spec($kind);
+    $table = (string) ($spec['table'] ?? '');
+    $arColumn = (string) (($spec['columns']['ar'] ?? '') ?: '');
+    if ($table === '' || $arColumn === '' || (function_exists('orange_table_exists') && !orange_table_exists($pdo, $table))) {
+        return [];
+    }
+
+    $rows = $pdo->query('SELECT id, ' . $arColumn . ' FROM ' . $table)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $ids = [];
+    foreach ($rows as $row) {
+        if (is_array($row)) {
+            $ids[] = (int) ($row['id'] ?? 0);
+        }
+    }
+    $stored = orange_dictionary_locale_rows_for($pdo, $kind, $ids);
+    $out = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $id = (int) ($row['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $out[] = [
+            'id' => $id,
+            'name_ar' => orange_dictionary_locale_text($kind, 'ar', $row, $stored[$id] ?? []),
+        ];
+    }
+
+    return $out;
+}
+
 function orange_dictionary_locale_guard(PDO $pdo, int $countryId, bool $localeMode, string $baseText, string $englishText, string $legacyAr, string $legacyEn, string $legacyMessage): ?string
 {
     if (!$localeMode) {

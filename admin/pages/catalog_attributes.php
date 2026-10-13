@@ -394,7 +394,7 @@ if ($hasTable) {
 </style>
 
 <script>
-window.ORANGE_CATALOG_ATTR_OPTIONS = <?php echo json_encode($caOptionsByAttrId, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_CATALOG_ATTR_OPTIONS = <?php echo json_encode($caOptionsByAttrId, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 if (!window.ORANGE_CATALOG_ATTR_OPTIONS || Array.isArray(window.ORANGE_CATALOG_ATTR_OPTIONS)) {
     window.ORANGE_CATALOG_ATTR_OPTIONS = {};
 }

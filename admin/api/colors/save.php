@@ -49,7 +49,7 @@ try {
         }
     }
 
-    $colorRows = $pdo->query('SELECT id, name_ar FROM color_dictionary')->fetchAll(PDO::FETCH_ASSOC);
+    $colorRows = orange_dictionary_locale_arabic_name_rows($pdo, 'color');
     $excludeColorId = $id > 0 ? $id : null;
     if (orange_rows_normalized_arabic_conflict(is_array($colorRows) ? $colorRows : [], 'id', 'name_ar', $nameAr, $excludeColorId)) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
