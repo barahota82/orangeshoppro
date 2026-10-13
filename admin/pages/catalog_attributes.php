@@ -4,9 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$caCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$caLocaleReady = orange_content_locale_screen_ready($pdo, $caCountryId);
+$caLocaleRoles = $caLocaleReady ? orange_country_locale_roles_read($pdo, $caCountryId) : ['base' => 'ar'];
+$caBase = (string) ($caLocaleRoles['base'] ?? 'ar');
+$caLocaleActive = [];
+if ($caLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $caLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $caLocaleActive = [];
+    }
+}
+$caAttrBags = [];
+$caOptionBags = [];
 
 $hasTable = orange_table_exists($pdo, 'catalog_attributes');
 $attrs = [];
@@ -21,6 +36,9 @@ if ($hasTable) {
              FROM catalog_attributes
              ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
+        if ($caLocaleReady) {
+            $caAttrBags = orange_dictionary_locale_rows_for($pdo, 'catalog_attribute', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $attrs));
+        }
         $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM catalog_attributes')->fetchColumn();
         if ($nextSort <= 0) {
             $nextSort = 1;
@@ -32,11 +50,14 @@ if ($hasTable) {
     if (orange_table_exists($pdo, 'catalog_attribute_options')) {
         try {
             $orows = $pdo->query(
-                'SELECT catalog_attribute_id, label_ar, label_en, label_fil, label_hi, sort_order
+                'SELECT id, catalog_attribute_id, label_ar, label_en, label_fil, label_hi, sort_order
                  FROM catalog_attribute_options
                  WHERE is_active = 1
                  ORDER BY catalog_attribute_id ASC, sort_order ASC, id ASC'
             )->fetchAll(PDO::FETCH_ASSOC);
+            if ($caLocaleReady) {
+                $caOptionBags = orange_dictionary_locale_rows_for($pdo, 'catalog_attribute_option', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), is_array($orows) ? $orows : []));
+            }
             foreach (is_array($orows) ? $orows : [] as $o) {
                 if (! is_array($o)) {
                     continue;
@@ -45,11 +66,14 @@ if ($hasTable) {
                 if ($aid <= 0) {
                     continue;
                 }
+                $optionId = (int) ($o['id'] ?? 0);
                 $caOptionsByAttrId[$aid][] = [
+                    'id' => $optionId,
                     'label_ar' => (string) ($o['label_ar'] ?? ''),
                     'label_en' => (string) ($o['label_en'] ?? ''),
                     'label_fil' => (string) ($o['label_fil'] ?? ''),
                     'label_hi' => (string) ($o['label_hi'] ?? ''),
+                    'locale_view' => $caLocaleReady ? orange_dictionary_locale_panel_state('catalog_attribute_option', $o, $caOptionBags[$optionId] ?? [], $caBase) : null,
                 ];
             }
         } catch (Throwable $e) {
@@ -110,7 +134,8 @@ if ($hasTable) {
                 </select>
             </div>
         </div>
-        <div class="ca-row ca-row--r3">
+        <div id="ca-locale-app" class="ca-row" style="grid-column:1 / -1;<?php echo $caLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="ca-row ca-row--r3"<?php echo $caLocaleReady ? ' style="display:none;"' : ''; ?>>
             <div class="admin-sort-field-wrap">
                 <label for="ca_label_ar">عربي (عنوان العرض)</label>
                 <input type="text" id="ca_label_ar" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
@@ -120,7 +145,7 @@ if ($hasTable) {
                 <input type="text" id="ca_label_en" class="admin-sort-field" lang="en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
             </div>
         </div>
-        <div class="ca-row ca-row--r4">
+        <div class="ca-row ca-row--r4"<?php echo $caLocaleReady ? ' style="display:none;"' : ''; ?>>
             <div class="admin-sort-field-wrap">
                 <label for="ca_label_fil">Filipino</label>
                 <input type="text" id="ca_label_fil" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
@@ -141,7 +166,7 @@ if ($hasTable) {
     </div>
     <div class="actions ca-attr-form-actions admin-actions--start" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn-secondary" onclick="resetCatalogAttrForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
-        <button type="button" class="btn-secondary" onclick="translateCatalogLabels({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary" onclick="translateCatalogLabels({ forceFromArabic: true })" <?php echo (!$hasTable || $caLocaleReady) ? 'disabled style="display:none;"' : ''; ?>>ترجمة</button>
         <button type="button" onclick="saveCatalogAttribute()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ السمة</button>
     </div>
 </div>
@@ -159,7 +184,7 @@ if ($hasTable) {
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">#</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">المفتاح</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">النوع</th>
-                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">عربي</th>
+                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;"><?php echo $caLocaleReady ? 'العنوان' : 'عربي'; ?></th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">EN</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">قيم معرفة</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">فلتر</th>
@@ -174,7 +199,7 @@ if ($hasTable) {
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo (int) ($row['id'] ?? 0); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['input_kind'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['label_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars($caLocaleReady ? orange_dictionary_locale_base_text('catalog_attribute', $caBase, $row, $caAttrBags[(int) ($row['id'] ?? 0)] ?? []) : (string) ($row['label_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['label_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo (int) count($caOptionsByAttrId[(int) ($row['id'] ?? 0)] ?? []); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo ((int) ($row['is_filterable'] ?? 0) === 1) ? '√' : '—'; ?></td>
@@ -192,6 +217,7 @@ if ($hasTable) {
                                 'is_filterable' => (int) ($row['is_filterable'] ?? 0),
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                                 'is_active' => (int) ($row['is_active'] ?? 1),
+                                'locale_view' => $caLocaleReady ? orange_dictionary_locale_panel_state('catalog_attribute', $row, $caAttrBags[(int) ($row['id'] ?? 0)] ?? [], $caBase) : null,
                             ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                         </td>
                     </tr>
@@ -210,6 +236,9 @@ if ($hasTable) {
     .ca-row--opts-inner {
         width: 100%;
         min-width: 0;
+    }
+    .ca-opt-row--locale {
+        display: block;
     }
     .ca-opt-row {
         display: grid;
@@ -386,6 +415,31 @@ function caGetOptionsForAttrId(aid) {
     return m[n] || m[String(n)] || [];
 }
 
+var caOptSeq = 0;
+
+function caMountOptionPanel(host, record) {
+    if (!window.OrangeContentLocalePanel || !window.ATTR_LOCALE_BOOT) return null;
+    var api = window.OrangeContentLocalePanel.mount(host, {
+        showSlug: false,
+        showSort: false,
+        showSave: false,
+        debounceMs: 650,
+        idPrefix: host.id + '-',
+        suggest: function (req) {
+            var body = { base_text: req.base_text, known: req.known || {}, explicit: req.explicit || [] };
+            if (req.from_corrected_english) {
+                body.from_corrected_english = true;
+                body.corrected_english = req.corrected_english || '';
+            }
+            if (typeof window.postJSON !== 'function') return Promise.resolve({ success: false, suggestions: {} });
+            return window.postJSON('/admin/api/content_locale/suggest.php', body);
+        }
+    });
+    api.setRoles(window.ATTR_LOCALE_BOOT.roles || {}, window.ATTR_LOCALE_BOOT.active || []);
+    api.openRecord(record || { id: 0, base_text: '', locales: {} });
+    return api;
+}
+
 function caOptionsCollect() {
     var out = [];
     var box = document.getElementById('ca_options_box');
@@ -393,11 +447,37 @@ function caOptionsCollect() {
         return out;
     }
     box.querySelectorAll('.ca-opt-row').forEach(function (row) {
+        if (window.ATTR_LOCALE_READY && row._localeApi) {
+            var payload = row._localeApi.getPayload();
+            var prior = row._localeView && row._localeView.locales ? row._localeView.locales : {};
+            var locales = {};
+            Object.keys(prior).forEach(function (code) { locales[code] = prior[code]; });
+            Object.keys(payload.locales || {}).forEach(function (code) {
+                var inc = payload.locales[code] || {};
+                locales[code] = {
+                    text: inc.text || '',
+                    text_value: inc.text || '',
+                    origin: inc.clear ? 'cleared' : (inc.intent || 'manual'),
+                    source_locale: inc.source_locale || '',
+                    source_hash: inc.source_hash || ''
+                };
+            });
+            var optionId = parseInt(row.dataset.optionId || '0', 10) || 0;
+            out.push({
+                id: optionId,
+                base_text: payload.base_text || '',
+                locales: payload.locales || {},
+                locale_view: { id: optionId, base_text: payload.base_text || '', locales: locales },
+                label_ar: payload.base_text || ''
+            });
+            return;
+        }
         var ar = row.querySelector('.ca-opt-ar');
         var en = row.querySelector('.ca-opt-en');
         var fil = row.querySelector('.ca-opt-fil');
         var hi = row.querySelector('.ca-opt-hi');
         out.push({
+            id: parseInt(row.dataset.optionId || '0', 10) || 0,
             label_ar: ar ? ar.value.trim() : '',
             label_en: en ? en.value.trim() : '',
             label_fil: fil ? fil.value.trim() : '',
@@ -409,6 +489,7 @@ function caOptionsCollect() {
 
 function caOptionsPayload() {
     return caOptionsCollect().filter(function (r) {
+        if (window.ATTR_LOCALE_READY) return String(r.base_text || '').trim() !== '';
         return (r.label_ar || '').trim() !== '';
     });
 }
@@ -433,38 +514,67 @@ function caOptionsRender(rows) {
         return;
     }
     rows.forEach(function (r) {
-        var wrap = document.createElement('div');
-        wrap.className = 'ca-opt-row';
-        function addField(cls, label, val, ph) {
-            var d = document.createElement('div');
-            d.className = 'admin-sort-field-wrap';
-            var lb = document.createElement('label');
-            lb.textContent = label;
-            var inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'admin-sort-field ' + cls;
-            inp.value = val != null ? String(val) : '';
-            if (ph) {
-                inp.setAttribute('placeholder', ph);
-            }
-            d.appendChild(lb);
-            d.appendChild(inp);
-            wrap.appendChild(d);
-        }
-        addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '');
-        addField('ca-opt-en', 'English', r.label_en || '', '');
-        addField('ca-opt-fil', 'Filipino', r.label_fil || '', '');
-        addField('ca-opt-hi', 'Hindi', r.label_hi || '', '');
-        var rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'btn-secondary ca-opt-remove';
-        rm.textContent = 'حذف';
-        rm.onclick = function () {
-            caOptionsRemoveRow(rm);
-        };
-        wrap.appendChild(rm);
-        box.appendChild(wrap);
+        caOptionsMountOne(box, r);
     });
+}
+
+function caOptionsBlankRow() {
+    return window.ATTR_LOCALE_READY
+        ? { id: 0, base_text: '', locales: {}, locale_view: { id: 0, base_text: '', locales: {} }, label_ar: '', label_en: '', label_fil: '', label_hi: '' }
+        : { label_ar: '', label_en: '', label_fil: '', label_hi: '' };
+}
+
+function caOptionsMountOne(box, r) {
+    var wrap = document.createElement('div');
+    wrap.className = 'ca-opt-row';
+    wrap.dataset.optionId = String(r.id || 0);
+    if (window.ATTR_LOCALE_READY && window.OrangeContentLocalePanel) {
+        wrap.className = 'ca-opt-row ca-opt-row--locale';
+        var host = document.createElement('div');
+        caOptSeq += 1;
+        host.id = 'ca-opt-host-' + String(caOptSeq);
+        wrap.appendChild(host);
+        var view = r.locale_view || { id: r.id || 0, base_text: r.base_text || '', locales: {} };
+        wrap._localeView = view;
+        var rmLocale = document.createElement('button');
+        rmLocale.type = 'button';
+        rmLocale.className = 'btn-secondary';
+        rmLocale.textContent = 'حذف';
+        rmLocale.onclick = function () { caOptionsRemoveRow(rmLocale); };
+        wrap.appendChild(rmLocale);
+        box.appendChild(wrap);
+        wrap._localeApi = caMountOptionPanel(host, view);
+        return;
+    }
+    function addField(cls, label, val, ph) {
+        var d = document.createElement('div');
+        d.className = 'admin-sort-field-wrap';
+        var lb = document.createElement('label');
+        lb.textContent = label;
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'admin-sort-field ' + cls;
+        inp.value = val != null ? String(val) : '';
+        if (ph) {
+            inp.setAttribute('placeholder', ph);
+        }
+        d.appendChild(lb);
+        d.appendChild(inp);
+        wrap.appendChild(d);
+    }
+    addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '');
+    addField('ca-opt-en', 'English', r.label_en || '', '');
+    addField('ca-opt-fil', 'Filipino', r.label_fil || '', '');
+    addField('ca-opt-hi', 'Hindi', r.label_hi || '', '');
+    var rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'btn-secondary ca-opt-remove';
+    rm.textContent = 'حذف';
+    rm.onclick = function () {
+        caOptionsRemoveRow(rm);
+    };
+    wrap.appendChild(rm);
+    box.appendChild(wrap);
 }
 
 function caOptionsRenderFromAttrId(aid) {
@@ -472,9 +582,14 @@ function caOptionsRenderFromAttrId(aid) {
 }
 
 function caOptionsAddRow() {
-    var cur = caOptionsCollect();
-    cur.push({ label_ar: '', label_en: '', label_fil: '', label_hi: '' });
-    caOptionsRender(cur);
+    var box = document.getElementById('ca_options_box');
+    if (!box) {
+        return;
+    }
+    if (!box.querySelector('.ca-opt-row')) {
+        box.innerHTML = '';
+    }
+    caOptionsMountOne(box, caOptionsBlankRow());
 }
 
 function caOptionsRemoveRow(btn) {
@@ -505,6 +620,7 @@ function caClearOptionRowDerived(row) {
 }
 
 function scheduleCaOptTranslateFromAr(row) {
+    if (window.ATTR_LOCALE_READY) return;
     if (!row) {
         return;
     }
@@ -527,6 +643,7 @@ function scheduleCaOptTranslateFromAr(row) {
 }
 
 function scheduleCaOptTranslateFromEn(row) {
+    if (window.ATTR_LOCALE_READY) return;
     if (!row) {
         return;
     }
@@ -713,6 +830,7 @@ function resetCatalogAttrForm() {
     document.getElementById('ca_label_hi').value = '';
     document.getElementById('ca_filterable').value = '0';
     document.getElementById('ca_active').value = '1';
+    if (window.ATTR_LOCALE_READY && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('attr');
     caOptionsRender([]);
     applyCatalogAttrFormMode(false);
     caRefreshOptionsSectionVisibility();
@@ -737,6 +855,7 @@ function editCatalogAttribute(a) {
     }
     applyCatalogAttrFormMode(true);
     caRefreshOptionsSectionVisibility();
+    if (window.ATTR_LOCALE_READY && window.OrangeCatalogNameLocale && a.locale_view) window.OrangeCatalogNameLocale.open('attr', a.locale_view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -764,6 +883,7 @@ async function translateCatalogLabels(opts) {
 }
 
 function scheduleCatalogAttrAutoTranslate() {
+    if (window.ATTR_LOCALE_READY) return;
     const ar = document.getElementById('ca_label_ar').value.trim();
     if (!ar) {
         document.getElementById('ca_label_en').value = '';
@@ -778,6 +898,7 @@ function scheduleCatalogAttrAutoTranslate() {
 }
 
 function scheduleCatalogAttrTranslateFromEnglish() {
+    if (window.ATTR_LOCALE_READY) return;
     if (caEnTranslateTimer) clearTimeout(caEnTranslateTimer);
     caEnTranslateTimer = setTimeout(function () {
         const en = document.getElementById('ca_label_en').value.trim();
@@ -810,6 +931,7 @@ async function saveCatalogAttribute() {
             is_active: parseInt(document.getElementById('ca_active').value || '1', 10) ? 1 : 0
         };
         if (recordId > 0) payload.id = recordId;
+        if (window.ATTR_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('attr'));
         payload.options = caOptionsPayload();
         const res = await postJSON('/admin/api/catalog_attributes/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
@@ -856,3 +978,20 @@ async function saveCatalogAttribute() {
     }
 })();
 </script>
+<?php if ($caLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.ATTR_LOCALE_READY = true;
+window.ATTR_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $caLocaleRoles,
+    'active' => $caLocaleActive,
+    'mounts' => [[
+        'key' => 'attr',
+        'rootId' => 'ca-locale-app',
+        'idPrefix' => 'ca-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.ATTR_LOCALE_BOOT);
+</script>
+<?php endif; ?>

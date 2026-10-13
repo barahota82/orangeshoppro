@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/orange_dictionary_locale.php';
+
 function orange_dict_color(PDO $pdo, $id): ?array
 {
     if ($id === null || $id === '') {
@@ -18,6 +20,10 @@ function orange_dict_color(PDO $pdo, $id): ?array
     $stmt = $pdo->prepare('SELECT * FROM color_dictionary WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (is_array($row)) {
+        $row['_locale_kind'] = 'color';
+        $row['_locale_stored'] = orange_dictionary_locale_rows($pdo, 'color', $id);
+    }
     $cache[$id] = $row ?: null;
     return $cache[$id];
 }
@@ -41,6 +47,10 @@ function orange_dict_pattern(PDO $pdo, $id): ?array
     $stmt = $pdo->prepare('SELECT * FROM pattern_dictionary WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (is_array($row)) {
+        $row['_locale_kind'] = 'pattern';
+        $row['_locale_stored'] = orange_dictionary_locale_rows($pdo, 'pattern', $id);
+    }
     $cache[$id] = $row ?: null;
 
     return $cache[$id];
@@ -66,6 +76,14 @@ function orange_catalog_dictionary_row_name(?array $row, string $lang): string
         return '';
     }
     $lang = strtolower(trim($lang));
+    $code = orange_content_locale_code($lang) ?? (in_array($lang, ['en', 'fil', 'hi'], true) ? $lang : 'ar');
+    $stored = is_array($row['_locale_stored'] ?? null) ? $row['_locale_stored'] : null;
+    if (is_array($stored) && array_key_exists($code, $stored) && is_array($stored[$code])) {
+        return (string) ($stored[$code]['text_value'] ?? '');
+    }
+    if (!in_array($code, ['ar', 'en', 'fil', 'hi'], true)) {
+        return '';
+    }
     $ar = trim((string) ($row['name_ar'] ?? ''));
     $en = trim((string) ($row['name_en'] ?? ''));
     $fil = trim((string) ($row['name_fil'] ?? ''));

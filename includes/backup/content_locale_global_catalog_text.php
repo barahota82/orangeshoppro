@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../orange_catalog_name_locale.php';
+require_once __DIR__ . '/../orange_dictionary_locale.php';
 
 /**
  * @param array<string, list<int>> $exportedParentIds
@@ -35,6 +36,27 @@ function orange_content_locale_global_catalog_text_export_rows(PDO $pdo, array $
             . ' WHERE t.entity_kind = ? AND t.field_key = ? AND t.entity_id IN (' . $placeholders . ')';
         $st = $pdo->prepare($sql);
         $st->execute(array_merge([$kind, 'name'], $allowed));
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            if (is_array($row)) {
+                $rows[] = $row;
+            }
+        }
+    }
+    foreach (ORANGE_DICTIONARY_LOCALE_SPECS as $kind => $spec) {
+        $allowed = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $exportedParentIds[$spec['table']] ?? []),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($allowed === []) {
+            continue;
+        }
+        $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+        $sql = 'SELECT t.entity_kind, t.entity_id, t.field_key, t.locale_code, t.text_value, t.origin, t.source_locale, t.source_hash'
+            . ' FROM orange_content_locale_text t'
+            . ' INNER JOIN ' . $spec['table'] . ' p ON p.id = t.entity_id'
+            . ' WHERE t.entity_kind = ? AND t.field_key = ? AND t.entity_id IN (' . $placeholders . ')';
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge([$kind, $spec['field']], $allowed));
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
             if (is_array($row)) {
                 $rows[] = $row;
@@ -84,6 +106,30 @@ function orange_content_locale_global_catalog_text_capture(PDO $pdo, array $pare
             }
         }
     }
+    foreach (ORANGE_DICTIONARY_LOCALE_SPECS as $kind => $spec) {
+        $parentIds = $parentIdsByKind[$kind] ?? null;
+        if (!is_array($parentIds)) {
+            continue;
+        }
+        $allowed = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $parentIds),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($allowed === []) {
+            continue;
+        }
+        $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+        $st = $pdo->prepare(
+            'SELECT id FROM orange_content_locale_text WHERE field_key = ? AND entity_kind = ? AND entity_id IN (' . $placeholders . ')'
+        );
+        $st->execute(array_merge([$spec['field'], $kind], $allowed));
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+            $textId = (int) $id;
+            if ($textId > 0) {
+                $ids[] = $textId;
+            }
+        }
+    }
 
     return ['table_ready' => true, 'target_text_ids' => $ids];
 }
@@ -100,7 +146,19 @@ function orange_content_locale_global_catalog_text_plan(PDO $pdo, array $rows): 
             throw new RuntimeException('content_locale_snapshot_invalid');
         }
         $kind = (string) ($row['entity_kind'] ?? '');
-        if (!isset(ORANGE_CATALOG_NAME_LOCALE_KINDS[$kind]) || (string) ($row['field_key'] ?? '') !== 'name') {
+        $field = (string) ($row['field_key'] ?? '');
+        if (isset(ORANGE_DICTIONARY_LOCALE_SPECS[$kind])) {
+            if ($field !== ORANGE_DICTIONARY_LOCALE_SPECS[$kind]['field']) {
+                throw new RuntimeException('content_locale_kind_not_allowed');
+            }
+            $sourceId = (int) ($row['entity_id'] ?? 0);
+            if ($sourceId <= 0) {
+                throw new RuntimeException('content_locale_snapshot_invalid');
+            }
+            $parentIdsByKind[$kind][$sourceId] = $sourceId;
+            continue;
+        }
+        if (!isset(ORANGE_CATALOG_NAME_LOCALE_KINDS[$kind]) || $field !== 'name') {
             throw new RuntimeException('content_locale_kind_not_allowed');
         }
         $sourceId = (int) ($row['entity_id'] ?? 0);
@@ -128,8 +186,18 @@ function orange_content_locale_global_catalog_text_commit(PDO $pdo, array $plan,
         throw new RuntimeException('content_locale_table_missing');
     }
     $packageRows = is_array($plan['rows'] ?? null) ? $plan['rows'] : [];
-    $resolved = [];
+    $treeRows = [];
+    $dictionaryRows = [];
     foreach ($packageRows as $row) {
+        $kind = is_array($row) ? (string) ($row['entity_kind'] ?? '') : '';
+        if (isset(ORANGE_DICTIONARY_LOCALE_SPECS[$kind])) {
+            $dictionaryRows[] = $row;
+            continue;
+        }
+        $treeRows[] = $row;
+    }
+    $resolved = [];
+    foreach ($treeRows as $row) {
         if (!is_array($row)) {
             throw new RuntimeException('content_locale_snapshot_invalid');
         }
@@ -163,6 +231,42 @@ function orange_content_locale_global_catalog_text_commit(PDO $pdo, array $plan,
             'source_hash' => $row['source_hash'] ?? null,
         ];
     }
+    $dictionaryResolved = [];
+    foreach ($dictionaryRows as $row) {
+        if (!is_array($row)) {
+            throw new RuntimeException('content_locale_snapshot_invalid');
+        }
+        $kind = (string) ($row['entity_kind'] ?? '');
+        $spec = ORANGE_DICTIONARY_LOCALE_SPECS[$kind] ?? null;
+        if (!is_array($spec) || (string) ($row['field_key'] ?? '') !== $spec['field']) {
+            throw new RuntimeException('content_locale_kind_not_allowed');
+        }
+        $sourceId = (int) ($row['entity_id'] ?? 0);
+        $map = $parentIdMaps[$kind] ?? null;
+        if (!is_array($map) || !isset($map[$sourceId])) {
+            throw new RuntimeException('content_locale_parent_id_unmapped');
+        }
+        $parentId = (int) $map[$sourceId];
+        $exists = $pdo->prepare('SELECT id FROM ' . $spec['table'] . ' WHERE id = ?');
+        $exists->execute([$parentId]);
+        if ($parentId <= 0 || !$exists->fetchColumn()) {
+            throw new RuntimeException('content_locale_parent_id_unmapped');
+        }
+        $locale = trim((string) ($row['locale_code'] ?? ''));
+        if ($locale === '') {
+            throw new RuntimeException('content_locale_snapshot_invalid');
+        }
+        $dictionaryResolved[] = [
+            'entity_kind' => $kind,
+            'entity_id' => $parentId,
+            'field_key' => $spec['field'],
+            'locale_code' => $locale,
+            'text_value' => (string) ($row['text_value'] ?? ''),
+            'origin' => (string) ($row['origin'] ?? 'unknown'),
+            'source_locale' => $row['source_locale'] ?? null,
+            'source_hash' => $row['source_hash'] ?? null,
+        ];
+    }
     $target = is_array($capture['target_text_ids'] ?? null) ? $capture['target_text_ids'] : [];
     if ($target !== []) {
         $placeholders = implode(',', array_fill(0, count($target), '?'));
@@ -172,6 +276,12 @@ function orange_content_locale_global_catalog_text_commit(PDO $pdo, array $plan,
             'DELETE FROM orange_content_locale_text WHERE id IN (' . $placeholders . ') AND field_key = ? AND entity_kind IN (' . $kindPlaceholders . ')'
         );
         $del->execute(array_merge($target, ['name'], $kinds));
+        $dictKinds = array_keys(ORANGE_DICTIONARY_LOCALE_SPECS);
+        $dictPlaceholders = implode(',', array_fill(0, count($dictKinds), '?'));
+        $dictDel = $pdo->prepare(
+            'DELETE FROM orange_content_locale_text WHERE id IN (' . $placeholders . ') AND entity_kind IN (' . $dictPlaceholders . ')'
+        );
+        $dictDel->execute(array_merge($target, $dictKinds));
     }
     $existing = $pdo->prepare('SELECT id FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ? AND locale_code = ?');
     $insert = $pdo->prepare('INSERT INTO orange_content_locale_text (entity_kind, entity_id, field_key, locale_code, text_value, origin, source_locale, source_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
@@ -184,6 +294,24 @@ function orange_content_locale_global_catalog_text_commit(PDO $pdo, array $plan,
                 $row['entity_kind'],
                 $row['entity_id'],
                 'name',
+                $row['locale_code'],
+                $row['text_value'],
+                $row['origin'],
+                $row['source_locale'],
+                $row['source_hash'],
+            ]);
+            continue;
+        }
+        $update->execute([$row['text_value'], $row['origin'], $row['source_locale'], $row['source_hash'], (int) $id]);
+    }
+    foreach ($dictionaryResolved as $row) {
+        $existing->execute([$row['entity_kind'], $row['entity_id'], $row['field_key'], $row['locale_code']]);
+        $id = $existing->fetchColumn();
+        if ($id === false) {
+            $insert->execute([
+                $row['entity_kind'],
+                $row['entity_id'],
+                $row['field_key'],
                 $row['locale_code'],
                 $row['text_value'],
                 $row['origin'],

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
 require_once __DIR__ . '/../../includes/orange_catalog_name_locale.php';
 require_once __DIR__ . '/../../includes/orange_product_content_locale.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -178,8 +179,11 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
         $attrIds = array_values(array_unique($attrIds));
         if ($attrIds !== []) {
             $placeholders = implode(',', array_fill(0, count($attrIds), '?'));
+            $optKeySelect = orange_table_has_column($pdo, 'catalog_attribute_options', 'option_key')
+                ? 'option_key'
+                : "'' AS option_key";
             $stOp = $pdo->prepare(
-                "SELECT catalog_attribute_id, label_ar, label_en, sort_order
+                "SELECT id, catalog_attribute_id, {$optKeySelect}, label_ar, label_en, sort_order
                  FROM catalog_attribute_options
                  WHERE is_active = 1 AND catalog_attribute_id IN ($placeholders)
                  ORDER BY catalog_attribute_id ASC, sort_order ASC, id ASC"
@@ -202,6 +206,12 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
     }
 }
 
+$catalogAttrLabelMap = [];
+$catalogOptionLabelMap = [];
+if ($productLocaleReady) {
+    $catalogAttrLabelMap = orange_dictionary_locale_label_map($pdo, (int) $adminCountryId, 'catalog_attribute');
+    $catalogOptionLabelMap = orange_dictionary_locale_label_map($pdo, (int) $adminCountryId, 'catalog_attribute_option');
+}
 $catalogAttrDefsForJs = [];
 foreach ($catalogAttributesActive as $caRow) {
     if (! is_array($caRow)) {
@@ -212,20 +222,43 @@ foreach ($catalogAttributesActive as $caRow) {
         continue;
     }
     $label = trim((string) (($caRow['label_ar'] ?: $caRow['label_en']) ?: ($caRow['attribute_key'] ?? '')));
+    if ($productLocaleReady && array_key_exists($caid, $catalogAttrLabelMap)) {
+        $label = (string) $catalogAttrLabelMap[$caid];
+    }
     $optOut = [];
     foreach ($catalogAttrOptionsByAttrId[$caid] ?? [] as $opt) {
         if (! is_array($opt)) {
             continue;
         }
         $optAr = trim((string) ($opt['label_ar'] ?? ''));
-        if ($optAr === '') {
+        $optEn = trim((string) ($opt['label_en'] ?? ''));
+        $optId = (int) ($opt['id'] ?? 0);
+        $optKey = trim((string) ($opt['option_key'] ?? ''));
+        $optValue = $optKey !== '' ? $optKey : $optAr;
+        if ($optValue === '') {
             continue;
         }
-        $optEn = trim((string) ($opt['label_en'] ?? ''));
-        $optOut[] = [
-            'v' => $optAr,
-            'd' => $optAr . ($optEn !== '' ? ' / ' . $optEn : ''),
+        $optDisplay = $optAr . ($optEn !== '' ? ' / ' . $optEn : '');
+        if ($optDisplay === '') {
+            $optDisplay = $optEn;
+        }
+        if ($productLocaleReady && $optId > 0 && array_key_exists($optId, $catalogOptionLabelMap)) {
+            $mapped = trim((string) $catalogOptionLabelMap[$optId]);
+            if ($mapped !== '') {
+                $optDisplay = $mapped;
+            }
+        }
+        if ($optDisplay === '') {
+            $optDisplay = $optValue;
+        }
+        $optItem = [
+            'v' => $optValue,
+            'd' => $optDisplay,
         ];
+        if ($optAr !== '' && $optAr !== $optValue) {
+            $optItem['legacy'] = $optAr;
+        }
+        $optOut[] = $optItem;
     }
     $catalogAttrDefsForJs[] = [
         'id' => $caid,
@@ -286,6 +319,19 @@ if (orange_table_has_column($pdo, 'color_dictionary', 'hex_code')) {
 $colors = $pdo->query(
     'SELECT ' . $colorSelectCols . ' FROM color_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
+if ($productLocaleReady && is_array($colors)) {
+    $colorLabelMap = orange_dictionary_locale_label_map($pdo, (int) $adminCountryId, 'color');
+    foreach ($colors as &$colorRow) {
+        if (!is_array($colorRow)) {
+            continue;
+        }
+        $colorId = (int) ($colorRow['id'] ?? 0);
+        if ($colorId > 0 && array_key_exists($colorId, $colorLabelMap)) {
+            $colorRow['display_name'] = $colorLabelMap[$colorId];
+        }
+    }
+    unset($colorRow);
+}
 
 $patterns = [];
 if (orange_table_exists($pdo, 'pattern_dictionary')) {
@@ -293,6 +339,19 @@ if (orange_table_exists($pdo, 'pattern_dictionary')) {
         $patterns = $pdo->query(
             'SELECT id, name_ar, name_en FROM pattern_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
+        if ($productLocaleReady && is_array($patterns)) {
+            $patternLabelMap = orange_dictionary_locale_label_map($pdo, (int) $adminCountryId, 'pattern');
+            foreach ($patterns as &$patternRow) {
+                if (!is_array($patternRow)) {
+                    continue;
+                }
+                $patternId = (int) ($patternRow['id'] ?? 0);
+                if ($patternId > 0 && array_key_exists($patternId, $patternLabelMap)) {
+                    $patternRow['display_name'] = $patternLabelMap[$patternId];
+                }
+            }
+            unset($patternRow);
+        }
     } catch (Throwable $e) {
         $patterns = [];
     }
@@ -1753,13 +1812,25 @@ function orangeCatalogAttrFillValueWrap(row, attrId, presetVal) {
             const o = document.createElement('option');
             o.value = String(op.v || '');
             o.textContent = String(op.d || op.v || '');
+            if (op.legacy) {
+                o.dataset.legacy = String(op.legacy);
+            }
             s.appendChild(o);
         });
         wrap.appendChild(s);
         if (preset !== '') {
             s.value = preset;
             if (s.value !== preset) {
-                s.value = '';
+                const match = Array.from(s.options).find(function (o) {
+                    return o.dataset.legacy === preset;
+                });
+                if (match) {
+                    s.value = match.value;
+                    s.dataset.preserveRaw = preset;
+                    s.dataset.preserveKey = match.value;
+                } else {
+                    s.value = '';
+                }
             }
         }
         return;
@@ -1885,9 +1956,12 @@ function orangeCollectCatalogAttributePayload() {
         if (!inp || inp.disabled) {
             return;
         }
-        const v = String(inp.value || '').trim();
+        let v = String(inp.value || '').trim();
         if (v === '') {
             return;
+        }
+        if (inp.dataset.preserveRaw && inp.dataset.preserveKey === v) {
+            v = inp.dataset.preserveRaw;
         }
         byId.set(id, v);
     });
@@ -2284,10 +2358,10 @@ function orangeAdminCwRowDisplayParts(row) {
     });
     let colorLabel = '';
     if (pCol) {
-        colorLabel += pCol.name_ar || pCol.name_en || '';
+        colorLabel += orangeDictChoiceLabel(pCol);
     }
     if (sCol && (!pCol || String(sCol.id) !== String(pCol.id))) {
-        colorLabel += (colorLabel ? ' + ' : '') + (sCol.name_ar || sCol.name_en || '');
+        colorLabel += (colorLabel ? ' + ' : '') + orangeDictChoiceLabel(sCol);
     }
     const ppt = (window.ORANGE_PATTERNS || []).find(function (x) {
         return String(x.id) === String(pp);
@@ -2297,10 +2371,10 @@ function orangeAdminCwRowDisplayParts(row) {
     });
     let patPhrase = '';
     if (ppt) {
-        patPhrase += ppt.name_ar || ppt.name_en || '';
+        patPhrase += orangeDictChoiceLabel(ppt);
     }
     if (spt) {
-        patPhrase += (patPhrase ? ' · ' : '') + (spt.name_ar || spt.name_en || '');
+        patPhrase += (patPhrase ? ' · ' : '') + orangeDictChoiceLabel(spt);
     }
     let colorOut = colorLabel || '';
     let patOut = patPhrase || '';
@@ -3904,10 +3978,16 @@ function orangeProductValidatePerVariantPricing() {
     return null;
 }
 
+function orangeDictChoiceLabel(row) {
+    if (!row) return '';
+    if (Object.prototype.hasOwnProperty.call(row, 'display_name')) return String(row.display_name);
+    return String(row.name_ar || row.name_en || '');
+}
+
 function patternOptionsHtml() {
     let h = '<option value="0">—</option>';
     (window.ORANGE_PATTERNS || []).forEach(pt => {
-        const t = (pt.name_ar || pt.name_en || '').replace(/</g,'');
+        const t = orangeDictChoiceLabel(pt).replace(/</g,'');
         h += `<option value="${pt.id}">${t}</option>`;
     });
     return h;
@@ -3916,7 +3996,7 @@ function patternOptionsHtml() {
 function colorOptionsHtml() {
     let h = '<option value="0">—</option>';
     (window.ORANGE_COLORS || []).forEach(c => {
-        const t = (c.name_ar || c.name_en || '').replace(/</g,'');
+        const t = orangeDictChoiceLabel(c).replace(/</g,'');
         h += `<option value="${c.id}">${t}</option>`;
     });
     return h;
@@ -3932,7 +4012,7 @@ function adminColorSwatchHtml(col) {
     }
     const valid = /^#[0-9A-Fa-f]{3,8}$/.test(hex);
     const bg = valid ? hex : '#e5e7eb';
-    const name = String(col.name_ar || col.name_en || '').replace(/"/g, '&quot;');
+    const name = orangeDictChoiceLabel(col).replace(/"/g, '&quot;');
     return '<span class="admin-color-swatch" style="background:' + bg + '" title="' + name + '"></span>';
 }
 
@@ -4767,14 +4847,14 @@ function generateVariants(opts) {
         const p = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.primary_color_id));
         const s = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.secondary_color_id));
         let colorLabel = '';
-        if (p) colorLabel += (p.name_ar || p.name_en);
-        if (s) colorLabel += (colorLabel ? ' + ' : '') + (s.name_ar || s.name_en);
+        if (p) colorLabel += orangeDictChoiceLabel(p);
+        if (s) colorLabel += (colorLabel ? ' + ' : '') + orangeDictChoiceLabel(s);
         if (!colorLabel) colorLabel = '—';
         const ppt = (window.ORANGE_PATTERNS || []).find(x => String(x.id) === String(c.primary_pattern_id));
         const spt = (window.ORANGE_PATTERNS || []).find(x => String(x.id) === String(c.secondary_pattern_id));
         let patPhrase = '';
-        if (ppt) patPhrase += (ppt.name_ar || ppt.name_en);
-        if (spt) patPhrase += (patPhrase ? ' · ' : '') + (spt.name_ar || spt.name_en);
+        if (ppt) patPhrase += orangeDictChoiceLabel(ppt);
+        if (spt) patPhrase += (patPhrase ? ' · ' : '') + orangeDictChoiceLabel(spt);
         if (patPhrase) {
             colorLabel = colorLabel === '—' ? patPhrase : colorLabel + ' — ' + patPhrase;
         }

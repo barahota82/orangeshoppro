@@ -4,9 +4,23 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$patternCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$patternLocaleReady = orange_content_locale_screen_ready($pdo, $patternCountryId);
+$patternLocaleRoles = $patternLocaleReady ? orange_country_locale_roles_read($pdo, $patternCountryId) : ['base' => 'ar'];
+$patternBase = (string) ($patternLocaleRoles['base'] ?? 'ar');
+$patternLocaleActive = [];
+if ($patternLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $patternLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $patternLocaleActive = [];
+    }
+}
+$patternBags = [];
 
 $hasTable = orange_table_exists($pdo, 'pattern_dictionary');
 
@@ -15,6 +29,9 @@ $nextSort = 1;
 if ($hasTable) {
     try {
         $patterns = $pdo->query('SELECT * FROM pattern_dictionary ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        if ($patternLocaleReady) {
+            $patternBags = orange_dictionary_locale_rows_for($pdo, 'pattern', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $patterns));
+        }
         $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM pattern_dictionary')->fetchColumn();
         if ($nextSort <= 0) {
             $nextSort = 1;
@@ -50,26 +67,27 @@ if ($hasTable) {
                 <option value="0">لا</option>
             </select>
         </div>
-        <div class="pd-ar">
+        <div id="pattern-locale-app" style="grid-column:1 / -1;<?php echo $patternLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="pd-ar"<?php echo $patternLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>الاسم العربي</label>
             <input type="text" id="p_name_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="pd-en">
+        <div class="pd-en"<?php echo $patternLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>English</label>
             <input type="text" id="p_name_en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="pd-fil">
+        <div class="pd-fil"<?php echo $patternLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>Filipino</label>
             <input type="text" id="p_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="pd-hi">
+        <div class="pd-hi"<?php echo $patternLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>Hindi</label>
             <input type="text" id="p_name_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
     </div>
     <div class="actions pd-form-actions" style="margin-top:14px;">
         <button type="button" onclick="savePattern()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ النمط</button>
-        <button type="button" class="btn-secondary" onclick="translatePattern({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary" onclick="translatePattern({ forceFromArabic: true })" <?php echo (!$hasTable || $patternLocaleReady) ? 'disabled style="display:none;"' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetPatternForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>
@@ -87,7 +105,7 @@ if ($hasTable) {
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>العربي</th>
+                    <th><?php echo $patternLocaleReady ? 'الاسم' : 'العربي'; ?></th>
                     <th>English</th>
                     <th>Filipino</th>
                     <th>Hindi</th>
@@ -100,7 +118,7 @@ if ($hasTable) {
                 <?php foreach ($patterns as $c): ?>
                 <tr data-id="<?php echo (int) $c['id']; ?>">
                     <td><?php echo (int) $c['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($patternLocaleReady ? orange_dictionary_locale_base_text('pattern', $patternBase, $c, $patternBags[(int) $c['id']] ?? []) : (string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) $c['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) ($c['name_fil'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) ($c['name_hi'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -121,6 +139,7 @@ if ($hasTable) {
                                     'name_hi' => (string) ($c['name_hi'] ?? ''),
                                     'sort_order' => (int) $c['sort_order'],
                                     'is_active' => (int) $c['is_active'],
+                                    'locale_view' => $patternLocaleReady ? orange_dictionary_locale_panel_state('pattern', $c, $patternBags[(int) $c['id']] ?? [], $patternBase) : null,
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                                 <button type="button" class="pd-btn-toggle" onclick="togglePattern(<?php echo (int) $c['id']; ?>, <?php echo (int) $c['is_active']; ?>)">
                                     <?php echo (int) $c['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
@@ -150,6 +169,7 @@ function resetPatternForm() {
     document.getElementById('p_name_hi').value = '';
     document.getElementById('p_sort').value = String(defaultNextPatternSort || 1);
     document.getElementById('p_active').value = '1';
+    if (window.PATTERN_LOCALE_READY && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('pattern');
 }
 
 function editPattern(c) {
@@ -160,6 +180,7 @@ function editPattern(c) {
     document.getElementById('p_name_hi').value = c.name_hi || '';
     document.getElementById('p_sort').value = String(c.sort_order ?? 0);
     document.getElementById('p_active').value = String(c.is_active === 0 ? 0 : 1);
+    if (window.PATTERN_LOCALE_READY && window.OrangeCatalogNameLocale && c.locale_view) window.OrangeCatalogNameLocale.open('pattern', c.locale_view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -214,18 +235,20 @@ function schedulePatternTranslateFromEnglish() {
 async function savePattern() {
     if (isSavingPattern) return;
     isSavingPattern = true;
-    const required = [
-        { id: 'p_name_ar', label: 'الاسم العربي' },
-        { id: 'p_name_en', label: 'English' },
-        { id: 'p_name_fil', label: 'Filipino' },
-        { id: 'p_name_hi', label: 'Hindi' }
-    ];
-    for (let i = 0; i < required.length; i++) {
-        const f = required[i];
-        if (!document.getElementById(f.id).value.trim()) {
-            alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
-            isSavingPattern = false;
-            return;
+    if (!window.PATTERN_LOCALE_READY) {
+        const required = [
+            { id: 'p_name_ar', label: 'الاسم العربي' },
+            { id: 'p_name_en', label: 'English' },
+            { id: 'p_name_fil', label: 'Filipino' },
+            { id: 'p_name_hi', label: 'Hindi' }
+        ];
+        for (let i = 0; i < required.length; i++) {
+            const f = required[i];
+            if (!document.getElementById(f.id).value.trim()) {
+                alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
+                isSavingPattern = false;
+                return;
+            }
         }
     }
     try {
@@ -240,6 +263,7 @@ async function savePattern() {
             is_active: parseInt(document.getElementById('p_active').value, 10)
         };
         if (recordId > 0) payload.id = recordId;
+        if (window.PATTERN_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('pattern'));
         const res = await postJSON('/admin/api/patterns/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
         if (res.success) location.reload();
@@ -468,3 +492,20 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
     });
 })();
 </script>
+<?php if ($patternLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.PATTERN_LOCALE_READY = true;
+window.PATTERN_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $patternLocaleRoles,
+    'active' => $patternLocaleActive,
+    'mounts' => [[
+        'key' => 'pattern',
+        'rootId' => 'pattern-locale-app',
+        'idPrefix' => 'pattern-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.PATTERN_LOCALE_BOOT);
+</script>
+<?php endif; ?>

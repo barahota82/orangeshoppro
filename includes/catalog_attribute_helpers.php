@@ -200,3 +200,58 @@ function orange_catalog_attribute_options_replace(PDO $pdo, int $catalogAttribut
         ]);
     }
 }
+
+/**
+ * Keep option ids that the form still posts. New rows are inserted with empty labels
+ * so the locale save, not this sync, writes the text. Missing ids are deleted.
+ *
+ * @param list<array{id:int,label_en:string,label_ar:string}> $posted
+ * @return list<int>
+ */
+function orange_catalog_attribute_options_sync_stable(PDO $pdo, int $catalogAttributeId, array $posted): array
+{
+    if ($catalogAttributeId <= 0 || !orange_table_exists($pdo, 'catalog_attribute_options')) {
+        return [];
+    }
+    $existing = $pdo->prepare('SELECT id FROM catalog_attribute_options WHERE catalog_attribute_id = ?');
+    $existing->execute([$catalogAttributeId]);
+    $owned = [];
+    foreach ($existing->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+        $owned[(int) $id] = true;
+    }
+    $kept = [];
+    $sort = 0;
+    $updateSort = $pdo->prepare('UPDATE catalog_attribute_options SET sort_order = ? WHERE id = ? AND catalog_attribute_id = ?');
+    $insert = $pdo->prepare(
+        'INSERT INTO catalog_attribute_options (
+            catalog_attribute_id, option_key, label_ar, label_en, label_fil, label_hi, sort_order, is_active
+        ) VALUES (?,?,?,?,?,?,?,1)'
+    );
+    foreach ($posted as $row) {
+        $sort++;
+        $id = (int) ($row['id'] ?? 0);
+        if ($id > 0 && isset($owned[$id])) {
+            $updateSort->execute([$sort, $id, $catalogAttributeId]);
+            $kept[] = $id;
+            unset($owned[$id]);
+            continue;
+        }
+        $key = orange_catalog_attribute_option_key_allocate_unique(
+            $pdo,
+            $catalogAttributeId,
+            (string) ($row['label_en'] ?? ''),
+            (string) ($row['label_ar'] ?? ''),
+            0
+        );
+        $insert->execute([$catalogAttributeId, $key, '', '', '', '', $sort]);
+        $kept[] = (int) $pdo->lastInsertId();
+    }
+    if ($owned !== []) {
+        $drop = array_keys($owned);
+        $placeholders = implode(',', array_fill(0, count($drop), '?'));
+        $del = $pdo->prepare('DELETE FROM catalog_attribute_options WHERE catalog_attribute_id = ? AND id IN (' . $placeholders . ')');
+        $del->execute(array_merge([$catalogAttributeId], $drop));
+    }
+
+    return $kept;
+}

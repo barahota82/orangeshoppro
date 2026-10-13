@@ -1,19 +1,34 @@
 <?php
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 $pdo = db();
-
-$hasTable = false;
-try {
-    $hasTable = (bool) $pdo->query("SHOW TABLES LIKE 'color_dictionary'")->fetchColumn();
-} catch (Throwable $e) {
-    $hasTable = false;
+if (function_exists('orange_catalog_ensure_schema')) {
+    orange_catalog_ensure_schema($pdo);
 }
+$colorCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$colorLocaleReady = orange_content_locale_screen_ready($pdo, $colorCountryId);
+$colorLocaleRoles = $colorLocaleReady ? orange_country_locale_roles_read($pdo, $colorCountryId) : ['base' => 'ar'];
+$colorBase = (string) ($colorLocaleRoles['base'] ?? 'ar');
+$colorLocaleActive = [];
+if ($colorLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $colorLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $colorLocaleActive = [];
+    }
+}
+$colorBags = [];
+
+$hasTable = function_exists('orange_table_exists') && orange_table_exists($pdo, 'color_dictionary');
 
 $colors = [];
 $nextSort = 1;
 if ($hasTable) {
     try {
         $colors = $pdo->query('SELECT * FROM color_dictionary ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        if ($colorLocaleReady) {
+            $colorBags = orange_dictionary_locale_rows_for($pdo, 'color', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $colors));
+        }
         $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM color_dictionary')->fetchColumn();
         if ($nextSort <= 0) {
             $nextSort = 1;
@@ -53,26 +68,27 @@ if ($hasTable) {
                 <option value="0">لا</option>
             </select>
         </div>
-        <div class="cd-ar">
+        <div id="color-locale-app" style="grid-column:1 / -1;<?php echo $colorLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="cd-ar"<?php echo $colorLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>الاسم العربي</label>
             <input type="text" id="c_name_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="cd-en">
+        <div class="cd-en"<?php echo $colorLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>English</label>
             <input type="text" id="c_name_en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="cd-fil">
+        <div class="cd-fil"<?php echo $colorLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>Filipino</label>
             <input type="text" id="c_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="cd-hi">
+        <div class="cd-hi"<?php echo $colorLocaleReady ? ' style="display:none;"' : ''; ?>>
             <label>Hindi</label>
             <input type="text" id="c_name_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
     </div>
     <div class="actions cd-form-actions" style="margin-top:14px;">
         <button type="button" onclick="saveColor()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ اللون</button>
-        <button type="button" class="btn-secondary" onclick="translateColor({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" class="btn-secondary" onclick="translateColor({ forceFromArabic: true })" <?php echo (!$hasTable || $colorLocaleReady) ? 'disabled style="display:none;"' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetColorForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>
@@ -90,7 +106,7 @@ if ($hasTable) {
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>العربي</th>
+                    <th><?php echo $colorLocaleReady ? 'الاسم' : 'العربي'; ?></th>
                     <th>English</th>
                     <th>Filipino</th>
                     <th>Hindi</th>
@@ -104,7 +120,7 @@ if ($hasTable) {
                 <?php foreach ($colors as $c): ?>
                 <tr data-id="<?php echo (int) $c['id']; ?>">
                     <td><?php echo (int) $c['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($colorLocaleReady ? orange_dictionary_locale_base_text('color', $colorBase, $c, $colorBags[(int) $c['id']] ?? []) : (string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) $c['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) ($c['name_fil'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) ($c['name_hi'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -127,6 +143,8 @@ if ($hasTable) {
                                     'hex_code' => $c['hex_code'] ?? null,
                                     'sort_order' => (int) $c['sort_order'],
                                     'is_active' => (int) $c['is_active'],
+                                    'locale_view' => $colorLocaleReady ? orange_dictionary_locale_panel_state('color', $c, $colorBags[(int) $c['id']] ?? [], $colorBase) : null,
+                                    'display_name' => $colorLocaleReady ? orange_dictionary_locale_base_text('color', $colorBase, $c, $colorBags[(int) $c['id']] ?? []) : (string) $c['name_ar'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                                 <button type="button" class="cd-btn-toggle" onclick="toggleColor(<?php echo (int) $c['id']; ?>, <?php echo (int) $c['is_active']; ?>)">
                                     <?php echo (int) $c['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
@@ -157,6 +175,7 @@ function resetColorForm() {
     document.getElementById('c_hex').value = '';
     document.getElementById('c_sort').value = String(defaultNextColorSort || 1);
     document.getElementById('c_active').value = '1';
+    if (window.COLOR_LOCALE_READY && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('color');
 }
 
 function editColor(c) {
@@ -168,6 +187,7 @@ function editColor(c) {
     document.getElementById('c_hex').value = c.hex_code || '';
     document.getElementById('c_sort').value = String(c.sort_order ?? 0);
     document.getElementById('c_active').value = String(c.is_active === 0 ? 0 : 1);
+    if (window.COLOR_LOCALE_READY && window.OrangeCatalogNameLocale && c.locale_view) window.OrangeCatalogNameLocale.open('color', c.locale_view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -223,18 +243,20 @@ function scheduleColorTranslateFromEnglish() {
 async function saveColor() {
     if (isSavingColor) return;
     isSavingColor = true;
-    const required = [
-        { id: 'c_name_ar', label: 'الاسم العربي' },
-        { id: 'c_name_en', label: 'English' },
-        { id: 'c_name_fil', label: 'Filipino' },
-        { id: 'c_name_hi', label: 'Hindi' }
-    ];
-    for (var i = 0; i < required.length; i++) {
-        var f = required[i];
-        if (!document.getElementById(f.id).value.trim()) {
-            alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
-            isSavingColor = false;
-            return;
+    if (!window.COLOR_LOCALE_READY) {
+        const required = [
+            { id: 'c_name_ar', label: 'الاسم العربي' },
+            { id: 'c_name_en', label: 'English' },
+            { id: 'c_name_fil', label: 'Filipino' },
+            { id: 'c_name_hi', label: 'Hindi' }
+        ];
+        for (var i = 0; i < required.length; i++) {
+            var f = required[i];
+            if (!document.getElementById(f.id).value.trim()) {
+                alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
+                isSavingColor = false;
+                return;
+            }
         }
     }
     try {
@@ -250,6 +272,7 @@ async function saveColor() {
             is_active: parseInt(document.getElementById('c_active').value, 10)
         };
         if (recordId > 0) payload.id = recordId;
+        if (window.COLOR_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('color'));
         var res = await postJSON('/admin/api/colors/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
         if (res.success) location.reload();
@@ -478,3 +501,20 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
     });
 })();
 </script>
+<?php if ($colorLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.COLOR_LOCALE_READY = true;
+window.COLOR_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $colorLocaleRoles,
+    'active' => $colorLocaleActive,
+    'mounts' => [[
+        'key' => 'color',
+        'rootId' => 'color-locale-app',
+        'idPrefix' => 'color-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.COLOR_LOCALE_BOOT);
+</script>
+<?php endif; ?>
