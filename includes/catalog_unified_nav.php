@@ -119,6 +119,33 @@ function orange_storefront_unified_nav_for_home(PDO $pdo, ?int $countryId = null
         }
     }
 
+    $categories = orange_catalog_name_locale_overlay($pdo, 'catalog_category', $categories);
+    if ($subcategoriesByCategory !== []) {
+        $subRowsFlat = [];
+        foreach ($subcategoriesByCategory as $groupRows) {
+            foreach (is_array($groupRows) ? $groupRows : [] as $srow) {
+                if (is_array($srow)) {
+                    $subRowsFlat[] = $srow;
+                }
+            }
+        }
+        $subRowsFlat = orange_catalog_name_locale_overlay($pdo, 'catalog_subcategory', $subRowsFlat);
+        $subcategoriesByCategory = [];
+        foreach ($subRowsFlat as $srow) {
+            if (!is_array($srow)) {
+                continue;
+            }
+            $scid = (int) ($srow['catalog_category_id'] ?? $srow['category_id'] ?? 0);
+            if ($scid <= 0) {
+                continue;
+            }
+            if (!isset($subcategoriesByCategory[$scid])) {
+                $subcategoriesByCategory[$scid] = [];
+            }
+            $subcategoriesByCategory[$scid][] = $srow;
+        }
+    }
+
     $categoryToDepartment = [];
     foreach ($categories as $cat) {
         if (!is_array($cat)) {
@@ -169,14 +196,6 @@ function orange_storefront_unified_nav_for_home(PDO $pdo, ?int $countryId = null
             $catsByDept[$did] = [];
         }
         $catsByDept[$did][] = $cat;
-    }
-
-    $categories = orange_catalog_name_locale_overlay($pdo, 'catalog_category', $categories);
-    foreach ($subcategoriesByCategory as $groupId => $groupRows) {
-        $subcategoriesByCategory[$groupId] = orange_catalog_name_locale_overlay($pdo, 'catalog_subcategory', is_array($groupRows) ? $groupRows : []);
-    }
-    foreach ($catsByDept as $groupId => $groupRows) {
-        $catsByDept[$groupId] = orange_catalog_name_locale_overlay($pdo, 'catalog_category', is_array($groupRows) ? $groupRows : []);
     }
 
     return [

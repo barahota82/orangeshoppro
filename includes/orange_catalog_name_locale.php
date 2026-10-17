@@ -205,7 +205,10 @@ function orange_catalog_name_locale_label_map(PDO $pdo, int $countryId, string $
     if (function_exists('orange_table_exists') && !orange_table_exists($pdo, $table)) {
         return [];
     }
-    $roles = $countryId > 0 ? orange_country_locale_roles_read($pdo, $countryId) : ['mode' => 'legacy_unconfigured', 'base' => null];
+    $roles = ['mode' => 'legacy_unconfigured', 'base' => null];
+    if ($countryId > 0 && orange_content_locale_screen_ready($pdo, $countryId)) {
+        $roles = orange_country_locale_roles_read($pdo, $countryId);
+    }
     $base = (string) (($roles['mode'] ?? '') === 'configured' ? ($roles['base'] ?? '') : 'ar');
     $rows = $pdo->query('SELECT * FROM ' . $table)->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $ids = [];
