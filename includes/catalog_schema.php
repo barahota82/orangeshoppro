@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 124);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 125);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2123,6 +2123,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_safe_exec(
         $pdo,
         'CREATE TABLE IF NOT EXISTS commercial_kind_dictionary (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             kind_key VARCHAR(32) NOT NULL,
             label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             label_en VARCHAR(191) NOT NULL DEFAULT \'\',
@@ -2130,6 +2131,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (kind_key),
+            UNIQUE KEY uq_ckd_id (id),
             KEY idx_ckd_sort (sort_order),
             KEY idx_ckd_active (is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
@@ -2139,6 +2141,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_safe_exec(
         $pdo,
         'CREATE TABLE IF NOT EXISTS sizing_category_dictionary (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             commercial_kind_key VARCHAR(32) NOT NULL,
             category_key VARCHAR(64) NOT NULL,
             label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
@@ -2147,6 +2150,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (commercial_kind_key, category_key),
+            UNIQUE KEY uq_scd_id (id),
             KEY idx_scd_kind_sort (commercial_kind_key, sort_order),
             CONSTRAINT fk_scd_commercial_kind
                 FOREIGN KEY (commercial_kind_key) REFERENCES commercial_kind_dictionary(kind_key)
@@ -3284,6 +3288,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_countries_timezone_v122($pdo);
     orange_catalog_migrate_admin_time_country_authority_v123($pdo);
     orange_catalog_migrate_channels_country_name_unique_v124($pdo);
+    orange_catalog_migrate_sizing_dictionary_identity_v125($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3925,6 +3930,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_countries_timezone_v122($pdo);
     orange_catalog_migrate_admin_time_country_authority_v123($pdo);
     orange_catalog_migrate_channels_country_name_unique_v124($pdo);
+    orange_catalog_migrate_sizing_dictionary_identity_v125($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9604,6 +9610,91 @@ function orange_catalog_migrate_channels_country_name_unique_v124(PDO $pdo): voi
         $pdo,
         'CREATE UNIQUE INDEX uq_channels_country_name ON channels (country_id, name)'
     );
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+function orange_catalog_sizing_dictionary_unique_id_index_exists(PDO $pdo, string $table): bool
+{
+    $st = $pdo->prepare(
+        'SELECT INDEX_NAME, COLUMN_NAME
+         FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND NON_UNIQUE = 0 AND INDEX_NAME <> \'PRIMARY\'
+         ORDER BY INDEX_NAME, SEQ_IN_INDEX'
+    );
+    $st->execute([$table]);
+    $grouped = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $grouped[(string) ($row['INDEX_NAME'] ?? '')][] = (string) ($row['COLUMN_NAME'] ?? '');
+    }
+    foreach ($grouped as $columns) {
+        if ($columns === ['id']) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function orange_catalog_sizing_dictionary_id_auto_increment(PDO $pdo, string $table): bool
+{
+    if (!orange_table_has_column($pdo, $table, 'id')) {
+        return false;
+    }
+    $st = $pdo->prepare(
+        'SELECT DATA_TYPE, IS_NULLABLE, EXTRA
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = \'id\'
+         LIMIT 1'
+    );
+    $st->execute([$table]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return false;
+    }
+    $type = strtolower((string) ($row['DATA_TYPE'] ?? ''));
+    $integer = in_array($type, ['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint'], true);
+    $nullable = strtoupper((string) ($row['IS_NULLABLE'] ?? '')) === 'YES';
+    $extra = strtolower((string) ($row['EXTRA'] ?? ''));
+
+    return $integer && !$nullable && str_contains($extra, 'auto_increment');
+}
+
+function orange_catalog_migrate_sizing_dictionary_identity_v125(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_sizing_dictionary_identity_v125';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = [
+        'commercial_kind_dictionary' => 'uq_ckd_id',
+        'sizing_category_dictionary' => 'uq_scd_id',
+    ];
+    foreach ($tables as $table => $indexName) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $table, 'id')) {
+            $pdo->exec(
+                'ALTER TABLE ' . $table
+                . ' ADD COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT FIRST,'
+                . ' ADD UNIQUE KEY ' . $indexName . ' (id)'
+            );
+            orange_schema_invalidate_column_check($table, 'id');
+        } elseif (!orange_catalog_sizing_dictionary_unique_id_index_exists($pdo, $table)) {
+            $pdo->exec('ALTER TABLE ' . $table . ' ADD UNIQUE KEY ' . $indexName . ' (id)');
+        }
+        if (!orange_catalog_sizing_dictionary_id_auto_increment($pdo, $table)
+            || !orange_catalog_sizing_dictionary_unique_id_index_exists($pdo, $table)) {
+            throw new RuntimeException($table . '.id identity contract is not ready for locale binding.');
+        }
+    }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }
