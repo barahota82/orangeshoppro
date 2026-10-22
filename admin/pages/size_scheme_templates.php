@@ -5,14 +5,30 @@ declare(strict_types=1);
 $pdo = db();
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 
 orange_catalog_ensure_schema($pdo);
+
+$sstCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$sstLocaleReady = orange_content_locale_screen_ready($pdo, $sstCountryId);
+$sstLocaleRoles = $sstLocaleReady ? orange_country_locale_roles_read($pdo, $sstCountryId) : ['base' => 'ar'];
+$sstBase = (string) ($sstLocaleRoles['base'] ?? 'ar');
+$sstLocaleActive = [];
+if ($sstLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $sstLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $sstLocaleActive = [];
+    }
+}
+$sstLocaleBags = [];
 
 $tablesReady = orange_table_exists($pdo, 'size_scheme_templates')
     && orange_table_exists($pdo, 'size_scheme_template_sizes');
 
 $templates = [];
 $nextSort = 1;
+$sstLocaleBags = [];
 if ($tablesReady) {
     try {
         $templates = $pdo->query(
@@ -21,6 +37,9 @@ if ($tablesReady) {
              FROM size_scheme_templates t
              ORDER BY t.sort_order ASC, t.id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
+        if ($sstLocaleReady && is_array($templates)) {
+            $sstLocaleBags = orange_dictionary_locale_rows_for($pdo, 'size_scheme_template', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $templates));
+        }
         $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_scheme_templates')->fetchColumn();
         if ($nextSort <= 0) {
             $nextSort = 1;
@@ -170,19 +189,20 @@ if ($tablesReady) {
                 <label for="sst_sort_display">الترتيب</label>
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off" style="background:#f4f4f5;">
             </div>
-            <div class="admin-sort-field-wrap">
+            <div id="sst-locale-app" class="admin-sort-field-wrap" style="<?php echo $sstLocaleReady ? '' : 'display:none;'; ?>"></div>
+            <div class="admin-sort-field-wrap"<?php echo $sstLocaleReady ? ' style="display:none;"' : ''; ?>>
                 <label for="sst_name_en">English</label>
                 <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
             </div>
-            <div class="admin-sort-field-wrap">
+            <div class="admin-sort-field-wrap"<?php echo $sstLocaleReady ? ' style="display:none;"' : ''; ?>>
                 <label for="sst_name_ar">الاسم العربي</label>
                 <input type="text" id="sst_name_ar" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
-            <div class="admin-sort-field-wrap">
+            <div class="admin-sort-field-wrap"<?php echo $sstLocaleReady ? ' style="display:none;"' : ''; ?>>
                 <label for="sst_name_fil">Filipino</label>
                 <input type="text" id="sst_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
-            <div class="admin-sort-field-wrap">
+            <div class="admin-sort-field-wrap"<?php echo $sstLocaleReady ? ' style="display:none;"' : ''; ?>>
                 <label for="sst_name_hi">Hindi</label>
                 <input type="text" id="sst_name_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
@@ -243,8 +263,17 @@ if ($tablesReady) {
                 <?php foreach ($templates as $t): ?>
                 <tr data-id="<?php echo (int) $t['id']; ?>">
                     <td><?php echo (int) $t['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php
+                        $sstId = (int) $t['id'];
+                        $sstToken = (string) ($t['name_en'] ?? '');
+                        $sstEnBag = $sstLocaleBags[$sstId]['en'] ?? null;
+                        $sstEnTitle = is_array($sstEnBag) ? (string) ($sstEnBag['text_value'] ?? '') : $sstToken;
+                        echo htmlspecialchars($sstLocaleReady ? $sstEnTitle : $sstToken, ENT_QUOTES, 'UTF-8');
+                        if ($sstLocaleReady && $sstToken !== '' && $sstToken !== $sstEnTitle) {
+                            echo ' <code>' . htmlspecialchars($sstToken, ENT_QUOTES, 'UTF-8') . '</code>';
+                        }
+                    ?></td>
+                    <td><?php echo htmlspecialchars($sstLocaleReady ? orange_dictionary_locale_base_text('size_scheme_template', $sstBase, $t, $sstLocaleBags[(int) $t['id']] ?? []) : (string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
                     <td><?php echo (int) $t['sort_order']; ?></td>
                     <td><?php echo (int) $t['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
@@ -366,6 +395,7 @@ function sstCollectSizes() {
 
 function sstResetForm() {
     document.getElementById('sst_id').value = '0';
+    if (window.SST_LOCALE_READY && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('template');
     document.getElementById('sst_name_ar').value = '';
     document.getElementById('sst_name_en').value = '';
     document.getElementById('sst_name_fil').value = '';
@@ -386,6 +416,7 @@ function sstResetForm() {
 
 /** عربي / Fil / Hi = نسخ حرفية لعمود الإنجليزي (مثل سلوك Fil السابق للعربي). */
 function sstSyncHeaderArFilHiFromEn() {
+    if (window.SST_LOCALE_READY) return;
     var enEl = document.getElementById('sst_name_en');
     var arEl = document.getElementById('sst_name_ar');
     var filEl = document.getElementById('sst_name_fil');
@@ -453,7 +484,7 @@ function scheduleSstRowFromEn(tr) {
 
 function sstSyncAllDerivedFromEnglish() {
     var en = document.getElementById('sst_name_en').value.trim();
-    if (!en) {
+    if (!window.SST_LOCALE_READY && !en) {
         alert('أدخل English للقالب أولاً');
         return;
     }
@@ -478,6 +509,7 @@ async function sstSave() {
         is_active: parseInt(document.getElementById('sst_active').value, 10),
         sizes: sstCollectSizes()
     };
+    if (window.SST_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('template'));
     try {
         var res = await postJSON(SST_API, payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
@@ -498,6 +530,7 @@ async function sstLoadOne(tplId) {
         }
         var t = res.template;
         document.getElementById('sst_id').value = String(t.id);
+        if (window.SST_LOCALE_READY && window.OrangeCatalogNameLocale && t.locale_view) window.OrangeCatalogNameLocale.open('template', t.locale_view);
         document.getElementById('sst_name_ar').value = t.name_ar || '';
         document.getElementById('sst_name_en').value = t.name_en || '';
         document.getElementById('sst_name_fil').value = t.name_fil || '';
@@ -614,5 +647,22 @@ document.addEventListener('click', function (ev) {
 
 sstResetForm();
 </script>
+<?php if ($sstLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.SST_LOCALE_READY = true;
+window.SST_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $sstLocaleRoles,
+    'active' => $sstLocaleActive,
+    'mounts' => [[
+        'key' => 'template',
+        'rootId' => 'sst-locale-app',
+        'idPrefix' => 'sst-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.SST_LOCALE_BOOT);
+</script>
+<?php endif; ?>
 
 <?php endif; ?>

@@ -6,8 +6,21 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = db();
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/advisory_sizing_guides.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 
 orange_catalog_ensure_schema($pdo);
+
+$asgCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$asgLocaleReady = orange_content_locale_screen_ready($pdo, $asgCountryId);
+$asgLocaleRoles = $asgLocaleReady ? orange_country_locale_roles_read($pdo, $asgCountryId) : ['base' => 'ar', 'mode' => 'legacy_unconfigured', 'content' => []];
+$asgLocaleActive = [];
+if ($asgLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $asgLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $asgLocaleActive = [];
+    }
+}
 
 $tablesReady = orange_table_exists($pdo, 'size_families')
     && orange_table_exists($pdo, 'size_family_sizes')
@@ -25,9 +38,26 @@ if ($tablesReady) {
             )->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
         $families = $pdo->query(
-            'SELECT id, name_ar, name_en, commercial_kind_key, sizing_category_key, size_scheme_template_id
+            'SELECT id, name_ar, name_en, name_fil, name_hi, commercial_kind_key, sizing_category_key, size_scheme_template_id
              FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if ($asgLocaleReady && $families !== []) {
+            $familyIds = [];
+            foreach ($families as $familyRow) {
+                $familyIds[] = (int) ($familyRow['id'] ?? 0);
+            }
+            $familyBags = orange_dictionary_locale_rows_for($pdo, 'size_family', $familyIds);
+            $familyBase = (string) ($asgLocaleRoles['base'] ?? '');
+            foreach ($families as $familyIx => $familyRow) {
+                $familyId = (int) ($familyRow['id'] ?? 0);
+                $families[$familyIx]['display_name'] = orange_dictionary_locale_base_text(
+                    'size_family',
+                    $familyBase,
+                    $familyRow,
+                    $familyBags[$familyId] ?? []
+                );
+            }
+        }
         $sStmt = $pdo->query(
             'SELECT id, size_family_id, label_ar, label_en, sort_order
              FROM size_family_sizes WHERE is_active = 1 ORDER BY size_family_id ASC, sort_order ASC, id ASC'
@@ -39,12 +69,34 @@ if ($tablesReady) {
 
         // تسميات النوع التجاري (لفلترة العائلات حسب نوعها هي، لا حسب القسم).
         if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
+            $kindSelect = 'SELECT kind_key, label_ar, label_en';
+            if (orange_sizing_dictionary_identity_ready($pdo)) {
+                $kindSelect .= ', id';
+            }
             $ckRows = $pdo->query(
-                'SELECT kind_key, label_ar, label_en FROM commercial_kind_dictionary WHERE is_active = 1'
+                $kindSelect . ' FROM commercial_kind_dictionary WHERE is_active = 1'
             )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $kindBags = [];
+            $kindBase = (string) ($asgLocaleRoles['base'] ?? '');
+            if ($asgLocaleReady && orange_sizing_dictionary_identity_ready($pdo)) {
+                $kindIds = [];
+                foreach ($ckRows as $kindRow) {
+                    $kindIds[] = (int) ($kindRow['id'] ?? 0);
+                }
+                $kindBags = orange_dictionary_locale_rows_for($pdo, 'commercial_kind', $kindIds);
+            }
             foreach ($ckRows as $r) {
                 $k = trim((string) ($r['kind_key'] ?? ''));
                 if ($k === '') {
+                    continue;
+                }
+                if ($asgLocaleReady && orange_sizing_dictionary_identity_ready($pdo)) {
+                    $kindLabels[$k] = orange_dictionary_locale_base_text(
+                        'commercial_kind',
+                        $kindBase,
+                        $r,
+                        $kindBags[(int) ($r['id'] ?? 0)] ?? []
+                    );
                     continue;
                 }
                 $kindLabels[$k] = (string) (($r['label_ar'] ?? '') !== '' ? $r['label_ar'] : (($r['label_en'] ?? '') !== '' ? $r['label_en'] : $k));
@@ -112,8 +164,9 @@ if ($familiesJson === false) {
         </div>
         <!-- السطر الثاني: الاسم الداخلي · شكل الدليل -->
         <div class="asg-fg-name">
-            <label for="asg_name">الاسم الداخلي (عربي) <span style="color:#b91c1c;">*</span></label>
-            <input type="text" id="asg_name" maxlength="191" placeholder="مثال: قمصان رجالي EU">
+            <label for="asg_name">الاسم الداخلي <?php echo $asgLocaleReady ? '' : '(عربي)'; ?> <span style="color:#b91c1c;">*</span></label>
+            <div id="asg-locale-app"<?php echo $asgLocaleReady ? '' : ' style="display:none;"'; ?>></div>
+            <input type="text" id="asg_name" maxlength="191" placeholder="مثال: قمصان رجالي EU"<?php echo $asgLocaleReady ? ' style="display:none;"' : ''; ?>>
         </div>
         <div class="asg-fg-shape">
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
@@ -292,6 +345,10 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 }
 </style>
 
+<?php if ($asgLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<?php endif; ?>
 <script>
 (function () {
     var ADVISORY_API = '/admin/api/advisory_sizing_guides/manage.php';
@@ -301,6 +358,38 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     var KIND_LABELS = <?php echo $kindLabelsJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var rowSeq = 0;
+    var ASG_LOCALE = <?php echo $asgLocaleReady ? 'true' : 'false'; ?>;
+    var ASG_ROLES = <?php echo json_encode($asgLocaleRoles, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    var ASG_ACTIVE = <?php echo json_encode($asgLocaleActive, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+
+    function mountAsgField(root, record) {
+        if (!ASG_LOCALE || !root || !window.OrangeContentLocalePanel) return null;
+        var api = window.OrangeContentLocalePanel.mount(root, {
+            showSlug: false,
+            showSort: false,
+            showSave: false,
+            debounceMs: 650,
+            idPrefix: 'asg-field-' + String(++rowSeq) + '-',
+            suggest: function (req) {
+                var body = {
+                    base_text: req.base_text,
+                    known: req.known || {},
+                    explicit: req.explicit || []
+                };
+                if (req.from_corrected_english) {
+                    body.from_corrected_english = true;
+                    body.corrected_english = req.corrected_english || '';
+                }
+                if (typeof postJSON !== 'function') {
+                    return Promise.resolve({ success: false, suggestions: {} });
+                }
+                return postJSON('/admin/api/content_locale/suggest.php', body);
+            }
+        });
+        api.setRoles(ASG_ROLES || {}, ASG_ACTIVE || []);
+        api.openRecord(record || { id: 0, base_text: '', locales: {} });
+        return api;
+    }
 
     function esc(s) {
         if (s === 0) { return '0'; }
@@ -408,20 +497,31 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     function createColumnRow(sortOrder) {
         var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td><input type="number" class="asg-c-sort" value="' + sortOrder + '" style="width:4rem;"></td>' +
-            '<td><input type="text" class="asg-c-ar" maxlength="191"></td>' +
-            '<td><input type="text" class="asg-c-en" maxlength="191"></td>' +
-            '<td><input type="text" class="asg-c-fil" maxlength="191"></td>' +
-            '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
-            '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
-            '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="cm"></td>' +
-            '<td><select class="asg-c-stor"><option value="">—</option><option value="length_cm">قياس بالسم (عرض cm/inch)</option></select></td>' +
-            '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" style="width:7rem;"></td>';
+        if (ASG_LOCALE) {
+            tr.innerHTML =
+                '<td><input type="number" class="asg-c-sort" value="' + sortOrder + '" style="width:4rem;"></td>' +
+                '<td class="asg-c-locale" colspan="4"></td>' +
+                '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
+                '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="cm"></td>' +
+                '<td><select class="asg-c-stor"><option value="">—</option><option value="length_cm">قياس بالسم (عرض cm/inch)</option></select></td>' +
+                '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" style="width:7rem;"></td>';
+            tr._localeApi = mountAsgField(tr.querySelector('.asg-c-locale'), { id: 0, base_text: '', locales: {} });
+        } else {
+            tr.innerHTML =
+                '<td><input type="number" class="asg-c-sort" value="' + sortOrder + '" style="width:4rem;"></td>' +
+                '<td><input type="text" class="asg-c-ar" maxlength="191"></td>' +
+                '<td><input type="text" class="asg-c-en" maxlength="191"></td>' +
+                '<td><input type="text" class="asg-c-fil" maxlength="191"></td>' +
+                '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
+                '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
+                '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="cm"></td>' +
+                '<td><select class="asg-c-stor"><option value="">—</option><option value="length_cm">قياس بالسم (عرض cm/inch)</option></select></td>' +
+                '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" style="width:7rem;"></td>';
+            bindLabelTranslate(tr.querySelector('.asg-c-ar'), tr.querySelector('.asg-c-en'), tr.querySelector('.asg-c-fil'), tr.querySelector('.asg-c-hi'));
+        }
         tr.querySelector('.asg-c-stor').addEventListener('change', function () {
             if (tr.querySelector('.asg-c-stor').value === 'length_cm') { tr.querySelector('.asg-c-vk').value = 'number'; }
         });
-        bindLabelTranslate(tr.querySelector('.asg-c-ar'), tr.querySelector('.asg-c-en'), tr.querySelector('.asg-c-fil'), tr.querySelector('.asg-c-hi'));
         return tr;
     }
 
@@ -453,12 +553,16 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var trs = colsBody(panel).querySelectorAll('tr');
         for (var i = 0; i < trs.length; i++) {
             var tr = trs[i];
+            var localePayload = (ASG_LOCALE && tr._localeApi) ? tr._localeApi.getPayload() : null;
             out.push({
+                id: parseInt(tr.dataset.childId || '0', 10) || 0,
                 sort_order: parseInt(tr.querySelector('.asg-c-sort').value, 10) || (i + 1),
-                label_ar: tr.querySelector('.asg-c-ar').value.trim(),
-                label_en: tr.querySelector('.asg-c-en').value.trim(),
-                label_fil: tr.querySelector('.asg-c-fil').value.trim(),
-                label_hi: tr.querySelector('.asg-c-hi').value.trim(),
+                label_ar: localePayload ? String(localePayload.base_text || '').trim() : tr.querySelector('.asg-c-ar').value.trim(),
+                label_en: localePayload ? '' : tr.querySelector('.asg-c-en').value.trim(),
+                label_fil: localePayload ? '' : tr.querySelector('.asg-c-fil').value.trim(),
+                label_hi: localePayload ? '' : tr.querySelector('.asg-c-hi').value.trim(),
+                base_text: localePayload ? localePayload.base_text : undefined,
+                locales: localePayload ? localePayload.locales : undefined,
                 value_kind: tr.querySelector('.asg-c-vk').value,
                 unit_hint: tr.querySelector('.asg-c-unit').value.trim(),
                 storage_measure: tr.querySelector('.asg-c-stor').value,
@@ -472,11 +576,16 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var trs = colsBody(panel).querySelectorAll('tr');
         for (var i = 0; i < cols.length && i < trs.length; i++) {
             var c = cols[i]; var tr = trs[i];
+            if ((parseInt(c.id, 10) || 0) > 0) { tr.dataset.childId = String(parseInt(c.id, 10)); }
             tr.querySelector('.asg-c-sort').value = String(c.sort_order != null ? c.sort_order : (i + 1));
-            tr.querySelector('.asg-c-ar').value = c.label_ar || '';
-            tr.querySelector('.asg-c-en').value = c.label_en || '';
-            tr.querySelector('.asg-c-fil').value = c.label_fil || '';
-            tr.querySelector('.asg-c-hi').value = c.label_hi || '';
+            if (ASG_LOCALE && tr._localeApi) {
+                tr._localeApi.openRecord(c.locale_view || { id: c.id || 0, base_text: c.label_ar || '', locales: {} });
+            } else {
+                tr.querySelector('.asg-c-ar').value = c.label_ar || '';
+                tr.querySelector('.asg-c-en').value = c.label_en || '';
+                tr.querySelector('.asg-c-fil').value = c.label_fil || '';
+                tr.querySelector('.asg-c-hi').value = c.label_hi || '';
+            }
             tr.querySelector('.asg-c-vk').value = (c.value_kind === 'number') ? 'number' : 'text';
             tr.querySelector('.asg-c-unit').value = c.unit_hint || '';
             tr.querySelector('.asg-c-stor').value = (c.storage_measure === 'length_cm') ? 'length_cm' : '';
@@ -510,6 +619,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var div = document.createElement('div');
         div.className = 'asg-row-block card';
         div.dataset.rowKind = 'data';
+        if ((parseInt(prefill.id, 10) || 0) > 0) { div.dataset.childId = String(parseInt(prefill.id, 10)); }
         div.id = 'asg_r_' + (++rowSeq);
         var cellInputs = '';
         for (var j = 0; j < n; j++) {
@@ -533,17 +643,23 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var div = document.createElement('div');
         div.className = 'asg-row-block card';
         div.dataset.rowKind = 'label';
+        if ((parseInt(prefill.id, 10) || 0) > 0) { div.dataset.childId = String(parseInt(prefill.id, 10)); }
         div.style.borderInlineStart = '4px solid #0ea5e9';
         div.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:center;">' +
             '<strong>صف عنوان</strong><button type="button" class="btn-secondary asg-rm">حذف</button></div>' +
-            '<div class="form-grid" style="margin-top:8px;">' +
+            '<div class="asg-l-locale" style="margin-top:8px;' + (ASG_LOCALE ? '' : 'display:none;') + '"></div>' +
+            '<div class="form-grid asg-l-legacy" style="margin-top:8px;' + (ASG_LOCALE ? 'display:none;' : '') + '">' +
             '<div><label>عربي</label><input type="text" class="asg-l-ar" maxlength="191" value="' + esc(prefill.label_ar) + '"></div>' +
             '<div><label>EN</label><input type="text" class="asg-l-en" maxlength="191" value="' + esc(prefill.label_en) + '"></div>' +
             '<div><label>Fil</label><input type="text" class="asg-l-fil" maxlength="191" value="' + esc(prefill.label_fil) + '"></div>' +
             '<div><label>Hi</label><input type="text" class="asg-l-hi" maxlength="191" value="' + esc(prefill.label_hi) + '"></div></div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
-        bindLabelTranslate(div.querySelector('.asg-l-ar'), div.querySelector('.asg-l-en'), div.querySelector('.asg-l-fil'), div.querySelector('.asg-l-hi'));
+        if (ASG_LOCALE) {
+            div._localeApi = mountAsgField(div.querySelector('.asg-l-locale'), prefill.locale_view || { id: prefill.id || 0, base_text: prefill.label_ar || '', locales: {} });
+        } else {
+            bindLabelTranslate(div.querySelector('.asg-l-ar'), div.querySelector('.asg-l-en'), div.querySelector('.asg-l-fil'), div.querySelector('.asg-l-hi'));
+        }
         rowsBox(panel).appendChild(div);
     }
 
@@ -818,7 +934,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             var tr = document.createElement('tr');
             tr.innerHTML =
                 '<td>' + gid + '</td>' +
-                '<td>' + esc(g.name_ar || ('#' + gid)) + '</td>' +
+                '<td>' + esc(Object.prototype.hasOwnProperty.call(g, 'display_name') ? g.display_name : (g.name_ar || ('#' + gid))) + '</td>' +
                 '<td>' + shapeLabel(g.layout_kind) + '</td>' +
                 '<td>' + (parseInt(g.columns_count, 10) || 0) + '</td>' +
                 '<td>' + (parseInt(g.rows_count, 10) || 0) + '</td>' +
@@ -845,6 +961,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         rebuildFamilyOptions();
         document.getElementById('asg_family').value = '0';
         document.getElementById('asg_name').value = '';
+        if (ASG_LOCALE && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('guide');
         document.getElementById('asg_active').value = '1';
         var single = document.querySelector('input[name="asg_shape"][value="single"]');
         if (single) { single.checked = true; }
@@ -886,6 +1003,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         document.getElementById('asg_kind_filter').disabled = false;
         famSel.disabled = false;
         document.getElementById('asg_name').value = g.name_ar || '';
+        if (ASG_LOCALE && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.open('guide', g.locale_view || { id: g.id || 0, base_text: g.name_ar || '', locales: {} });
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         var lk = (g.layout_kind === 'dual') ? 'dual' : 'single';
         var rb = document.querySelector('input[name="asg_shape"][value="' + lk + '"]');
@@ -909,7 +1027,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             rowsBox(panel).innerHTML = '';
             rowsByPanel[pk].forEach(function (r) {
                 if (r.row_kind === 'label') { addLabelRow(panel, r); }
-                else { addDataRow(panel, { cells: r.cells || [], size_family_size_id: r.size_family_size_id }); }
+                else { addDataRow(panel, { id: r.id, cells: r.cells || [], size_family_size_id: r.size_family_size_id }); }
             });
             refreshSizeSelects(panel);
         });
@@ -927,7 +1045,11 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             var cols = readColumns(panel);
             for (var i = 0; i < cols.length; i++) {
                 var c = cols[i];
-                if (!c.label_ar || !c.label_en || !c.label_fil || !c.label_hi) {
+                if (ASG_LOCALE) {
+                    if (!String(c.base_text || '').trim()) {
+                        err = 'في ' + panelTitle(pk) + ': أدخل اسم العمود بلغة الأساس (الصف ' + (i + 1) + ').'; return;
+                    }
+                } else if (!c.label_ar || !c.label_en || !c.label_fil || !c.label_hi) {
                     err = 'في ' + panelTitle(pk) + ': أكمل عربي/EN/Fil/Hi لكل عمود (الصف ' + (i + 1) + ').'; return;
                 }
                 c.panel_kind = pk; columns.push(c);
@@ -938,12 +1060,16 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
                 if (err) { return; }
                 so++;
                 if (b.dataset.rowKind === 'label') {
+                    var labelPayload = (ASG_LOCALE && b._localeApi) ? b._localeApi.getPayload() : null;
                     rows.push({
+                        id: parseInt(b.dataset.childId || '0', 10) || 0,
                         panel_kind: pk, row_kind: 'label', sort_order: so,
-                        label_ar: b.querySelector('.asg-l-ar').value.trim(),
-                        label_en: b.querySelector('.asg-l-en').value.trim(),
-                        label_fil: b.querySelector('.asg-l-fil').value.trim(),
-                        label_hi: b.querySelector('.asg-l-hi').value.trim(),
+                        label_ar: labelPayload ? String(labelPayload.base_text || '').trim() : b.querySelector('.asg-l-ar').value.trim(),
+                        label_en: labelPayload ? '' : b.querySelector('.asg-l-en').value.trim(),
+                        label_fil: labelPayload ? '' : b.querySelector('.asg-l-fil').value.trim(),
+                        label_hi: labelPayload ? '' : b.querySelector('.asg-l-hi').value.trim(),
+                        base_text: labelPayload ? labelPayload.base_text : undefined,
+                        locales: labelPayload ? labelPayload.locales : undefined,
                         cells: []
                     });
                     return;
@@ -955,7 +1081,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
                 var cells = [];
                 for (var j = 0; j < ins.length; j++) { cells.push(ins[j].value); }
                 if (cells.length > 0) { cells[0] = ''; }
-                rows.push({ panel_kind: pk, row_kind: 'data', sort_order: so, size_family_size_id: sid, cells: cells });
+                rows.push({ id: parseInt(b.dataset.childId || '0', 10) || 0, panel_kind: pk, row_kind: 'data', sort_order: so, size_family_size_id: sid, cells: cells });
             });
             if (dataCount === 0) { err = 'في ' + panelTitle(pk) + ': أضف صف بيانات واحداً على الأقل.'; }
         });
@@ -966,7 +1092,10 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         if (deptId() <= 0) { alert('اختر القسم الرئيسي.'); return; }
         if (kindFilter() === '') { alert('اختر نوع المقاس.'); return; }
         if (famId() <= 0) { alert('اختر عائلة المقاسات.'); return; }
-        if (document.getElementById('asg_name').value.trim() === '') { alert('الاسم الداخلي إلزامي.'); return; }
+        if (ASG_LOCALE && window.OrangeCatalogNameLocale) {
+            var namePayload = window.OrangeCatalogNameLocale.merge('guide');
+            if (!String(namePayload.base_text || '').trim()) { alert('الاسم الداخلي بلغة الأساس إلزامي.'); return; }
+        } else if (document.getElementById('asg_name').value.trim() === '') { alert('الاسم الداخلي إلزامي.'); return; }
         var pr = collectPayload();
         if (pr.err) { alert(pr.err); return; }
         var payload = {
@@ -982,6 +1111,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             link_product_type_ids: selectedTypeIds(),
             link_product_ids: selectedProductIds()
         };
+        if (ASG_LOCALE && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('guide'));
         var res = await post(ADVISORY_API, payload);
         if (!res || !res.success) { alert((res && res.message) || 'خطأ'); return; }
         alert('تم الحفظ');
@@ -1005,7 +1135,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         });
         var html = '<option value="">— اختر —</option>';
         kinds.forEach(function (ck) {
-            html += '<option value="' + esc(ck) + '">' + esc(KIND_LABELS[ck] || ck) + '</option>';
+            var kindTitle = Object.prototype.hasOwnProperty.call(KIND_LABELS, ck) ? KIND_LABELS[ck] : ck;
+            html += '<option value="' + esc(ck) + '">' + esc(kindTitle) + '</option>';
         });
         sel.innerHTML = html;
         sel.value = (prev && seen[prev]) ? prev : '';
@@ -1024,7 +1155,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             if (!familyAllowed(f)) { return; }
             var id = parseInt(f.id, 10) || 0;
             if (id === prev) { keepPrev = true; }
-            html += '<option value="' + id + '">' + esc(f.name_ar || f.name_en || ('#' + id)) + '</option>';
+            var famTitle = Object.prototype.hasOwnProperty.call(f, 'display_name') ? f.display_name : (f.name_ar || f.name_en || ('#' + id));
+            html += '<option value="' + id + '">' + esc(famTitle) + '</option>';
         });
         sel.innerHTML = html;
         sel.value = keepPrev ? String(prev) : '0';
@@ -1085,6 +1217,13 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         document.addEventListener('click', function (ev) {
             if (!ev.target.closest('.asg-picker')) { closeAllPickers(); }
         });
+        if (ASG_LOCALE && window.OrangeCatalogNameLocale) {
+            window.OrangeCatalogNameLocale.bind({
+                roles: ASG_ROLES,
+                active: ASG_ACTIVE,
+                mounts: [{ key: 'guide', rootId: 'asg-locale-app', idPrefix: 'asg-guide-' }]
+            });
+        }
         if (famId() > 0) { loadList(); loadLinkTargets([], []); }
         document.getElementById('asg_link_products_search').addEventListener('input', function () {
             renderLinkProducts(this.value);

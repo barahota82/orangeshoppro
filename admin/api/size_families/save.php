@@ -5,12 +5,18 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_sizing_dictionary.php';
+require_once __DIR__ . '/../../../includes/orange_dictionary_locale.php';
 require_admin_api();
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    if (isset($data['locales']) && is_array($data['locales'])) {
+        $data['locales'] = orange_dictionary_locale_strip_public($data['locales']);
+    }
+    $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+    $localeMode = orange_dictionary_locale_use_payload($pdo, $countryId, $data);
 
     $sanitizeKey = static function (string $raw, int $maxLen): string {
         $t = strtolower(trim($raw));
@@ -27,16 +33,28 @@ try {
     $sizingCategory = $sanitizeKey((string) ($data['sizing_category_key'] ?? ''), 64);
 
     $id = (int)($data['id'] ?? 0);
-    $nameAr = trim((string)($data['name_ar'] ?? ''));
-    $nameEn = trim((string)($data['name_en'] ?? ''));
-    $nameFil = trim((string)($data['name_fil'] ?? ''));
-    $nameHi = trim((string)($data['name_hi'] ?? ''));
-    if ($nameEn !== '') {
-        if ($nameFil === '') {
-            $nameFil = $nameEn;
+    if ($localeMode) {
+        $preview = orange_dictionary_locale_preview($pdo, $countryId, 'size_family', $id, $data);
+        $nameAr = $preview['name_ar'];
+        $nameEn = $preview['name_en'];
+        $nameFil = $preview['name_fil'];
+        $nameHi = $preview['name_hi'];
+        $guard = orange_dictionary_locale_guard($pdo, $countryId, true, (string) ($data['base_text'] ?? ''), $nameEn, $nameAr, $nameEn, 'يجب تعبئة الاسم العربي والإنجليزي');
+        if ($guard !== null) {
+            json_response(['success' => false, 'message' => $guard], 422);
         }
-        if ($nameHi === '') {
-            $nameHi = $nameEn;
+    } else {
+        $nameAr = trim((string)($data['name_ar'] ?? ''));
+        $nameEn = trim((string)($data['name_en'] ?? ''));
+        $nameFil = trim((string)($data['name_fil'] ?? ''));
+        $nameHi = trim((string)($data['name_hi'] ?? ''));
+        if ($nameEn !== '') {
+            if ($nameFil === '') {
+                $nameFil = $nameEn;
+            }
+            if ($nameHi === '') {
+                $nameHi = $nameEn;
+            }
         }
     }
     $sort = (int)($data['sort_order'] ?? 0);
@@ -46,7 +64,7 @@ try {
     $hasFamTplRef = orange_table_exists($pdo, 'size_families')
         && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
 
-    if ($nameAr === '' || $nameEn === '') {
+    if (!$localeMode && ($nameAr === '' || $nameEn === '')) {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
     }
 
@@ -147,37 +165,89 @@ try {
         && orange_table_has_column($pdo, 'size_families', 'name_hi');
 
     if ($id > 0) {
-        if ($hasFilHi) {
-            $pdo->prepare(
-                'UPDATE size_families SET name_ar=?, name_en=?, name_fil=?, name_hi=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
-            )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
-        } else {
-            $pdo->prepare(
-                'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
-            )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+        if ($localeMode) {
+            $pdo->beginTransaction();
         }
-        if ($hasFamTplRef) {
-            $pdo->prepare(
-                'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
-            )->execute([$tplRefBind, $id]);
+        try {
+            if ($localeMode) {
+                $pdo->prepare(
+                    'UPDATE size_families SET size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+                )->execute([$sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+            } elseif ($hasFilHi) {
+                $pdo->prepare(
+                    'UPDATE size_families SET name_ar=?, name_en=?, name_fil=?, name_hi=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+                )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+            } else {
+                $pdo->prepare(
+                    'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+                )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+            }
+            if ($hasFamTplRef) {
+                $pdo->prepare(
+                    'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
+                )->execute([$tplRefBind, $id]);
+            }
+            if ($localeMode) {
+                orange_dictionary_locale_save(
+                    $pdo,
+                    $countryId,
+                    'size_family',
+                    $id,
+                    trim((string) ($data['base_text'] ?? '')),
+                    is_array($data['locales'] ?? null) ? $data['locales'] : [],
+                    false
+                );
+                $pdo->commit();
+            }
+        } catch (Throwable $e) {
+            if ($localeMode && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
         json_response(['success' => true, 'id' => $id]);
     }
 
-    if ($hasFilHi) {
-        $pdo->prepare(
-            'INSERT INTO size_families (name_ar, name_en, name_fil, name_hi, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?)'
-        )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
-    } else {
-        $pdo->prepare(
-            'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
-        )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+    if ($localeMode) {
+        $pdo->beginTransaction();
     }
-    $newFamId = (int) $pdo->lastInsertId();
-    if ($hasFamTplRef && $newFamId > 0) {
-        $pdo->prepare(
-            'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
-        )->execute([$tplRefBind, $newFamId]);
+    try {
+        $insAr = $localeMode ? '' : $nameAr;
+        $insEn = $localeMode ? '' : $nameEn;
+        $insFil = $localeMode ? '' : $nameFil;
+        $insHi = $localeMode ? '' : $nameHi;
+        if ($hasFilHi) {
+            $pdo->prepare(
+                'INSERT INTO size_families (name_ar, name_en, name_fil, name_hi, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?)'
+            )->execute([$insAr, $insEn, $insFil, $insHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
+            )->execute([$insAr, $insEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+        }
+        $newFamId = (int) $pdo->lastInsertId();
+        if ($hasFamTplRef && $newFamId > 0) {
+            $pdo->prepare(
+                'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
+            )->execute([$tplRefBind, $newFamId]);
+        }
+        if ($localeMode && $newFamId > 0) {
+            orange_dictionary_locale_save(
+                $pdo,
+                $countryId,
+                'size_family',
+                $newFamId,
+                trim((string) ($data['base_text'] ?? '')),
+                is_array($data['locales'] ?? null) ? $data['locales'] : [],
+                false
+            );
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($localeMode && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
     json_response(['success' => true, 'id' => $newFamId]);
 } catch (Throwable $e) {

@@ -6,6 +6,21 @@ $pdo = db();
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
+
+$famCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$famLocaleReady = orange_content_locale_screen_ready($pdo, $famCountryId);
+$famLocaleRoles = $famLocaleReady ? orange_country_locale_roles_read($pdo, $famCountryId) : ['base' => 'ar'];
+$famBase = (string) ($famLocaleRoles['base'] ?? 'ar');
+$famLocaleActive = [];
+if ($famLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $famLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $famLocaleActive = [];
+    }
+}
+$famLocaleBags = [];
 
 $sizingDictForFamilyForm = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
@@ -13,8 +28,8 @@ $sizingDictForFamilyForm = orange_table_exists($pdo, 'commercial_kind_dictionary
 $hasFamilies = false;
 $hasSizes = false;
 try {
-    $hasFamilies = (bool) $pdo->query("SHOW TABLES LIKE 'size_families'")->fetchColumn();
-    $hasSizes = (bool) $pdo->query("SHOW TABLES LIKE 'size_family_sizes'")->fetchColumn();
+    $hasFamilies = orange_table_exists($pdo, 'size_families');
+    $hasSizes = orange_table_exists($pdo, 'size_family_sizes');
 } catch (Throwable $e) {
     $hasFamilies = false;
     $hasSizes = false;
@@ -27,6 +42,9 @@ $nextSort = 1;
 if ($hasFamilies) {
     try {
         $families = $pdo->query('SELECT * FROM size_families ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        if ($famLocaleReady && is_array($families)) {
+            $famLocaleBags = orange_dictionary_locale_rows_for($pdo, 'size_family', array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $families));
+        }
         $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_families')->fetchColumn();
         if ($nextSort <= 0) {
             $nextSort = 1;
@@ -53,13 +71,21 @@ if ($hasSizes && $hasFamilies) {
 
 $hasSizeTemplates = false;
 $sizeTemplatesList = [];
+$sizeTemplateBags = [];
 if ($hasFamilies) {
     try {
         if (orange_table_exists($pdo, 'size_scheme_templates')) {
             $hasSizeTemplates = true;
             $sizeTemplatesList = $pdo->query(
-                'SELECT id, name_ar, name_en FROM size_scheme_templates WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
-            )->fetchAll(PDO::FETCH_ASSOC);
+                'SELECT id, name_ar, name_en, name_fil, name_hi FROM size_scheme_templates WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if ($famLocaleReady && $sizeTemplatesList !== []) {
+                $sizeTemplateBags = orange_dictionary_locale_rows_for(
+                    $pdo,
+                    'size_scheme_template',
+                    array_map(static fn ($row): int => (int) ($row['id'] ?? 0), $sizeTemplatesList)
+                );
+            }
         }
     } catch (Throwable $e) {
         $hasSizeTemplates = false;
@@ -332,7 +358,18 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <select id="sizes_template_pick" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
                     <option value="">— اختر قالباً —</option>
                     <?php foreach ($sizeTemplatesList as $tpl): ?>
-                    <option value="<?php echo (int) $tpl['id']; ?>" data-name-en="<?php echo htmlspecialchars((string) ($tpl['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php
+                    $tplTitle = (string) (($tpl['name_ar'] ?? '') !== '' ? $tpl['name_ar'] : ($tpl['name_en'] ?? ''));
+                    if ($famLocaleReady) {
+                        $tplTitle = orange_dictionary_locale_base_text(
+                            'size_scheme_template',
+                            (string) ($famLocaleRoles['base'] ?? ''),
+                            $tpl,
+                            $sizeTemplateBags[(int) $tpl['id']] ?? []
+                        );
+                    }
+                    ?>
+                    <option value="<?php echo (int) $tpl['id']; ?>" data-name-en="<?php echo htmlspecialchars((string) ($tpl['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($tplTitle, ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php else: ?>
@@ -341,7 +378,8 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <?php endif; ?>
             </div>
         </div>
-        <div class="sf-fam-names-row">
+        <div id="family-locale-app" style="grid-column:1 / -1;<?php echo $famLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="sf-fam-names-row"<?php echo $famLocaleReady ? ' style="display:none;"' : ''; ?>>
             <div class="admin-sort-field-wrap">
                 <label for="fam_name_ar">الاسم العربي</label>
                 <input type="text" id="fam_name_ar" class="admin-sort-field<?php echo $sizingDictForFamilyForm ? ' admin-sort-field--muted' : ''; ?>" maxlength="191" autocomplete="off"<?php
@@ -405,7 +443,7 @@ $tablesReady = $hasFamilies && $hasSizes;
             <thead>
                 <tr>
                     <th class="sf-col-id">#</th>
-                    <th class="sf-col-ar">العربي</th>
+                    <th class="sf-col-ar"><?php echo $famLocaleReady ? 'الاسم' : 'العربي'; ?></th>
                     <th class="sf-col-en">English</th>
                     <th class="sf-col-scheme">scheme</th>
                     <th class="sf-col-szcount">عدد المقاسات</th>
@@ -418,7 +456,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <?php foreach ($families as $f): ?>
                 <tr data-id="<?php echo (int) $f['id']; ?>">
                     <td class="sf-col-id"><?php echo (int) $f['id']; ?></td>
-                    <td class="sf-col-ar"><?php echo htmlspecialchars((string) $f['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="sf-col-ar"><?php echo htmlspecialchars($famLocaleReady ? orange_dictionary_locale_base_text('size_family', $famBase, $f, $famLocaleBags[(int) $f['id']] ?? []) : (string) $f['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="sf-col-en"><?php echo htmlspecialchars((string) $f['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="sf-col-scheme"><?php echo htmlspecialchars((string) ($f['size_scheme_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="sf-col-szcount"><?php echo isset($sizesByFamily[(int) $f['id']]) ? count($sizesByFamily[(int) $f['id']]) : 0; ?></td>
@@ -443,6 +481,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'size_scheme_template_id' => (int) ($f['size_scheme_template_id'] ?? 0),
                                     'sort_order' => (int) $f['sort_order'],
                                     'is_active' => (int) $f['is_active'],
+                                    'locale_view' => $famLocaleReady ? orange_dictionary_locale_panel_state('size_family', $f, $famLocaleBags[(int) $f['id']] ?? [], $famBase) : null,
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                                 <button type="button" class="sf-btn-toggle" onclick="toggleFamily(<?php echo (int) $f['id']; ?>, <?php echo (int) $f['is_active']; ?>)">
                                     <?php echo (int) $f['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
@@ -505,6 +544,8 @@ function famHierarchyFieldValue(id) {
 function famApplyAutoSizeSchemeKey() {
     var keyEl = document.getElementById('fam_size_scheme_key');
     if (!keyEl) return;
+    var existingId = parseInt(String(document.getElementById('fam_id').value || '0'), 10) || 0;
+    if (existingId > 0) return;
     var sk = famSizingSlugKey(famHierarchyFieldValue('fam_sizing_category_key'), 64);
     var tplEl = document.getElementById('sizes_template_pick');
     var tplSlug = '';
@@ -681,7 +722,8 @@ async function famLoadKindsIntoSelect(preferredKind) {
         kinds.forEach(function (k) {
             var o = document.createElement('option');
             o.value = k.kind_key || '';
-            o.textContent = (k.label_ar || k.kind_key || '') + ' (' + (k.kind_key || '') + ')';
+            var kindTitle = Object.prototype.hasOwnProperty.call(k, 'display_name') ? String(k.display_name) : String(k.label_ar || k.kind_key || '');
+            o.textContent = kindTitle + ' (' + (k.kind_key || '') + ')';
             o.setAttribute('data-label-ar', String(k.label_ar != null ? k.label_ar : ''));
             o.setAttribute('data-label-en', String(k.label_en != null ? k.label_en : ''));
             sel.appendChild(o);
@@ -725,7 +767,8 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
         (res.categories || []).forEach(function (c) {
             var o = document.createElement('option');
             o.value = c.category_key || '';
-            o.textContent = (c.label_ar || c.category_key || '') + ' (' + (c.category_key || '') + ')';
+            var catTitle = Object.prototype.hasOwnProperty.call(c, 'display_name') ? String(c.display_name) : String(c.label_ar || c.category_key || '');
+            o.textContent = catTitle + ' (' + (c.category_key || '') + ')';
             o.setAttribute('data-label-ar', String(c.label_ar != null ? c.label_ar : ''));
             o.setAttribute('data-label-en', String(c.label_en != null ? c.label_en : ''));
             catSel.appendChild(o);
@@ -763,6 +806,7 @@ function famInitSizingHierarchySelects() {
 
 function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
+    if (window.FAM_LOCALE_READY && window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.reset('family');
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
     var filEl = document.getElementById('fam_name_fil');
@@ -792,6 +836,9 @@ function resetFamilyForm() {
 
 async function editFamily(f) {
     document.getElementById('fam_id').value = String(f.id != null ? f.id : 0);
+    if (window.FAM_LOCALE_READY && window.OrangeCatalogNameLocale && f.locale_view) {
+        window.OrangeCatalogNameLocale.open('family', f.locale_view);
+    }
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
@@ -815,6 +862,13 @@ async function editFamily(f) {
         document.getElementById('fam_name_en').value = f.name_en || '';
         document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
         document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
+        var tplPickOff = document.getElementById('sizes_template_pick');
+        if (tplPickOff && tplPickOff.tagName === 'SELECT' && f.size_scheme_template_id != null) {
+            var tcOff = parseInt(String(f.size_scheme_template_id), 10) || 0;
+            if (tcOff > 0 && [].some.call(tplPickOff.options, function (o) { return String(o.value) === String(tcOff); })) {
+                tplPickOff.value = String(tcOff);
+            }
+        }
         famSyncFamFilHiFromEn();
     }
     famApplyAutoSizeSchemeKey();
@@ -885,7 +939,7 @@ async function saveFamily() {
     isSavingFamily = true;
     famApplyAutoSizeSchemeKey();
     famSyncFamFilHiFromEn();
-    if (!document.getElementById('fam_name_ar').value.trim() || !document.getElementById('fam_name_en').value.trim()) {
+    if (!window.FAM_LOCALE_READY && (!document.getElementById('fam_name_ar').value.trim() || !document.getElementById('fam_name_en').value.trim())) {
         alert('يجب تعبئة الاسم العربي والإنجليزي قبل الحفظ');
         isSavingFamily = false;
         return;
@@ -933,6 +987,7 @@ async function saveFamily() {
         var tplPickSave = document.getElementById('sizes_template_pick');
         var tplRefSave = (tplPickSave && tplPickSave.tagName === 'SELECT') ? (parseInt(tplPickSave.value || '0', 10) || 0) : 0;
         payload.size_scheme_template_id = tplRefSave;
+        if (window.FAM_LOCALE_READY && window.OrangeCatalogNameLocale) Object.assign(payload, window.OrangeCatalogNameLocale.merge('family'));
         var res = await postJSON('/admin/api/size_families/save.php', payload);
         if (!res || !res.success) {
             alert((res && res.message) ? res.message : 'فشل');
@@ -1475,3 +1530,20 @@ async function saveSizesForFamily() {
     famRunInitWhenPostJsonReady();
 })();
 </script>
+<?php if ($famLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.FAM_LOCALE_READY = true;
+window.FAM_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $famLocaleRoles,
+    'active' => $famLocaleActive,
+    'mounts' => [[
+        'key' => 'family',
+        'rootId' => 'family-locale-app',
+        'idPrefix' => 'family-',
+    ]],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.FAM_LOCALE_BOOT);
+</script>
+<?php endif; ?>

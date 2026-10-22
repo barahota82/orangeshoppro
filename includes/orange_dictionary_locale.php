@@ -32,7 +32,203 @@ const ORANGE_DICTIONARY_LOCALE_SPECS = [
         'columns' => ['ar' => 'label_ar', 'en' => 'label_en', 'fil' => 'label_fil', 'hi' => 'label_hi'],
         'value_column' => 'label_ar',
     ],
+    'size_family' => [
+        'table' => 'size_families',
+        'field' => 'name',
+        'columns' => ['ar' => 'name_ar', 'en' => 'name_en', 'fil' => 'name_fil', 'hi' => 'name_hi'],
+    ],
+    'size_scheme_template' => [
+        'table' => 'size_scheme_templates',
+        'field' => 'name',
+        'columns' => ['ar' => 'name_ar', 'en' => 'name_en', 'fil' => 'name_fil', 'hi' => 'name_hi'],
+        'value_column' => 'name_en',
+    ],
+    'advisory_sizing_guide' => [
+        'table' => 'advisory_sizing_guides',
+        'field' => 'name',
+        'columns' => ['ar' => 'name_ar'],
+    ],
+    'advisory_sizing_guide_column' => [
+        'table' => 'advisory_sizing_guide_columns',
+        'field' => 'label',
+        'columns' => ['ar' => 'label_ar', 'en' => 'label_en', 'fil' => 'label_fil', 'hi' => 'label_hi'],
+    ],
+    'advisory_sizing_guide_label' => [
+        'table' => 'advisory_sizing_guide_rows',
+        'field' => 'label',
+        'columns' => ['ar' => 'label_ar', 'en' => 'label_en', 'fil' => 'label_fil', 'hi' => 'label_hi'],
+    ],
+    'commercial_kind' => [
+        'table' => 'commercial_kind_dictionary',
+        'field' => 'name',
+        'columns' => ['ar' => 'label_ar', 'en' => 'label_en'],
+    ],
+    'sizing_category' => [
+        'table' => 'sizing_category_dictionary',
+        'field' => 'name',
+        'columns' => ['ar' => 'label_ar', 'en' => 'label_en'],
+    ],
 ];
+
+function orange_sizing_dictionary_identity_ready(PDO $pdo): bool
+{
+    $required = [
+        'commercial_kind_dictionary' => ['id', 'kind_key', 'label_ar', 'label_en'],
+        'sizing_category_dictionary' => ['id', 'commercial_kind_key', 'category_key', 'label_ar', 'label_en'],
+    ];
+    if (!function_exists('orange_table_exists') || !function_exists('orange_table_has_column')) {
+        return false;
+    }
+    try {
+        if (!orange_sizing_dictionary_id_contract($pdo)) {
+            return false;
+        }
+        foreach ($required as $table => $columns) {
+            if (!orange_table_exists($pdo, $table)) {
+                return false;
+            }
+            foreach ($columns as $column) {
+                if (!orange_table_has_column($pdo, $table, $column)) {
+                    return false;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Read-only MariaDB contract. A column named id, or a composite index that
+ * merely includes id, is not enough. This function does not ALTER.
+ */
+function orange_sizing_dictionary_id_contract(PDO $pdo): bool
+{
+    $primary = [
+        'commercial_kind_dictionary' => ['kind_key'],
+        'sizing_category_dictionary' => ['commercial_kind_key', 'category_key'],
+    ];
+    foreach ($primary as $table => $columns) {
+        if (!orange_sizing_dictionary_id_column_ok($pdo, $table)) {
+            return false;
+        }
+        if (!orange_sizing_dictionary_unique_id_index($pdo, $table)) {
+            return false;
+        }
+        if (orange_sizing_dictionary_primary_columns($pdo, $table) !== $columns) {
+            return false;
+        }
+    }
+
+    return orange_sizing_dictionary_category_fk_ok($pdo);
+}
+
+function orange_sizing_dictionary_id_column_ok(PDO $pdo, string $table): bool
+{
+    $st = $pdo->prepare(
+        'SELECT DATA_TYPE, IS_NULLABLE, EXTRA
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = \'id\''
+    );
+    $st->execute([$table]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return false;
+    }
+    $type = strtolower((string) ($row['DATA_TYPE'] ?? ''));
+    $integer = in_array($type, ['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint'], true);
+    $nullable = strtoupper((string) ($row['IS_NULLABLE'] ?? '')) === 'YES';
+    $extra = strtolower((string) ($row['EXTRA'] ?? ''));
+
+    return $integer && !$nullable && str_contains($extra, 'auto_increment');
+}
+
+function orange_sizing_dictionary_unique_id_index(PDO $pdo, string $table): bool
+{
+    $st = $pdo->prepare(
+        'SELECT INDEX_NAME, COLUMN_NAME
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND NON_UNIQUE = 0 AND INDEX_NAME <> \'PRIMARY\'
+         ORDER BY INDEX_NAME, SEQ_IN_INDEX'
+    );
+    $st->execute([$table]);
+    $grouped = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $grouped[(string) ($row['INDEX_NAME'] ?? '')][] = (string) ($row['COLUMN_NAME'] ?? '');
+    }
+    foreach ($grouped as $columns) {
+        if ($columns === ['id']) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function orange_sizing_dictionary_primary_columns(PDO $pdo, string $table): array
+{
+    $st = $pdo->prepare(
+        'SELECT COLUMN_NAME
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = \'PRIMARY\'
+         ORDER BY SEQ_IN_INDEX'
+    );
+    $st->execute([$table]);
+    $columns = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        if (is_array($row)) {
+            $columns[] = (string) ($row['COLUMN_NAME'] ?? '');
+        }
+    }
+
+    return $columns;
+}
+
+function orange_sizing_dictionary_category_fk_ok(PDO $pdo): bool
+{
+    $st = $pdo->prepare(
+        'SELECT CONSTRAINT_NAME
+         FROM information_schema.KEY_COLUMN_USAGE
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = \'sizing_category_dictionary\'
+           AND COLUMN_NAME = \'commercial_kind_key\'
+           AND REFERENCED_TABLE_NAME = \'commercial_kind_dictionary\'
+           AND REFERENCED_COLUMN_NAME = \'kind_key\'
+           AND CONSTRAINT_NAME = \'fk_scd_commercial_kind\''
+    );
+    $st->execute();
+
+    return $st->fetchColumn() === 'fk_scd_commercial_kind';
+}
+
+function orange_dictionary_locale_reference_english(PDO $pdo, int $countryId, string $kind, int $entityId, string $baseText, array $locales): string
+{
+    $roles = orange_country_locale_roles_read($pdo, $countryId);
+    $base = (string) ($roles['base'] ?? '');
+    $english = $base === 'en' ? trim($baseText) : '';
+    if ($base !== 'en' && $entityId > 0) {
+        $spec = orange_dictionary_locale_spec($kind);
+        $st = $pdo->prepare('SELECT * FROM ' . $spec['table'] . ' WHERE id = ?');
+        $st->execute([$entityId]);
+        $record = $st->fetch(PDO::FETCH_ASSOC);
+        if (is_array($record)) {
+            $stored = orange_dictionary_locale_rows($pdo, $kind, $entityId);
+            $effective = orange_dictionary_locale_effective($kind, $record, $stored);
+            $english = (string) ($effective['en']['text_value'] ?? '');
+        }
+    }
+    $posted = $locales['en'] ?? null;
+    if (is_array($posted) && !empty($posted['present'])) {
+        $english = !empty($posted['clear']) ? '' : trim((string) ($posted['text'] ?? ''));
+    }
+
+    return $english;
+}
 
 function orange_dictionary_locale_spec(string $kind): array
 {
@@ -143,6 +339,15 @@ function orange_dictionary_locale_effective(string $kind, array $record, array $
     }
 
     return $effective;
+}
+
+function orange_dictionary_locale_option_text(array $row, string $legacy): string
+{
+    if (array_key_exists('display_name', $row)) {
+        return (string) $row['display_name'];
+    }
+
+    return $legacy;
 }
 
 function orange_dictionary_locale_base_text(string $kind, string $base, array $record, array $stored): string
@@ -315,6 +520,26 @@ function orange_dictionary_locale_delete_entity(PDO $pdo, string $kind, int $ent
     $field = orange_dictionary_locale_spec($kind)['field'];
     $st = $pdo->prepare('DELETE FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ?');
     $st->execute([$kind, $entityId, $field]);
+}
+
+/**
+ * @param list<int> $ids
+ */
+function orange_dictionary_locale_delete_ids(PDO $pdo, string $kind, array $ids): void
+{
+    $field = orange_dictionary_locale_spec($kind)['field'];
+    $ids = array_values(array_unique(array_filter(
+        array_map(static fn ($id): int => (int) $id, $ids),
+        static fn (int $id): bool => $id > 0
+    )));
+    if ($ids === [] || !orange_content_locale_table_ready($pdo)) {
+        return;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare(
+        'DELETE FROM orange_content_locale_text WHERE entity_kind = ? AND field_key = ? AND entity_id IN (' . $placeholders . ')'
+    );
+    $st->execute(array_merge([$kind, $field], $ids));
 }
 
 function orange_dictionary_locale_apply_one(

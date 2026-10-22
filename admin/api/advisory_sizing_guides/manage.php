@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/advisory_sizing_guides.php';
+require_once __DIR__ . '/../../../includes/orange_dictionary_locale.php';
 require_admin_api();
 
 /**
@@ -24,6 +25,41 @@ function orange_advisory_row_kind_valid($raw): string
 function orange_advisory_value_kind_valid($raw): string
 {
     return strtolower(trim((string) $raw)) === 'number' ? 'number' : 'text';
+}
+
+function orange_advisory_guide_duplicate_id(PDO $pdo, int $countryId, int $familyId, string $baseText, int $exceptId): int
+{
+    $roles = orange_country_locale_roles_read($pdo, $countryId);
+    $base = (string) ($roles['base'] ?? '');
+    $wanted = trim($baseText);
+    if ($base === '' || $wanted === '') {
+        return 0;
+    }
+    $st = $pdo->prepare('SELECT id, name_ar FROM advisory_sizing_guides WHERE size_family_id = ?');
+    $st->execute([$familyId]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $ids = [];
+    foreach ($rows as $row) {
+        if (is_array($row)) {
+            $ids[] = (int) ($row['id'] ?? 0);
+        }
+    }
+    $bags = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide', $ids);
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $gid = (int) ($row['id'] ?? 0);
+        if ($gid <= 0 || $gid === $exceptId) {
+            continue;
+        }
+        $text = trim(orange_dictionary_locale_base_text('advisory_sizing_guide', $base, $row, $bags[$gid] ?? []));
+        if ($text === $wanted) {
+            return $gid;
+        }
+    }
+
+    return 0;
 }
 
 /** @param mixed $raw */
@@ -64,6 +100,38 @@ function orange_advisory_api_trunc_utf8(string $s, int $maxLen): string
     }
 
     return strlen($s) <= $maxLen ? $s : substr($s, 0, $maxLen);
+}
+
+function orange_advisory_locale_flag_message(array $locales): ?string
+{
+    foreach ($locales as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (!empty($entry['preserve']) || array_key_exists('origin', $entry)) {
+            return 'لا يُقبل preserve أو origin من الحفظ.';
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @return array<int, true>
+ */
+function orange_advisory_owned_id_set(PDO $pdo, string $sql, int $guideId): array
+{
+    $st = $pdo->prepare($sql);
+    $st->execute([$guideId]);
+    $out = [];
+    foreach ($st->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+        $id = (int) $id;
+        if ($id > 0) {
+            $out[$id] = true;
+        }
+    }
+
+    return $out;
 }
 
 /**
@@ -147,7 +215,22 @@ try {
             );
             $st->execute([$fid]);
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-            json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
+            $rows = is_array($rows) ? $rows : [];
+            $listCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+            if ($listCountryId > 0 && orange_content_locale_screen_ready($pdo, $listCountryId) && $rows !== []) {
+                $listRoles = orange_country_locale_roles_read($pdo, $listCountryId);
+                $listBase = (string) ($listRoles['base'] ?? '');
+                $listIds = [];
+                foreach ($rows as $row) {
+                    $listIds[] = (int) ($row['id'] ?? 0);
+                }
+                $listBags = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide', $listIds);
+                foreach ($rows as $ix => $row) {
+                    $gidList = (int) ($row['id'] ?? 0);
+                    $rows[$ix]['display_name'] = orange_dictionary_locale_base_text('advisory_sizing_guide', $listBase, $row, $listBags[$gidList] ?? []);
+                }
+            }
+            json_response(['success' => true, 'guides' => $rows]);
 
         case 'list_link_targets':
             $fid = (int) ($data['size_family_id'] ?? 0);
@@ -341,6 +424,37 @@ try {
                 $linkedProductIds = array_map('intval', $lp->fetchAll(PDO::FETCH_COLUMN) ?: []);
             }
 
+            $viewCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+            if ($viewCountryId > 0 && orange_content_locale_screen_ready($pdo, $viewCountryId)) {
+                $viewRoles = orange_country_locale_roles_read($pdo, $viewCountryId);
+                $viewBase = (string) ($viewRoles['base'] ?? '');
+                $guideStored = orange_dictionary_locale_rows($pdo, 'advisory_sizing_guide', $gid);
+                $guide['locale_view'] = orange_dictionary_locale_panel_state('advisory_sizing_guide', $guide, $guideStored, $viewBase);
+                $guide['display_name'] = (string) ($guide['locale_view']['base_text'] ?? '');
+                $colIds = [];
+                foreach ($outCols as $col) {
+                    $colIds[] = (int) ($col['id'] ?? 0);
+                }
+                $colBags = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide_column', $colIds);
+                foreach ($outCols as $ix => $col) {
+                    $cid = (int) ($col['id'] ?? 0);
+                    $outCols[$ix]['locale_view'] = orange_dictionary_locale_panel_state('advisory_sizing_guide_column', $col, $colBags[$cid] ?? [], $viewBase);
+                }
+                $labelIds = [];
+                foreach ($outRows as $rw) {
+                    if (($rw['row_kind'] ?? '') === 'label') {
+                        $labelIds[] = (int) ($rw['id'] ?? 0);
+                    }
+                }
+                $labelBags = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide_label', $labelIds);
+                foreach ($outRows as $ix => $rw) {
+                    if (($rw['row_kind'] ?? '') !== 'label') {
+                        continue;
+                    }
+                    $rid = (int) ($rw['id'] ?? 0);
+                    $outRows[$ix]['locale_view'] = orange_dictionary_locale_panel_state('advisory_sizing_guide_label', $rw, $labelBags[$rid] ?? [], $viewBase);
+                }
+            }
             json_response([
                 'success' => true,
                 'guide' => $guide,
@@ -366,10 +480,18 @@ try {
                 $stR = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
                 $stR->execute([$id]);
                 $rids = $stR->fetchAll(PDO::FETCH_COLUMN);
+                $stC = $pdo->prepare('SELECT id FROM advisory_sizing_guide_columns WHERE guide_id = ?');
+                $stC->execute([$id]);
+                $cids = $stC->fetchAll(PDO::FETCH_COLUMN);
                 if (is_array($rids) && $rids !== []) {
                     $in = implode(',', array_fill(0, count($rids), '?'));
                     $pdo->prepare("DELETE FROM advisory_sizing_guide_cells WHERE row_id IN ($in)")->execute(array_map('intval', $rids));
+                    orange_dictionary_locale_delete_ids($pdo, 'advisory_sizing_guide_label', array_map('intval', $rids));
                 }
+                if (is_array($cids) && $cids !== []) {
+                    orange_dictionary_locale_delete_ids($pdo, 'advisory_sizing_guide_column', array_map('intval', $cids));
+                }
+                orange_dictionary_locale_delete_entity($pdo, 'advisory_sizing_guide', $id);
                 $pdo->prepare('DELETE FROM advisory_sizing_guide_rows WHERE guide_id = ?')->execute([$id]);
                 $pdo->prepare('DELETE FROM advisory_sizing_guide_columns WHERE guide_id = ?')->execute([$id]);
                 $pdo->prepare('DELETE FROM advisory_sizing_guides WHERE id = ?')->execute([$id]);
@@ -408,9 +530,50 @@ try {
             }
 
             $layoutKind = orange_advisory_layout_kind_valid($data['layout_kind'] ?? 'single');
-            $nameAr = orange_advisory_api_trunc_utf8(trim((string) ($data['name_ar'] ?? '')), 191);
-            if ($nameAr === '') {
-                json_response(['success' => false, 'message' => 'الاسم الداخلي (عربي) إلزامي.'], 422);
+            $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+            if (isset($data['locales']) && is_array($data['locales'])) {
+                $nameFlag = orange_advisory_locale_flag_message($data['locales']);
+                if ($nameFlag !== null) {
+                    json_response(['success' => false, 'message' => $nameFlag], 422);
+                }
+                $data['locales'] = orange_dictionary_locale_strip_public($data['locales']);
+            }
+            $localeMode = orange_dictionary_locale_use_payload($pdo, $countryId, $data);
+            $ownedColumnIds = $id > 0
+                ? orange_advisory_owned_id_set($pdo, 'SELECT id FROM advisory_sizing_guide_columns WHERE guide_id = ?', $id)
+                : [];
+            $ownedRowIds = $id > 0
+                ? orange_advisory_owned_id_set($pdo, 'SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?', $id)
+                : [];
+            if ($localeMode) {
+                $namePreview = orange_dictionary_locale_preview($pdo, $countryId, 'advisory_sizing_guide', $id, $data);
+                $nameAr = orange_advisory_api_trunc_utf8((string) ($namePreview['name_ar'] ?? ''), 191);
+                $nameEn = orange_dictionary_locale_reference_english(
+                    $pdo,
+                    $countryId,
+                    'advisory_sizing_guide',
+                    $id,
+                    (string) ($data['base_text'] ?? ''),
+                    is_array($data['locales'] ?? null) ? $data['locales'] : []
+                );
+                $guard = orange_dictionary_locale_guard(
+                    $pdo,
+                    $countryId,
+                    true,
+                    (string) ($data['base_text'] ?? ''),
+                    $nameEn,
+                    $nameAr,
+                    $nameEn,
+                    'الاسم الداخلي (عربي) إلزامي.'
+                );
+                if ($guard !== null) {
+                    json_response(['success' => false, 'message' => $guard], 422);
+                }
+            } else {
+                $nameAr = orange_advisory_api_trunc_utf8(trim((string) ($data['name_ar'] ?? '')), 191);
+                if ($nameAr === '') {
+                    json_response(['success' => false, 'message' => 'الاسم الداخلي (عربي) إلزامي.'], 422);
+                }
             }
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
@@ -427,6 +590,7 @@ try {
                 $colsByPanel[$pk] = [];
             }
             $soByPanel = [];
+            $seenColumnIds = [];
             foreach ($columnsIn as $c) {
                 if (!is_array($c)) {
                     continue;
@@ -435,12 +599,59 @@ try {
                 if (!isset($colsByPanel[$pk])) {
                     continue;
                 }
-                $la = trim((string) ($c['label_ar'] ?? ''));
-                $le = trim((string) ($c['label_en'] ?? ''));
-                $lf = trim((string) ($c['label_fil'] ?? ''));
-                $lh = trim((string) ($c['label_hi'] ?? ''));
-                if ($la === '' || $le === '' || $lf === '' || $lh === '') {
-                    json_response(['success' => false, 'message' => 'كل عمود يحتاج عربي و EN و Fil و Hi (اللوحة: ' . $pk . ').'], 422);
+                $localePayload = null;
+                $childId = (int) ($c['id'] ?? 0);
+                if ($childId < 0) {
+                    $childId = 0;
+                }
+                if ($id <= 0 && $childId > 0) {
+                    json_response(['success' => false, 'message' => 'معرف العمود لا يخص هذا الدليل.'], 422);
+                }
+                if ($childId > 0 && !isset($ownedColumnIds[$childId])) {
+                    json_response(['success' => false, 'message' => 'معرف العمود لا يخص هذا الدليل.'], 422);
+                }
+                if ($childId > 0 && isset($seenColumnIds[$childId])) {
+                    json_response(['success' => false, 'message' => 'معرف العمود مكرر في الحفظ.'], 422);
+                }
+                if ($childId > 0) {
+                    $seenColumnIds[$childId] = true;
+                }
+                if ($localeMode && array_key_exists('base_text', $c)) {
+                    if (isset($c['locales']) && is_array($c['locales'])) {
+                        $colFlag = orange_advisory_locale_flag_message($c['locales']);
+                        if ($colFlag !== null) {
+                            json_response(['success' => false, 'message' => $colFlag], 422);
+                        }
+                        $c['locales'] = orange_dictionary_locale_strip_public($c['locales']);
+                    }
+                    $colEnglish = orange_dictionary_locale_reference_english(
+                        $pdo,
+                        $countryId,
+                        'advisory_sizing_guide_column',
+                        $childId,
+                        (string) ($c['base_text'] ?? ''),
+                        is_array($c['locales'] ?? null) ? $c['locales'] : []
+                    );
+                    $colGuard = orange_dictionary_locale_guard($pdo, $countryId, true, (string) ($c['base_text'] ?? ''), $colEnglish, '', $colEnglish, 'كل عمود يحتاج اسماً بلغة الأساس.');
+                    if ($colGuard !== null) {
+                        json_response(['success' => false, 'message' => $colGuard . ' (اللوحة: ' . $pk . ')'], 422);
+                    }
+                    $la = '';
+                    $le = '';
+                    $lf = '';
+                    $lh = '';
+                    $localePayload = [
+                        'base_text' => trim((string) ($c['base_text'] ?? '')),
+                        'locales' => is_array($c['locales'] ?? null) ? $c['locales'] : [],
+                    ];
+                } else {
+                    $la = trim((string) ($c['label_ar'] ?? ''));
+                    $le = trim((string) ($c['label_en'] ?? ''));
+                    $lf = trim((string) ($c['label_fil'] ?? ''));
+                    $lh = trim((string) ($c['label_hi'] ?? ''));
+                    if ($la === '' || $le === '' || $lf === '' || $lh === '') {
+                        json_response(['success' => false, 'message' => 'كل عمود يحتاج عربي و EN و Fil و Hi (اللوحة: ' . $pk . ').'], 422);
+                    }
                 }
                 $soByPanel[$pk] = ($soByPanel[$pk] ?? 0) + 1;
                 $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
@@ -450,6 +661,7 @@ try {
                     $vk = 'number';
                 }
                 $colsByPanel[$pk][] = [
+                    'id' => $childId,
                     'panel_kind' => $pk,
                     'label_ar' => orange_advisory_api_trunc_utf8($la, 191),
                     'label_en' => orange_advisory_api_trunc_utf8($le, 191),
@@ -460,6 +672,7 @@ try {
                     'storage_measure' => $stMeas,
                     'display_system' => $dispSys,
                     'sort_order' => $soByPanel[$pk],
+                    'locale' => $localePayload,
                 ];
             }
             foreach ($panels as $pk) {
@@ -475,6 +688,7 @@ try {
                 $rowsByPanel[$pk] = [];
             }
             $rsoByPanel = [];
+            $seenRowIds = [];
             foreach ($rowsIn as $r) {
                 if (!is_array($r)) {
                     continue;
@@ -502,16 +716,68 @@ try {
                 if ($rk === 'data' && $sfsId > 0 && $cells !== []) {
                     $cells[0] = '';
                 }
+                $rowLocale = null;
+                $rowChildId = (int) ($r['id'] ?? 0);
+                if ($rowChildId < 0) {
+                    $rowChildId = 0;
+                }
+                if ($id <= 0 && $rowChildId > 0) {
+                    json_response(['success' => false, 'message' => 'معرف الصف لا يخص هذا الدليل.'], 422);
+                }
+                if ($rowChildId > 0 && !isset($ownedRowIds[$rowChildId])) {
+                    json_response(['success' => false, 'message' => 'معرف الصف لا يخص هذا الدليل.'], 422);
+                }
+                if ($rowChildId > 0 && isset($seenRowIds[$rowChildId])) {
+                    json_response(['success' => false, 'message' => 'معرف الصف مكرر في الحفظ.'], 422);
+                }
+                if ($rowChildId > 0) {
+                    $seenRowIds[$rowChildId] = true;
+                }
+                $rowLa = trim((string) ($r['label_ar'] ?? ''));
+                $rowLe = trim((string) ($r['label_en'] ?? ''));
+                $rowLf = trim((string) ($r['label_fil'] ?? ''));
+                $rowLh = trim((string) ($r['label_hi'] ?? ''));
+                if ($rk === 'label' && $localeMode && array_key_exists('base_text', $r)) {
+                    if (isset($r['locales']) && is_array($r['locales'])) {
+                        $rowFlag = orange_advisory_locale_flag_message($r['locales']);
+                        if ($rowFlag !== null) {
+                            json_response(['success' => false, 'message' => $rowFlag], 422);
+                        }
+                        $r['locales'] = orange_dictionary_locale_strip_public($r['locales']);
+                    }
+                    $rowEnglish = orange_dictionary_locale_reference_english(
+                        $pdo,
+                        $countryId,
+                        'advisory_sizing_guide_label',
+                        $rowChildId,
+                        (string) ($r['base_text'] ?? ''),
+                        is_array($r['locales'] ?? null) ? $r['locales'] : []
+                    );
+                    $rowGuard = orange_dictionary_locale_guard($pdo, $countryId, true, (string) ($r['base_text'] ?? ''), $rowEnglish, '', $rowEnglish, 'صف العنوان يحتاج نصاً بلغة الأساس.');
+                    if ($rowGuard !== null) {
+                        json_response(['success' => false, 'message' => $rowGuard], 422);
+                    }
+                    $rowLa = '';
+                    $rowLe = '';
+                    $rowLf = '';
+                    $rowLh = '';
+                    $rowLocale = [
+                        'base_text' => trim((string) ($r['base_text'] ?? '')),
+                        'locales' => is_array($r['locales'] ?? null) ? $r['locales'] : [],
+                    ];
+                }
                 $rowsByPanel[$pk][] = [
+                    'id' => $rowChildId,
                     'panel_kind' => $pk,
                     'row_kind' => $rk,
                     'sort_order' => $rsoByPanel[$pk],
                     'size_family_size_id' => $rk === 'data' ? $sfsId : 0,
-                    'label_ar' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_ar'] ?? '')), 191),
-                    'label_en' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_en'] ?? '')), 191),
-                    'label_fil' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_fil'] ?? '')), 191),
-                    'label_hi' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_hi'] ?? '')), 191),
+                    'label_ar' => orange_advisory_api_trunc_utf8($rowLa, 191),
+                    'label_en' => orange_advisory_api_trunc_utf8($rowLe, 191),
+                    'label_fil' => orange_advisory_api_trunc_utf8($rowLf, 191),
+                    'label_hi' => orange_advisory_api_trunc_utf8($rowLh, 191),
                     'cells' => $rk === 'data' ? $cells : [],
+                    'locale' => $rowLocale,
                 ];
             }
             // تحقّق: لكل لوحة صف بيانات واحد على الأقل + لا تكرار مقاس + خلايا مكتملة.
@@ -522,7 +788,8 @@ try {
                 $ncol = count($colsByPanel[$pk]);
                 foreach ($rowsByPanel[$pk] as $nr) {
                     if ($nr['row_kind'] !== 'data') {
-                        if (trim($nr['label_ar']) === '' && trim($nr['label_en']) === '') {
+                        $hasLocaleTitle = is_array($nr['locale'] ?? null) && trim((string) ($nr['locale']['base_text'] ?? '')) !== '';
+                        if (!$hasLocaleTitle && trim($nr['label_ar']) === '' && trim($nr['label_en']) === '') {
                             json_response(['success' => false, 'message' => 'صف العنوان يحتاج نصاً عربياً أو إنجليزياً.'], 422);
                         }
                         continue;
@@ -572,17 +839,31 @@ try {
 
             $pdo->beginTransaction();
             try {
-                // منع تكرار الاسم الداخلي لنفس العائلة.
-                if ($id <= 0) {
-                    $dupN = $pdo->prepare('SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? LIMIT 1');
-                    $dupN->execute([$famId, $nameAr]);
+                // منع تكرار اسم لغة الأساس داخل العائلة. عمود name_ar يُستخدم فقط عند غياب صف اللغة.
+                if ($localeMode) {
+                    $dupId = orange_advisory_guide_duplicate_id(
+                        $pdo,
+                        $countryId,
+                        $famId,
+                        trim((string) ($data['base_text'] ?? '')),
+                        $id
+                    );
+                    if ($dupId > 0) {
+                        orange_advisory_api_rollback_safe($pdo);
+                        json_response(['success' => false, 'message' => 'يوجد دليل بنفس الاسم الداخلي لهذه العائلة.'], 409);
+                    }
                 } else {
-                    $dupN = $pdo->prepare('SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1');
-                    $dupN->execute([$famId, $nameAr, $id]);
-                }
-                if ($dupN->fetchColumn()) {
-                    orange_advisory_api_rollback_safe($pdo);
-                    json_response(['success' => false, 'message' => 'يوجد دليل بنفس الاسم الداخلي لهذه العائلة.'], 409);
+                    if ($id <= 0) {
+                        $dupN = $pdo->prepare('SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? LIMIT 1');
+                        $dupN->execute([$famId, $nameAr]);
+                    } else {
+                        $dupN = $pdo->prepare('SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1');
+                        $dupN->execute([$famId, $nameAr, $id]);
+                    }
+                    if ($dupN->fetchColumn()) {
+                        orange_advisory_api_rollback_safe($pdo);
+                        json_response(['success' => false, 'message' => 'يوجد دليل بنفس الاسم الداخلي لهذه العائلة.'], 409);
+                    }
                 }
 
                 $deptIns = $deptId > 0 ? $deptId : null;
@@ -594,64 +875,152 @@ try {
                             (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, layout_kind, name_ar, sort_order, is_active)
                          VALUES (?,?,?,?,?,?,?,?,?)'
                     );
-                    $ins->execute([$famId, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $nameAr, $guideSortIns, $active]);
+                    $ins->execute([$famId, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $localeMode ? '' : $nameAr, $guideSortIns, $active]);
                     $id = (int) $pdo->lastInsertId();
+                } elseif ($localeMode) {
+                    $pdo->prepare(
+                        'UPDATE advisory_sizing_guides SET
+                            size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
+                            scope_kind = ?, layout_kind = ?, is_active = ?
+                         WHERE id = ?'
+                    )->execute([$famId, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $active, $id]);
                 } else {
-                    $upd = $pdo->prepare(
+                    $pdo->prepare(
                         'UPDATE advisory_sizing_guides SET
                             size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
                             scope_kind = ?, layout_kind = ?, name_ar = ?, is_active = ?
                          WHERE id = ?'
+                    )->execute([$famId, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $nameAr, $active, $id]);
+                }
+                if ($localeMode) {
+                    orange_dictionary_locale_save(
+                        $pdo,
+                        $countryId,
+                        'advisory_sizing_guide',
+                        $id,
+                        trim((string) ($data['base_text'] ?? '')),
+                        is_array($data['locales'] ?? null) ? $data['locales'] : [],
+                        false
                     );
-                    $upd->execute([$famId, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $nameAr, $active, $id]);
-                    $stR2 = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
-                    $stR2->execute([$id]);
-                    $rids2 = $stR2->fetchAll(PDO::FETCH_COLUMN);
-                    if (is_array($rids2) && $rids2 !== []) {
-                        $in2 = implode(',', array_fill(0, count($rids2), '?'));
-                        $pdo->prepare("DELETE FROM advisory_sizing_guide_cells WHERE row_id IN ($in2)")->execute(array_map('intval', $rids2));
-                    }
-                    $pdo->prepare('DELETE FROM advisory_sizing_guide_rows WHERE guide_id = ?')->execute([$id]);
-                    $pdo->prepare('DELETE FROM advisory_sizing_guide_columns WHERE guide_id = ?')->execute([$id]);
                 }
 
-                // أدرج الأعمدة لكل لوحة واحتفظ بمعرّفاتها بالترتيب.
                 $colIdsByPanel = [];
+                $keptColumnIds = [];
                 foreach ($panels as $pk) {
                     $colIdsByPanel[$pk] = [];
                     foreach ($colsByPanel[$pk] as $nc) {
-                        $ic = $pdo->prepare(
-                            'INSERT INTO advisory_sizing_guide_columns
-                                (guide_id, panel_kind, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?)'
-                        );
-                        $ic->execute([
-                            $id, $nc['panel_kind'], (int) $nc['sort_order'],
-                            $nc['label_ar'], $nc['label_en'], $nc['label_fil'], $nc['label_hi'],
-                            $nc['value_kind'], $nc['unit_hint'], $nc['storage_measure'], $nc['display_system'],
-                        ]);
-                        $colIdsByPanel[$pk][] = (int) $pdo->lastInsertId();
+                        $colLocale = $localeMode && is_array($nc['locale'] ?? null);
+                        $existingColId = (int) ($nc['id'] ?? 0);
+                        if ($existingColId > 0) {
+                            if ($colLocale) {
+                                $pdo->prepare(
+                                    'UPDATE advisory_sizing_guide_columns
+                                     SET panel_kind = ?, sort_order = ?, value_kind = ?, unit_hint = ?, storage_measure = ?, display_system = ?
+                                     WHERE id = ? AND guide_id = ?'
+                                )->execute([
+                                    $nc['panel_kind'], (int) $nc['sort_order'], $nc['value_kind'], $nc['unit_hint'],
+                                    $nc['storage_measure'], $nc['display_system'], $existingColId, $id,
+                                ]);
+                            } else {
+                                $pdo->prepare(
+                                    'UPDATE advisory_sizing_guide_columns
+                                     SET panel_kind = ?, sort_order = ?, label_ar = ?, label_en = ?, label_fil = ?, label_hi = ?,
+                                         value_kind = ?, unit_hint = ?, storage_measure = ?, display_system = ?
+                                     WHERE id = ? AND guide_id = ?'
+                                )->execute([
+                                    $nc['panel_kind'], (int) $nc['sort_order'], $nc['label_ar'], $nc['label_en'], $nc['label_fil'], $nc['label_hi'],
+                                    $nc['value_kind'], $nc['unit_hint'], $nc['storage_measure'], $nc['display_system'], $existingColId, $id,
+                                ]);
+                            }
+                            $newColId = $existingColId;
+                        } else {
+                            $pdo->prepare(
+                                'INSERT INTO advisory_sizing_guide_columns
+                                    (guide_id, panel_kind, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
+                                 VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                            )->execute([
+                                $id, $nc['panel_kind'], (int) $nc['sort_order'],
+                                $colLocale ? '' : $nc['label_ar'],
+                                $colLocale ? '' : $nc['label_en'],
+                                $colLocale ? '' : $nc['label_fil'],
+                                $colLocale ? '' : $nc['label_hi'],
+                                $nc['value_kind'], $nc['unit_hint'], $nc['storage_measure'], $nc['display_system'],
+                            ]);
+                            $newColId = (int) $pdo->lastInsertId();
+                        }
+                        $colIdsByPanel[$pk][] = $newColId;
+                        $keptColumnIds[$newColId] = true;
+                        if ($colLocale) {
+                            orange_dictionary_locale_save(
+                                $pdo,
+                                $countryId,
+                                'advisory_sizing_guide_column',
+                                $newColId,
+                                (string) $nc['locale']['base_text'],
+                                is_array($nc['locale']['locales'] ?? null) ? $nc['locale']['locales'] : [],
+                                false
+                            );
+                        }
                     }
                 }
 
-                // أدرج الصفوف والخلايا (الخلايا تخص أعمدة نفس اللوحة).
+                $keptRowIds = [];
                 foreach ($panels as $pk) {
                     foreach ($rowsByPanel[$pk] as $nr) {
-                        $ir = $pdo->prepare(
-                            'INSERT INTO advisory_sizing_guide_rows
-                                (guide_id, panel_kind, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
-                             VALUES (?,?,?,?,?,?,?,?,?)'
-                        );
                         $sfsIns = $nr['row_kind'] === 'data' ? (int) $nr['size_family_size_id'] : 0;
                         if ($sfsIns <= 0) {
                             $sfsIns = null;
                         }
-                        $ir->execute([
-                            $id, $nr['panel_kind'], (int) $nr['sort_order'], $nr['row_kind'], $sfsIns,
-                            $nr['label_ar'], $nr['label_en'], $nr['label_fil'], $nr['label_hi'],
-                        ]);
-                        $rid = (int) $pdo->lastInsertId();
+                        $rowLocale = $nr['row_kind'] === 'label' && $localeMode && is_array($nr['locale'] ?? null);
+                        $existingRowId = (int) ($nr['id'] ?? 0);
+                        if ($existingRowId > 0) {
+                            if ($rowLocale) {
+                                $pdo->prepare(
+                                    'UPDATE advisory_sizing_guide_rows
+                                     SET panel_kind = ?, sort_order = ?, row_kind = ?, size_family_size_id = ?
+                                     WHERE id = ? AND guide_id = ?'
+                                )->execute([$nr['panel_kind'], (int) $nr['sort_order'], $nr['row_kind'], $sfsIns, $existingRowId, $id]);
+                            } else {
+                                $pdo->prepare(
+                                    'UPDATE advisory_sizing_guide_rows
+                                     SET panel_kind = ?, sort_order = ?, row_kind = ?, size_family_size_id = ?,
+                                         label_ar = ?, label_en = ?, label_fil = ?, label_hi = ?
+                                     WHERE id = ? AND guide_id = ?'
+                                )->execute([
+                                    $nr['panel_kind'], (int) $nr['sort_order'], $nr['row_kind'], $sfsIns,
+                                    $nr['label_ar'], $nr['label_en'], $nr['label_fil'], $nr['label_hi'],
+                                    $existingRowId, $id,
+                                ]);
+                            }
+                            $rid = $existingRowId;
+                        } else {
+                            $pdo->prepare(
+                                'INSERT INTO advisory_sizing_guide_rows
+                                    (guide_id, panel_kind, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
+                                 VALUES (?,?,?,?,?,?,?,?,?)'
+                            )->execute([
+                                $id, $nr['panel_kind'], (int) $nr['sort_order'], $nr['row_kind'], $sfsIns,
+                                $rowLocale ? '' : $nr['label_ar'],
+                                $rowLocale ? '' : $nr['label_en'],
+                                $rowLocale ? '' : $nr['label_fil'],
+                                $rowLocale ? '' : $nr['label_hi'],
+                            ]);
+                            $rid = (int) $pdo->lastInsertId();
+                        }
+                        $keptRowIds[$rid] = true;
+                        if ($rowLocale) {
+                            orange_dictionary_locale_save(
+                                $pdo,
+                                $countryId,
+                                'advisory_sizing_guide_label',
+                                $rid,
+                                (string) $nr['locale']['base_text'],
+                                is_array($nr['locale']['locales'] ?? null) ? $nr['locale']['locales'] : [],
+                                false
+                            );
+                        }
                         if ($nr['row_kind'] === 'data') {
+                            $pdo->prepare('DELETE FROM advisory_sizing_guide_cells WHERE row_id = ?')->execute([$rid]);
                             foreach ($colIdsByPanel[$pk] as $ix => $cid) {
                                 $val = orange_advisory_api_trunc_utf8((string) ($nr['cells'][$ix] ?? ''), 50000);
                                 $pdo->prepare('INSERT INTO advisory_sizing_guide_cells (row_id, column_id, cell_value) VALUES (?,?,?)')
@@ -659,6 +1028,33 @@ try {
                             }
                         }
                     }
+                }
+
+                $dropColumnIds = [];
+                foreach ($ownedColumnIds as $ownedId => $unusedOwned) {
+                    if (!isset($keptColumnIds[(int) $ownedId])) {
+                        $dropColumnIds[] = (int) $ownedId;
+                    }
+                }
+                $dropRowIds = [];
+                foreach ($ownedRowIds as $ownedId => $unusedOwned) {
+                    if (!isset($keptRowIds[(int) $ownedId])) {
+                        $dropRowIds[] = (int) $ownedId;
+                    }
+                }
+                if ($dropRowIds !== []) {
+                    $inDropRows = implode(',', array_fill(0, count($dropRowIds), '?'));
+                    $pdo->prepare('DELETE FROM advisory_sizing_guide_cells WHERE row_id IN (' . $inDropRows . ')')->execute($dropRowIds);
+                    orange_dictionary_locale_delete_ids($pdo, 'advisory_sizing_guide_label', $dropRowIds);
+                    $pdo->prepare('DELETE FROM advisory_sizing_guide_rows WHERE guide_id = ? AND id IN (' . $inDropRows . ')')
+                        ->execute(array_merge([$id], $dropRowIds));
+                }
+                if ($dropColumnIds !== []) {
+                    $inDropCols = implode(',', array_fill(0, count($dropColumnIds), '?'));
+                    $pdo->prepare('DELETE FROM advisory_sizing_guide_cells WHERE column_id IN (' . $inDropCols . ')')->execute($dropColumnIds);
+                    orange_dictionary_locale_delete_ids($pdo, 'advisory_sizing_guide_column', $dropColumnIds);
+                    $pdo->prepare('DELETE FROM advisory_sizing_guide_columns WHERE guide_id = ? AND id IN (' . $inDropCols . ')')
+                        ->execute(array_merge([$id], $dropColumnIds));
                 }
 
                 // الربط: أنواع المنتج.

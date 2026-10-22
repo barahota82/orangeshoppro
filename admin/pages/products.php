@@ -358,6 +358,19 @@ if (orange_table_exists($pdo, 'pattern_dictionary')) {
 }
 
 $families = $pdo->query('SELECT * FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+if (!empty($productLocaleReady) && is_array($families)) {
+    $familyLabelMap = orange_dictionary_locale_label_map($pdo, (int) $adminCountryId, 'size_family');
+    foreach ($families as &$familyRow) {
+        if (!is_array($familyRow)) {
+            continue;
+        }
+        $familyId = (int) ($familyRow['id'] ?? 0);
+        if ($familyId > 0 && array_key_exists($familyId, $familyLabelMap)) {
+            $familyRow['display_name'] = $familyLabelMap[$familyId];
+        }
+    }
+    unset($familyRow);
+}
 $famSizes = $pdo->query(
     'SELECT * FROM size_family_sizes WHERE is_active = 1 ORDER BY size_family_id ASC, sort_order ASC, id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
@@ -614,7 +627,11 @@ usort($productNavRows, static function ($a, $b) {
                                 $famCk = htmlspecialchars(trim((string) ($f['commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                                 $famSk = htmlspecialchars(trim((string) ($f['sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                                 ?>
-                                <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
+                                <?php
+                                $famLegacy = (string) ((($f['name_ar'] ?? '') !== '') ? $f['name_ar'] : ($f['name_en'] ?? ''));
+                                $famShown = orange_dictionary_locale_option_text($f, $famLegacy);
+                                ?>
+                                <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($famShown, ENT_QUOTES, 'UTF-8'); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -3601,7 +3618,7 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
             if (id <= 0) {
                 return;
             }
-            const lab = String(g.name_ar || g.name_en || ('#' + id)).replace(/</g, '');
+            const lab = String(Object.prototype.hasOwnProperty.call(g, 'display_name') ? g.display_name : (g.name_ar || g.name_en || ('#' + id))).replace(/</g, '');
             const o = document.createElement('option');
             o.value = String(id);
             o.textContent = lab;

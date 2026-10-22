@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_labels.php';
+require_once __DIR__ . '/orange_dictionary_locale.php';
 
 /**
  * @return list<string>
@@ -254,6 +255,13 @@ function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $g
     if ($columns === []) {
         return null;
     }
+    $columnIds = [];
+    foreach ($columns as $c) {
+        if (is_array($c) && isset($c['id'])) {
+            $columnIds[] = (int) $c['id'];
+        }
+    }
+    $columnLocales = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide_column', $columnIds);
     $rowWhere = 'guide_id = ?';
     $rowParams = [$gid];
     if ($panelFilter !== '' && $rowHasPanel) {
@@ -271,6 +279,13 @@ function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $g
     if ($rows === []) {
         return null;
     }
+    $labelRowIds = [];
+    foreach ($rows as $rw) {
+        if (is_array($rw) && strtolower(trim((string) ($rw['row_kind'] ?? ''))) === 'label') {
+            $labelRowIds[] = (int) ($rw['id'] ?? 0);
+        }
+    }
+    $labelLocales = orange_dictionary_locale_rows_for($pdo, 'advisory_sizing_guide_label', $labelRowIds);
     $sizeIdsNeeded = [];
     foreach ($rows as $rw) {
         $sid = isset($rw['size_family_size_id']) ? (int) $rw['size_family_size_id'] : 0;
@@ -286,7 +301,8 @@ function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $g
             continue;
         }
         $uh = trim((string) ($c['unit_hint'] ?? ''));
-        $base = orange_advisory_sizing_label_from_row($c, $lang);
+        $cid = (int) $c['id'];
+        $base = orange_dictionary_locale_text('advisory_sizing_guide_column', $lang, $c, $columnLocales[$cid] ?? []);
         $header = $base !== '' && $uh !== '' ? $base . ' (' . $uh . ')' : ($base !== '' ? $base : $uh);
 
         $vk = strtolower(trim((string) ($c['value_kind'] ?? 'text')));
@@ -347,7 +363,7 @@ function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $g
         $rid = (int) $rw['id'];
         $rk = strtolower(trim((string) ($rw['row_kind'] ?? 'data')));
         if ($rk === 'label') {
-            $lbl = orange_advisory_sizing_label_from_row($rw, $lang);
+            $lbl = orange_dictionary_locale_text('advisory_sizing_guide_label', $lang, $rw, $labelLocales[$rid] ?? []);
             $outRows[] = ['kind' => 'label', 'label' => $lbl];
 
             continue;

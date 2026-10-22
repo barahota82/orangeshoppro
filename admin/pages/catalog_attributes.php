@@ -508,7 +508,7 @@ function caOptionsRender(rows) {
         var kk = kindSel ? String(kindSel.value || '') : '';
         var needOpts = kk === 'enum_single' || kk === 'multi';
         p.textContent = needOpts
-            ? 'لا توجد قيم معرفة بعد — أضف صفاً واحداً على الأقل (العربي للقيمة مطلوب) قبل الحفظ، أو استخدم «+ إضافة قيمة».'
+            ? 'لا توجد قيم معرفة بعد — أضف صفاً واحداً على الأقل: أدخل القيمة بلغة الأساس ثم راجع ترجماتها قبل الحفظ، أو استخدم «+ إضافة قيمة».'
             : 'لا توجد قيم معرفة — للأنواع نص/نعم-لا تُدخل القيمة من صفحة المنتج ولا من هنا.';
         box.appendChild(p);
         return;
@@ -562,7 +562,7 @@ function caOptionsMountOne(box, r) {
         d.appendChild(inp);
         wrap.appendChild(d);
     }
-    addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '');
+    addField('ca-opt-ar', 'القيمة (لغة الأساس)', r.label_ar || '', '');
     addField('ca-opt-en', 'English', r.label_en || '', '');
     addField('ca-opt-fil', 'Filipino', r.label_fil || '', '');
     addField('ca-opt-hi', 'Hindi', r.label_hi || '', '');
@@ -794,7 +794,7 @@ function caRefreshOptionsSectionVisibility() {
         }
         if (hint) {
             hint.textContent =
-                'صف واحد = خيار واحد في قائمة المنتج. العربي هو النص المخزَّن للمنتج وللفلاتر (يفضّل أن يكون فريداً ضمن نفس السمة). بعد كتابة العربي يُحدَّث English وFilipino وHindi تلقائياً. نوع «قائمة واحدة» أو «متعدّد القيم» يتطلب قيمة معرّفة واحدة على الأقل قبل الحفظ.';
+                'صف واحد = خيار واحد في قائمة المنتج. أدخل القيمة بلغة الأساس ثم راجع ترجماتها. يفضّل أن تكون القيمة فريدة ضمن نفس السمة. نوع «قائمة واحدة» أو «متعدّد القيم» يتطلب قيمة معرّفة واحدة على الأقل قبل الحفظ.';
         }
         var box = document.getElementById('ca_options_box');
         if (box && !box.querySelector('.ca-opt-row')) {

@@ -3,10 +3,25 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/orange_dictionary_locale.php';
 $pdo = db();
 
 $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
+$sdCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$sdLocaleReady = $tablesReady
+    && orange_sizing_dictionary_identity_ready($pdo)
+    && orange_content_locale_screen_ready($pdo, $sdCountryId);
+$sdLocaleRoles = $sdLocaleReady ? orange_country_locale_roles_read($pdo, $sdCountryId) : ['base' => 'ar', 'mode' => 'legacy_unconfigured', 'content' => []];
+$sdLocaleActive = [];
+if ($sdLocaleReady && function_exists('orange_language_reference_active_codes')) {
+    try {
+        $sdLocaleActive = orange_language_reference_active_codes($pdo);
+    } catch (Throwable $e) {
+        $sdLocaleActive = [];
+    }
+}
 ?>
 <div class="page-title">
     <h1>قاموس هرَم المقاس — المستويان 1 و2</h1>
@@ -436,7 +451,8 @@ if ($sdNextKindSort < 1) {
                 <option value="0">لا</option>
             </select>
         </div>
-        <div class="sd-kind-names-row">
+        <div id="sd-kind-locale-app" style="grid-column:1 / -1;<?php echo $sdLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="sd-kind-names-row"<?php echo $sdLocaleReady ? ' style="display:none;"' : ''; ?>>
             <div class="admin-sort-field-wrap">
                 <label for="sd_kind_label_ar">الاسم عربي</label>
                 <input type="text" id="sd_kind_label_ar" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
@@ -508,7 +524,8 @@ if ($sdNextKindSort < 1) {
             <label>النوع التجاري</label>
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
-        <div class="sd-cat-names-row">
+        <div id="sd-cat-locale-app" style="grid-column:1 / -1;<?php echo $sdLocaleReady ? '' : 'display:none;'; ?>"></div>
+        <div class="sd-cat-names-row"<?php echo $sdLocaleReady ? ' style="display:none;"' : ''; ?>>
             <div class="admin-sort-field-wrap">
                 <label for="sd_cat_label_ar">الاسم عربي</label>
                 <input type="text" id="sd_cat_label_ar" class="admin-sort-field" maxlength="191" autocomplete="off">
@@ -560,6 +577,7 @@ if ($sdNextKindSort < 1) {
     const SD_KIND_STORAGE_KEY = 'orangeSdSelectedCommercialKind';
     var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
     var sdAllCats = [];
+    var sdKindByKey = {};
     window.sdCatParentProgrammaticDepth = 0;
     function sdCatParentBeginProgrammatic() {
         window.sdCatParentProgrammaticDepth++;
@@ -693,11 +711,17 @@ if ($sdNextKindSort < 1) {
     }
 
     function sdApplyAutoKindKey() {
+        if (window.SD_LOCALE_READY) {
+            return;
+        }
         const en = document.getElementById('sd_kind_label_en').value;
         document.getElementById('sd_kind_key').value = sdSizingSlugKey(en, 32);
     }
 
     function sdApplyAutoCatKey() {
+        if (window.SD_LOCALE_READY) {
+            return;
+        }
         const parent = sdSizingSlugKey(document.getElementById('sd_cat_parent_kind').value, 32);
         const en = sdSizingSlugKey(document.getElementById('sd_cat_label_en').value, 64);
         let combined = '';
@@ -920,7 +944,8 @@ if ($sdNextKindSort < 1) {
             (kinds || []).forEach(function (k) {
                 const o = document.createElement('option');
                 o.value = k.kind_key;
-                o.textContent = (k.label_ar || k.kind_key) + ' (' + k.kind_key + ')';
+                var kindTitle = Object.prototype.hasOwnProperty.call(k, 'display_name') ? String(k.display_name) : String(k.label_ar || k.kind_key || '');
+                o.textContent = kindTitle + ' (' + k.kind_key + ')';
                 sel.appendChild(o);
             });
             if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
@@ -940,14 +965,18 @@ if ($sdNextKindSort < 1) {
                 return;
             }
             const kinds = res.kinds || [];
+            sdKindByKey = {};
+            kinds.forEach(function (k) {
+                sdKindByKey[String(k.kind_key || '')] = k;
+            });
             const tb = document.getElementById('sd_kinds_tbody');
             tb.innerHTML = '';
             kinds.forEach(function (k) {
                 const tr = document.createElement('tr');
                 tr.innerHTML =
                     '<td>' + String(k.sort_order != null ? k.sort_order : '') + '</td>' +
-                    '<td>' + escapeHtml(k.label_ar || '') + '</td>' +
-                    '<td>' + escapeHtml(k.label_en || '') + '</td>' +
+                    '<td>' + escapeHtml(Object.prototype.hasOwnProperty.call(k, 'display_name') ? k.display_name : (k.label_ar || '')) + '</td>' +
+                    '<td>' + escapeHtml(k.locale_view && k.locale_view.locales && k.locale_view.locales.en ? (k.locale_view.locales.en.text_value || '') : (k.label_en || '')) + '</td>' +
                     '<td><code>' + escapeHtml(k.kind_key || '') + '</code></td>' +
                     '<td>' + ((parseInt(k.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
                     '<td class="sd-kind-row-ops"><div class="sd-kind-ops-main">' +
@@ -985,11 +1014,14 @@ if ($sdNextKindSort < 1) {
             tb.innerHTML = '';
             sdAllCats.forEach(function (c) {
                 const tr = document.createElement('tr');
-                const kindLabel = (c.kind_label_ar || c.kind_label_en || c.commercial_kind_key || '');
+                var kindRow = sdKindByKey[String(c.commercial_kind_key || '')];
+                var kindLabel = kindRow && Object.prototype.hasOwnProperty.call(kindRow, 'display_name')
+                    ? String(kindRow.display_name)
+                    : String(c.kind_label_ar || c.kind_label_en || c.commercial_kind_key || '');
                 tr.innerHTML =
                     '<td>' + String(c.sort_order != null ? c.sort_order : '') + '</td>' +
                     '<td>' + escapeHtml(kindLabel) + '</td>' +
-                    '<td>' + escapeHtml(c.label_ar || '') + '</td>' +
+                    '<td>' + escapeHtml(Object.prototype.hasOwnProperty.call(c, 'display_name') ? c.display_name : (c.label_ar || '')) + '</td>' +
                     '<td>' + escapeHtml(c.label_en || '') + '</td>' +
                     '<td><code>' + escapeHtml(c.category_key || '') + '</code></td>' +
                     '<td>' + ((parseInt(c.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
@@ -1010,10 +1042,15 @@ if ($sdNextKindSort < 1) {
 
     window.sdEditKind = function (k) {
         document.getElementById('sd_kind_old_key').value = k.kind_key || '';
+        document.getElementById('sd_kind_key').value = k.kind_key || '';
         document.getElementById('sd_kind_label_ar').value = k.label_ar || '';
         document.getElementById('sd_kind_label_en').value = k.label_en || '';
-        sdSyncKindFilHiFromEn();
-        sdApplyAutoKindKey();
+        if (window.SD_LOCALE_READY && window.OrangeCatalogNameLocale) {
+            window.OrangeCatalogNameLocale.open('kind', k.locale_view || { id: k.id || 0, base_text: '', locales: {} });
+        } else {
+            sdSyncKindFilHiFromEn();
+            sdApplyAutoKindKey();
+        }
         document.getElementById('sd_kind_sort').value = String(k.sort_order != null ? k.sort_order : 0);
         sdSyncKindSortView();
         document.getElementById('sd_kind_active').value = (parseInt(k.is_active, 10) === 0 ? '0' : '1');
@@ -1026,17 +1063,26 @@ if ($sdNextKindSort < 1) {
             let la = document.getElementById('sd_kind_label_ar').value.trim();
             let le = document.getElementById('sd_kind_label_en').value.trim();
             let kk = document.getElementById('sd_kind_key').value.trim();
-            if (kk === '' && la !== '') {
+            var localePayload = null;
+            if (window.SD_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                localePayload = window.OrangeCatalogNameLocale.merge('kind');
+                if (!String(localePayload.base_text || '').trim()) {
+                    alert('أدخل اسم النوع بلغة الأساس.');
+                    return;
+                }
+                kk = document.getElementById('sd_kind_old_key').value.trim() || kk;
+            }
+            if (!localePayload && kk === '' && la !== '') {
                 await sdKindFillEnFromArDebounced();
                 kk = document.getElementById('sd_kind_key').value.trim();
                 le = document.getElementById('sd_kind_label_en').value.trim();
                 la = document.getElementById('sd_kind_label_ar').value.trim();
             }
-            if (kk === '') {
+            if (!localePayload && kk === '') {
                 alert('أدخل الاسم العربي أو English لتُولَّد المفتاح آلياً قبل الحفظ.');
                 return;
             }
-            if (la === '' && le === '') {
+            if (!localePayload && la === '' && le === '') {
                 alert('عبِّئ الاسم العربي أو English على الأقل.');
                 return;
             }
@@ -1049,6 +1095,9 @@ if ($sdNextKindSort < 1) {
                 sort_order: parseInt(document.getElementById('sd_kind_sort').value, 10) || 0,
                 is_active: parseInt(document.getElementById('sd_kind_active').value, 10),
             };
+            if (localePayload) {
+                Object.assign(payload, localePayload);
+            }
             const res = await postJSON(api, payload);
             if (!res || !res.success) {
                 alert(res && res.message ? res.message : 'فشل الحفظ');
@@ -1091,10 +1140,15 @@ if ($sdNextKindSort < 1) {
         try {
             document.getElementById('sd_cat_parent_kind').value = c.commercial_kind_key || '';
             document.getElementById('sd_cat_old_key').value = c.category_key || '';
+            document.getElementById('sd_cat_key').value = c.category_key || '';
             document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
             document.getElementById('sd_cat_label_en').value = c.label_en || '';
-            sdSyncCatFilHiFromEn();
-            sdApplyAutoCatKey();
+            if (window.SD_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                window.OrangeCatalogNameLocale.open('category', c.locale_view || { id: c.id || 0, base_text: '', locales: {} });
+            } else {
+                sdSyncCatFilHiFromEn();
+                sdApplyAutoCatKey();
+            }
             document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
             document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
         } finally {
@@ -1115,17 +1169,25 @@ if ($sdNextKindSort < 1) {
             let la = document.getElementById('sd_cat_label_ar').value.trim();
             let le = document.getElementById('sd_cat_label_en').value.trim();
             let ck = document.getElementById('sd_cat_key').value.trim();
-            if (ck === '' && la !== '') {
+            var localePayload = null;
+            if (window.SD_LOCALE_READY && window.OrangeCatalogNameLocale) {
+                localePayload = window.OrangeCatalogNameLocale.merge('category');
+                if (!String(localePayload.base_text || '').trim()) {
+                    alert('أدخل اسم الفئة بلغة الأساس.');
+                    return;
+                }
+            }
+            if (!localePayload && ck === '' && la !== '') {
                 await sdCatFillEnFromArDebounced();
                 ck = document.getElementById('sd_cat_key').value.trim();
                 le = document.getElementById('sd_cat_label_en').value.trim();
                 la = document.getElementById('sd_cat_label_ar').value.trim();
             }
-            if (ck === '') {
+            if (!localePayload && ck === '') {
                 alert('اختر النوع التجاري واملأ English لتوليد category_key تلقائياً قبل الحفظ.');
                 return;
             }
-            if (la === '' && le === '') {
+            if (!localePayload && la === '' && le === '') {
                 alert('عبِّئ الاسم العربي أو English على الأقل.');
                 return;
             }
@@ -1136,12 +1198,15 @@ if ($sdNextKindSort < 1) {
                 commercial_kind_key: parent,
                 old_category_key: oldCatKey,
                 old_commercial_kind_key: oldCatKey !== '' ? origComm : '',
-                category_key: ck,
+                category_key: oldCatKey || ck,
                 label_ar: la,
                 label_en: le,
                 sort_order: parseInt(document.getElementById('sd_cat_sort').value, 10) || 0,
                 is_active: parseInt(document.getElementById('sd_cat_active').value, 10),
             };
+            if (localePayload) {
+                Object.assign(payload, localePayload);
+            }
             const res = await postJSON(api, payload);
             if (!res || !res.success) {
                 alert(res && res.message ? res.message : 'فشل الحفظ');
@@ -1242,5 +1307,21 @@ if ($sdNextKindSort < 1) {
     }
 })();
 </script>
+<?php if ($sdLocaleReady): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/content_locale_panel.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path('/admin/assets/js/catalog_name_locale_bind.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+window.SD_LOCALE_READY = true;
+window.SD_LOCALE_BOOT = <?php echo json_encode([
+    'roles' => $sdLocaleRoles,
+    'active' => $sdLocaleActive,
+    'mounts' => [
+        ['key' => 'kind', 'rootId' => 'sd-kind-locale-app', 'idPrefix' => 'sd-kind-'],
+        ['key' => 'category', 'rootId' => 'sd-cat-locale-app', 'idPrefix' => 'sd-cat-'],
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+if (window.OrangeCatalogNameLocale) window.OrangeCatalogNameLocale.bind(window.SD_LOCALE_BOOT);
+</script>
+<?php endif; ?>
 
 <?php endif; ?>

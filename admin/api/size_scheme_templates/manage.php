@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/orange_dictionary_locale.php';
 require_admin_api();
 
 function orange_tpl_slugify_key(string $s): string
@@ -108,6 +109,17 @@ try {
             );
             $st2->execute([$id]);
             $sizes = $st2->fetchAll(PDO::FETCH_ASSOC);
+            $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+            $localeReady = orange_dictionary_locale_use_payload($pdo, $countryId, ['base_text' => '']);
+            if (!$localeReady && $countryId > 0 && orange_content_locale_screen_ready($pdo, $countryId)) {
+                $localeReady = true;
+            }
+            if ($localeReady) {
+                $roles = orange_country_locale_roles_read($pdo, $countryId);
+                $base = (string) ($roles['base'] ?? '');
+                $stored = orange_dictionary_locale_rows($pdo, 'size_scheme_template', $id);
+                $tpl['locale_view'] = orange_dictionary_locale_panel_state('size_scheme_template', $tpl, $stored, $base);
+            }
             json_response([
                 'success' => true,
                 'template' => $tpl,
@@ -116,16 +128,44 @@ try {
 
         case 'save':
             $id = (int) ($data['id'] ?? 0);
-            $nameAr = trim((string) ($data['name_ar'] ?? ''));
-            $nameEn = trim((string) ($data['name_en'] ?? ''));
-            $nameFil = trim((string) ($data['name_fil'] ?? ''));
-            $nameHi = trim((string) ($data['name_hi'] ?? ''));
+            if (isset($data['locales']) && is_array($data['locales'])) {
+                $data['locales'] = orange_dictionary_locale_strip_public($data['locales']);
+            }
+            $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+            $localeMode = orange_dictionary_locale_use_payload($pdo, $countryId, $data);
+            if ($localeMode) {
+                $preview = orange_dictionary_locale_preview($pdo, $countryId, 'size_scheme_template', $id, $data);
+                $nameAr = $preview['name_ar'];
+                $nameFil = $preview['name_fil'];
+                $nameHi = $preview['name_hi'];
+                $guard = orange_dictionary_locale_guard($pdo, $countryId, true, (string) ($data['base_text'] ?? ''), $preview['name_en'], $nameAr, $preview['name_en'], 'عبّئ اسم القالب عربي وEnglish');
+                if ($guard !== null) {
+                    json_response(['success' => false, 'message' => $guard], 422);
+                }
+                if ($id > 0) {
+                    $keepEn = $pdo->prepare('SELECT name_en FROM size_scheme_templates WHERE id = ? LIMIT 1');
+                    $keepEn->execute([$id]);
+                    $nameEn = (string) $keepEn->fetchColumn();
+                } else {
+                    $roles = orange_country_locale_roles_read($pdo, $countryId);
+                    $base = (string) ($roles['base'] ?? '');
+                    $acceptedEn = $base === 'en'
+                        ? trim((string) ($data['base_text'] ?? ''))
+                        : trim((string) ($preview['name_en'] ?? ''));
+                    $nameEn = orange_tpl_slugify_key($acceptedEn);
+                }
+            } else {
+                $nameAr = trim((string) ($data['name_ar'] ?? ''));
+                $nameEn = trim((string) ($data['name_en'] ?? ''));
+                $nameFil = trim((string) ($data['name_fil'] ?? ''));
+                $nameHi = trim((string) ($data['name_hi'] ?? ''));
+            }
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
             $sizesIn = $data['sizes'] ?? [];
             if (!is_array($sizesIn)) {
                 $sizesIn = [];
             }
-            if ($nameAr === '' || $nameEn === '') {
+            if (!$localeMode && ($nameAr === '' || $nameEn === '')) {
                 json_response(['success' => false, 'message' => 'عبّئ اسم القالب عربي وEnglish'], 422);
             }
 
@@ -160,6 +200,7 @@ try {
                 json_response(['success' => false, 'message' => 'أضف صف مقاس واحد على الأقل داخل القالب'], 422);
             }
 
+            $mintToken = false;
             $pdo->beginTransaction();
             try {
                 if ($id > 0) {
@@ -170,18 +211,44 @@ try {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'القالب غير موجود'], 404);
                     }
-                    $pdo->prepare(
-                        'UPDATE size_scheme_templates SET name_ar=?, name_en=?, name_fil=?, name_hi=?, is_active=? WHERE id=? LIMIT 1'
-                    )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $active, $tplId]);
+                    if ($localeMode) {
+                        $pdo->prepare(
+                            'UPDATE size_scheme_templates SET is_active=? WHERE id=? LIMIT 1'
+                        )->execute([$active, $tplId]);
+                    } else {
+                        $pdo->prepare(
+                            'UPDATE size_scheme_templates SET name_ar=?, name_en=?, name_fil=?, name_hi=?, is_active=? WHERE id=? LIMIT 1'
+                        )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $active, $tplId]);
+                    }
                 } else {
                     $sort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_scheme_templates')->fetchColumn();
                     if ($sort <= 0) {
                         $sort = 1;
                     }
+                    $mintToken = $localeMode;
+                    $insAr = $localeMode ? '' : $nameAr;
+                    $insEn = $localeMode ? '' : $nameEn;
+                    $insFil = $localeMode ? '' : $nameFil;
+                    $insHi = $localeMode ? '' : $nameHi;
                     $pdo->prepare(
                         'INSERT INTO size_scheme_templates (name_ar, name_en, name_fil, name_hi, sort_order, is_active) VALUES (?,?,?,?,?,?)'
-                    )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sort, $active]);
+                    )->execute([$insAr, $insEn, $insFil, $insHi, $sort, $active]);
                     $tplId = (int) $pdo->lastInsertId();
+                }
+                if ($localeMode) {
+                    orange_dictionary_locale_save(
+                        $pdo,
+                        $countryId,
+                        'size_scheme_template',
+                        $tplId,
+                        trim((string) ($data['base_text'] ?? '')),
+                        is_array($data['locales'] ?? null) ? $data['locales'] : [],
+                        false
+                    );
+                    if ($mintToken && $tplId > 0) {
+                        $token = $nameEn !== '' ? $nameEn : ('tpl_' . $tplId);
+                        $pdo->prepare('UPDATE size_scheme_templates SET name_en = ? WHERE id = ?')->execute([$token, $tplId]);
+                    }
                 }
 
                 $stOld = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE template_id = ?');
@@ -464,6 +531,7 @@ try {
                 )->execute($delTstIds);
             }
             $pdo->prepare('DELETE FROM size_scheme_template_sizes WHERE template_id = ?')->execute([$id]);
+            orange_dictionary_locale_delete_entity($pdo, 'size_scheme_template', $id);
             $pdo->prepare('DELETE FROM size_scheme_templates WHERE id = ? LIMIT 1')->execute([$id]);
             json_response(['success' => true]);
 
