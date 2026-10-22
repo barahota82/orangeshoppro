@@ -228,7 +228,9 @@ if ($tablesReady) {
     <div class="actions admin-actions--start" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" onclick="sstResetForm()">جديد</button>
         <button type="button" onclick="sstAddSizeRow()">+ صف مقاس</button>
+        <?php if (!$sstLocaleReady): ?>
         <button type="button" class="btn-secondary" onclick="sstSyncAllDerivedFromEnglish()">ترجمة</button>
+        <?php endif; ?>
         <button type="button" onclick="sstSave()">حفظ القالب</button>
     </div>
 </div>
@@ -580,7 +582,9 @@ async function sstLoadOne(tplId) {
             return;
         }
         if (t.id === 'sst_name_en') {
-            scheduleSstHeaderFromEn();
+            if (!window.SST_LOCALE_READY) {
+                scheduleSstHeaderFromEn();
+            }
             return;
         }
         if (t.id === 'sst_name_ar' || t.id === 'sst_name_fil' || t.id === 'sst_name_hi') {

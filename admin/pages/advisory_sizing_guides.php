@@ -245,7 +245,7 @@ if ($familiesJson === false) {
         </div>
         <div style="overflow-x:auto;">
             <table class="data-table">
-                <thead><tr><th>ترتيب</th><th>عربي *</th><th>EN *</th><th>Fil *</th><th>Hi *</th><th>نوع القيمة</th><th>وحدة</th><th>تخزين الطول</th><th>كود النظام</th></tr></thead>
+                <thead><tr><?php if ($asgLocaleReady): ?><th>ترتيب</th><th>عنوان القياس</th><th>نوع القيمة</th><th>وحدة</th><th>تخزين الطول</th><th>كود النظام</th><?php else: ?><th>ترتيب</th><th>عربي *</th><th>EN *</th><th>Fil *</th><th>Hi *</th><th>نوع القيمة</th><th>وحدة</th><th>تخزين الطول</th><th>كود النظام</th><?php endif; ?></tr></thead>
                 <tbody class="asg-cols-body"></tbody>
             </table>
         </div>
@@ -519,7 +519,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         if (ASG_LOCALE) {
             tr.innerHTML =
                 '<td><input type="number" class="asg-c-sort" value="' + sortOrder + '" style="width:4rem;"></td>' +
-                '<td class="asg-c-locale" colspan="4"></td>' +
+                '<td class="asg-c-locale"></td>' +
                 '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
                 '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="cm"></td>' +
                 '<td><select class="asg-c-stor"><option value="">—</option><option value="length_cm">قياس بالسم (عرض cm/inch)</option></select></td>' +
@@ -733,6 +733,16 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     function prefillSizeColumn(panel) {
         var firstTr = colsBody(panel).querySelector('tr');
         if (!firstTr) { return; }
+        if (ASG_LOCALE && firstTr._localeApi) {
+            var current = firstTr._localeApi.getPayload();
+            if (String(current.base_text || '').trim() !== '') { return; }
+            var base = String((ASG_ROLES && ASG_ROLES.base) || '');
+            var seed = { ar: 'المقاس', en: 'Size', fil: 'Sukat', hi: 'साइज़' };
+            var text = Object.prototype.hasOwnProperty.call(seed, base) ? seed[base] : '';
+            if (text === '') { return; }
+            firstTr._localeApi.openRecord({ id: 0, base_text: text, locales: {} });
+            return;
+        }
         var pairs = [['.asg-c-ar', 'المقاس'], ['.asg-c-en', 'Size'], ['.asg-c-fil', 'Sukat'], ['.asg-c-hi', 'साइज़']];
         for (var i = 0; i < pairs.length; i++) {
             var el = firstTr.querySelector(pairs[i][0]);

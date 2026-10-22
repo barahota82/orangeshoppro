@@ -965,7 +965,9 @@ usort($productNavRows, static function ($a, $b) {
 
         <div class="admin-product-form-actions admin-product-form-actions--bar">
             <div class="actions admin-product-form-actions__buttons">
-                <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()"<?php echo $productLocaleReady ? ' hidden' : ''; ?>>ترجمة تلقائية من العربي</button>
+                <?php if (!$productLocaleReady): ?>
+                <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
+                <?php endif; ?>
                 <button type="button" class="btn" id="btnGenerateVariants" onclick="generateVariants()" disabled>توليد المتغيرات</button>
                 <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()" disabled>حفظ المنتج</button>
                 <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
