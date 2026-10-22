@@ -218,7 +218,7 @@ if ($hasTable) {
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                                 'is_active' => (int) ($row['is_active'] ?? 1),
                                 'locale_view' => $caLocaleReady ? orange_dictionary_locale_panel_state('catalog_attribute', $row, $caAttrBags[(int) ($row['id'] ?? 0)] ?? [], $caBase) : null,
-                            ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
+                            ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -394,7 +394,7 @@ if ($hasTable) {
 </style>
 
 <script>
-window.ORANGE_CATALOG_ATTR_OPTIONS = <?php echo json_encode($caOptionsByAttrId, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_CATALOG_ATTR_OPTIONS = <?php echo json_encode($caOptionsByAttrId, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 if (!window.ORANGE_CATALOG_ATTR_OPTIONS || Array.isArray(window.ORANGE_CATALOG_ATTR_OPTIONS)) {
     window.ORANGE_CATALOG_ATTR_OPTIONS = {};
 }

@@ -482,7 +482,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'sort_order' => (int) $f['sort_order'],
                                     'is_active' => (int) $f['is_active'],
                                     'locale_view' => $famLocaleReady ? orange_dictionary_locale_panel_state('size_family', $f, $famLocaleBags[(int) $f['id']] ?? [], $famBase) : null,
-                                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
+                                ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
                                 <button type="button" class="sf-btn-toggle" onclick="toggleFamily(<?php echo (int) $f['id']; ?>, <?php echo (int) $f['is_active']; ?>)">
                                     <?php echo (int) $f['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
                                 </button>
@@ -498,7 +498,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 <?php endif; ?>
 
 <script>
-var ORANGE_SIZES_BY_FAMILY = <?php echo json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE); ?>;
+var ORANGE_SIZES_BY_FAMILY = <?php echo json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 var SST_IMPORT_API = '/admin/api/size_scheme_templates/manage.php';
 var FAM_HAS_SIZE_TEMPLATES = <?php echo ($hasSizeTemplates && count($sizeTemplatesList) > 0) ? 'true' : 'false'; ?>;
 const defaultNextFamilySort = <?php echo (int) $nextSort; ?>;
