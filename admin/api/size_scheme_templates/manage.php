@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/size_token_payload.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/orange_dictionary_locale.php';
 require_admin_api();
@@ -174,16 +175,18 @@ try {
                 if (!is_array($row)) {
                     continue;
                 }
-                $la = trim((string) ($row['label_ar'] ?? ''));
-                $le = trim((string) ($row['label_en'] ?? ''));
-                if ($la === '' && $le === '') {
+                $tokenCols = orange_size_token_columns($row);
+                $la = $tokenCols['label_ar'];
+                $le = $tokenCols['label_en'];
+                $lf = $tokenCols['label_fil'];
+                $lh = $tokenCols['label_hi'];
+                if ($tokenCols['empty']) {
                     continue;
                 }
-                if ($la === '') {
+                $existingSizeId = (int) ($row['id'] ?? 0);
+                if ($la === '' && ($tokenCols['unified'] || $existingSizeId <= 0)) {
                     json_response(['success' => false, 'message' => 'كل صف في القالب يجب أن يحتوي على تسمية عربية للمقاس'], 422);
                 }
-                $lf = trim((string) ($row['label_fil'] ?? ''));
-                $lh = trim((string) ($row['label_hi'] ?? ''));
                 $so = (int) ($row['sort_order'] ?? 0);
                 $rowTplSizeId = (int) ($row['id'] ?? 0);
                 $normalized[] = [

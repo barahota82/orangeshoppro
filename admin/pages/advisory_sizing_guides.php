@@ -435,13 +435,32 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         return raw.sort(function (a, b) { return (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0); });
     }
 
+    function orangeSizeCodeText(sz, fallbackId) {
+        var keys = ['label_ar', 'label_en', 'label_fil', 'label_hi'];
+        var filled = [];
+        var row = sz || {};
+        for (var i = 0; i < keys.length; i++) {
+            var token = String(row[keys[i]] || '').trim();
+            if (token !== '' && filled.indexOf(token) === -1) {
+                filled.push(token);
+            }
+        }
+        if (filled.length === 1) {
+            return filled[0];
+        }
+        if (filled.length === 0) {
+            return '#' + String(fallbackId || '');
+        }
+        return String(row.label_ar || row.label_en || ('#' + String(fallbackId || '')));
+    }
+
     function sizeOptionsHtml(selectedId) {
         var rows = familySizeRows();
         var sel = parseInt(selectedId, 10) || 0;
         var h = '<option value="0">— اختر المقاس —</option>';
         for (var i = 0; i < rows.length; i++) {
             var id = parseInt(rows[i].id, 10) || 0;
-            var lab = (rows[i].label_ar || rows[i].label_en || '').replace(/</g, '');
+            var lab = orangeSizeCodeText(rows[i], id).replace(/</g, '');
             h += '<option value="' + id + '"' + (id === sel ? ' selected' : '') + '>' + esc(lab) + '</option>';
         }
         return h;
@@ -450,7 +469,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var rows = familySizeRows();
         for (var i = 0; i < rows.length; i++) {
             if ((parseInt(rows[i].id, 10) || 0) === sid) {
-                return (rows[i].label_ar || rows[i].label_en || ('#' + sid)).replace(/</g, '');
+                return orangeSizeCodeText(rows[i], sid).replace(/</g, '');
             }
         }
         return '#' + sid;

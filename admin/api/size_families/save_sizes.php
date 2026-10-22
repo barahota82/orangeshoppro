@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/size_token_payload.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
@@ -120,11 +121,9 @@ try {
         if (!is_array($row)) {
             continue;
         }
-        $la = trim((string)($row['label_ar'] ?? ''));
-        $leDup = trim((string)($row['label_en'] ?? ''));
-        if ($la === '' && $leDup !== '') {
-            $la = $leDup;
-        }
+        $tokenDup = orange_size_token_columns($row);
+        $la = $tokenDup['label_ar'];
+        $leDup = $tokenDup['label_en'];
         if ($la === '') {
             continue;
         }
@@ -237,21 +236,13 @@ try {
             continue;
         }
         $sid = (int)($row['id'] ?? 0);
-        $la = trim((string)($row['label_ar'] ?? ''));
-        $le = trim((string)($row['label_en'] ?? ''));
-        $lf = trim((string)($row['label_fil'] ?? ''));
-        $lh = trim((string)($row['label_hi'] ?? ''));
-        if ($la === '' && $le !== '') {
-            $la = $le;
-        }
-        if ($lf === '' && $le !== '') {
-            $lf = $le;
-        }
-        if ($lh === '' && $le !== '') {
-            $lh = $le;
-        }
+        $tokenCols = orange_size_token_columns($row);
+        $la = $tokenCols['label_ar'];
+        $le = $tokenCols['label_en'];
+        $lf = $tokenCols['label_fil'];
+        $lh = $tokenCols['label_hi'];
         $so = (int)($row['sort_order'] ?? $i);
-        if ($la === '' && $le === '') {
+        if ($la === '' && $le === '' && $lf === '' && $lh === '') {
             continue;
         }
 

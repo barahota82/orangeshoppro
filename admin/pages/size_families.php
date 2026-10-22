@@ -1064,7 +1064,7 @@ function loadSizesEditor() {
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
-    var thead = '<thead><tr><th>ترتيب</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th></tr></thead>';
+    var thead = '<thead><tr><th>ترتيب</th><th>المقاس — لجميع اللغات</th></tr></thead>';
     var html = '<div class="table-wrap"><table>' + thead + '<tbody>';
     if (!rows.length) {
         html += '</tbody></table></div>';
@@ -1072,41 +1072,52 @@ function loadSizesEditor() {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var tplSz = parseInt(String(r.scheme_template_size_id != null ? r.scheme_template_size_id : '0'), 10) || 0;
-            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td></tr>';
+            var packed = famStoredAttr(r);
+            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"' + packed.attr + '><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td><td>' + famSizeFieldHtml(packed.state) + '</td></tr>';
         }
         html += '</tbody></table></div>';
     }
     box.innerHTML = html;
-    if (rows.length) {
-        box.querySelectorAll('tr.size-row').forEach(function (tr) {
-            famSyncRowLabelsFromEn(tr);
-        });
-    }
 }
 
 function escapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
-/** نسخ EN إلى عربي / Fil / Hi (مثل شاشة قوالب المقاسات). */
-function famSyncRowLabelsFromEn(tr) {
-    if (!tr) {
-        return;
+function orangeSizeCodeState(row) {
+    var keys = ['label_ar', 'label_en', 'label_fil', 'label_hi'];
+    var filled = [];
+    var stored = { label_ar: '', label_en: '', label_fil: '', label_hi: '' };
+    for (var i = 0; i < keys.length; i++) {
+        var raw = String((row && row[keys[i]]) || '');
+        stored[keys[i]] = raw;
+        var token = raw.trim();
+        if (token !== '' && filled.indexOf(token) === -1) {
+            filled.push(token);
+        }
     }
-    var leEl = tr.querySelector('.s-le');
-    var v = leEl ? String(leEl.value || '') : '';
-    var la = tr.querySelector('.s-la');
-    var lf = tr.querySelector('.s-lf');
-    var lh = tr.querySelector('.s-lh');
-    if (la) {
-        la.value = v;
+    if (filled.length <= 1) {
+        return { diverge: false, value: filled[0] || '', stored: stored };
     }
-    if (lf) {
-        lf.value = v;
+    return { diverge: true, value: '', stored: stored };
+}
+
+function famStoredAttr(row) {
+    var state = orangeSizeCodeState(row || {});
+    var attr = ' data-stored-ar="' + escapeAttr(state.stored.label_ar) + '"'
+        + ' data-stored-en="' + escapeAttr(state.stored.label_en) + '"'
+        + ' data-stored-fil="' + escapeAttr(state.stored.label_fil) + '"'
+        + ' data-stored-hi="' + escapeAttr(state.stored.label_hi) + '"'
+        + ' data-size-explicit="0"';
+    return { state: state, attr: attr };
+}
+
+function famSizeFieldHtml(state) {
+    var extra = '';
+    if (state.diverge) {
+        extra = ' placeholder="قيم الأعمدة مختلفة" title="' + escapeAttr('AR=' + state.stored.label_ar + ' | EN=' + state.stored.label_en + ' | FIL=' + state.stored.label_fil + ' | HI=' + state.stored.label_hi) + '"';
     }
-    if (lh) {
-        lh.value = v;
-    }
+    return '<input type="text" class="s-size admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(state.value) + '"' + extra + '>';
 }
 
 function famEnsureSizesEditorEmptyTable() {
@@ -1118,7 +1129,7 @@ function famEnsureSizesEditorEmptyTable() {
     if (tbody) {
         return tbody;
     }
-    var thead = '<thead><tr><th>ترتيب</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th></tr></thead>';
+    var thead = '<thead><tr><th>ترتيب</th><th>المقاس — لجميع اللغات</th></tr></thead>';
     box.innerHTML = '<div class="table-wrap"><table>' + thead + '<tbody></tbody></table></div>';
     return box.querySelector('tbody');
 }
@@ -1132,11 +1143,14 @@ function famAddEmptySizeRow() {
     var tr = document.createElement('tr');
     tr.className = 'size-row';
     tr.setAttribute('data-new', '1');
+    var packed = famStoredAttr({});
     tr.innerHTML = '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + String(n + 1) + '"></td>' +
-        '<td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value=""></td>' +
-        '<td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td>' +
-        '<td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>' +
-        '<td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>';
+        '<td>' + famSizeFieldHtml(packed.state) + '</td>';
+    tr.setAttribute('data-stored-ar', '');
+    tr.setAttribute('data-stored-en', '');
+    tr.setAttribute('data-stored-fil', '');
+    tr.setAttribute('data-stored-hi', '');
+    tr.setAttribute('data-size-explicit', '0');
     tbody.appendChild(tr);
 }
 
@@ -1146,18 +1160,37 @@ function famCollectSizesRowsFromEditor() {
     for (var idx = 0; idx < trs.length; idx++) {
         var tr = trs[idx];
         var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
-        var leEl = tr.querySelector('.s-le');
+        var input = tr.querySelector('.s-size');
         var soEl = tr.querySelector('.s-so');
-        var le = leEl ? String(leEl.value || '').trim() : '';
-        if (le === '') {
-            continue;
-        }
-        var la = le;
-        var lf = le;
-        var lh = le;
+        var explicit = tr.getAttribute('data-size-explicit') === '1';
+        var stored = {
+            label_ar: tr.getAttribute('data-stored-ar') || '',
+            label_en: tr.getAttribute('data-stored-en') || '',
+            label_fil: tr.getAttribute('data-stored-fil') || '',
+            label_hi: tr.getAttribute('data-stored-hi') || ''
+        };
+        var token = input ? String(input.value || '').trim() : '';
         var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
         if (isNaN(so)) so = idx;
-        var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
+        var storedAny = ['label_ar', 'label_en', 'label_fil', 'label_hi'].some(function (key) {
+            return String(stored[key] || '').trim() !== '';
+        });
+        var row;
+        if (!explicit && storedAny) {
+            row = {
+                id: id,
+                label_ar: stored.label_ar,
+                label_en: stored.label_en,
+                label_fil: stored.label_fil,
+                label_hi: stored.label_hi,
+                sort_order: so
+            };
+        } else {
+            if (token === '') {
+                continue;
+            }
+            row = { id: id, size_label: token, label_ar: token, label_en: token, label_fil: token, label_hi: token, sort_order: so };
+        }
         var tplL = parseInt(tr.getAttribute('data-scheme-template-size-id') || '0', 10) || 0;
         if (tplL > 0) {
             row.scheme_template_size_id = tplL;
@@ -1248,9 +1281,14 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
             } else {
                 tr.setAttribute('data-new', '1');
             }
-            tr.innerHTML = '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || (i + 1)) + '"></td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>';
+            var packedTpl = famStoredAttr(r);
+            tr.innerHTML = '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || (i + 1)) + '"></td><td>' + famSizeFieldHtml(packedTpl.state) + '</td>';
+            tr.setAttribute('data-stored-ar', packedTpl.state.stored.label_ar);
+            tr.setAttribute('data-stored-en', packedTpl.state.stored.label_en);
+            tr.setAttribute('data-stored-fil', packedTpl.state.stored.label_fil);
+            tr.setAttribute('data-stored-hi', packedTpl.state.stored.label_hi);
+            tr.setAttribute('data-size-explicit', '0');
             tbody.appendChild(tr);
-            famSyncRowLabelsFromEn(tr);
         }
         return true;
     } catch (e) {
@@ -1515,14 +1553,14 @@ async function saveSizesForFamily() {
             sizesBox._famLeBound = true;
             sizesBox.addEventListener('input', function (ev) {
                 var t = ev.target;
-                if (!t || !t.classList || !t.classList.contains('s-le')) {
+                if (!t || !t.classList || !t.classList.contains('s-size')) {
                     return;
                 }
                 var tr = t.closest ? t.closest('tr.size-row') : null;
                 if (!tr) {
                     return;
                 }
-                famSyncRowLabelsFromEn(tr);
+                tr.setAttribute('data-size-explicit', '1');
             });
         }
         loadSizesEditor();

@@ -154,11 +154,8 @@ if ($tablesReady) {
             padding-inline-end: 26px;
             padding-inline-start: 10px;
         }
-        /* حقول صف المقاسات: EN + العربي + Fil + Hi — العربي بنفس شكل Fil (muted + خلفية للقراءة فقط) */
-        #sst_sizes_tbody input.sst-le,
-        #sst_sizes_tbody input.sst-la.admin-sort-field,
-        #sst_sizes_tbody input.sst-lf.admin-sort-field,
-        #sst_sizes_tbody input.sst-lh.admin-sort-field {
+        /* صف المقاس: خانة واحدة لكل اللغات. أعمدة label_* تبقى في التخزين. */
+        #sst_sizes_tbody input.sst-size {
             margin-inline: 0;
             margin-top: 0;
             display: block;
@@ -221,10 +218,7 @@ if ($tablesReady) {
             <thead>
                 <tr>
                     <th style="width:3.2rem;">ترتيب</th>
-                    <th>EN</th>
-                    <th>عربي</th>
-                    <th>Fil</th>
-                    <th>Hi</th>
+                    <th>المقاس — لجميع اللغات</th>
                     <th></th>
                 </tr>
             </thead>
@@ -352,16 +346,48 @@ function sstRemoveSizeRow(btn) {
     sstRefreshSizeRowOrder();
 }
 
+function orangeSizeCodeState(row) {
+    var keys = ['label_ar', 'label_en', 'label_fil', 'label_hi'];
+    var filled = [];
+    var stored = { label_ar: '', label_en: '', label_fil: '', label_hi: '' };
+    for (var i = 0; i < keys.length; i++) {
+        var raw = String((row && row[keys[i]]) || '');
+        stored[keys[i]] = raw;
+        var token = raw.trim();
+        if (token !== '' && filled.indexOf(token) === -1) {
+            filled.push(token);
+        }
+    }
+    if (filled.length <= 1) {
+        return { diverge: false, value: filled[0] || '', stored: stored };
+    }
+    return { diverge: true, value: '', stored: stored };
+}
+
+function sstRememberStored(tr, stored) {
+    tr.setAttribute('data-stored-ar', stored.label_ar || '');
+    tr.setAttribute('data-stored-en', stored.label_en || '');
+    tr.setAttribute('data-stored-fil', stored.label_fil || '');
+    tr.setAttribute('data-stored-hi', stored.label_hi || '');
+    tr.setAttribute('data-size-explicit', '0');
+}
+
+function sstSizeInputHtml(state) {
+    var extra = '';
+    if (state.diverge) {
+        extra = ' placeholder="قيم الأعمدة مختلفة" title="' + sstEscapeAttr('AR=' + state.stored.label_ar + ' | EN=' + state.stored.label_en + ' | FIL=' + state.stored.label_fil + ' | HI=' + state.stored.label_hi) + '"';
+    }
+    return '<input type="text" class="sst-size admin-sort-field" maxlength="191" autocomplete="off" value="' + sstEscapeAttr(state.value) + '"' + extra + '>';
+}
+
 function sstAddSizeRow() {
     var tb = document.getElementById('sst_sizes_tbody');
     if (!tb) return;
     var tr = document.createElement('tr');
     tr.className = 'sst-size-row';
+    sstRememberStored(tr, { label_ar: '', label_en: '', label_fil: '', label_hi: '' });
     tr.innerHTML = '<td class="sst-ord">1</td>' +
-        '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off"></td>' +
-        '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
-        '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
-        '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
+        '<td>' + sstSizeInputHtml({ diverge: false, value: '', stored: {} }) + '</td>' +
         '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
     tb.appendChild(tr);
     sstRefreshSizeRowOrder();
@@ -370,24 +396,39 @@ function sstAddSizeRow() {
 function sstCollectSizes() {
     var rows = [];
     document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row').forEach(function (tr, idx) {
-        var la = tr.querySelector('.sst-la');
-        var le = tr.querySelector('.sst-le');
-        var lf = tr.querySelector('.sst-lf');
-        var lh = tr.querySelector('.sst-lh');
-        var o = {
-            label_ar: la ? String(la.value || '').trim() : '',
-            label_en: le ? String(le.value || '').trim() : '',
-            label_fil: lf ? String(lf.value || '').trim() : '',
-            label_hi: lh ? String(lh.value || '').trim() : '',
-            sort_order: idx + 1
+        var input = tr.querySelector('.sst-size');
+        var explicit = tr.getAttribute('data-size-explicit') === '1';
+        var stored = {
+            label_ar: tr.getAttribute('data-stored-ar') || '',
+            label_en: tr.getAttribute('data-stored-en') || '',
+            label_fil: tr.getAttribute('data-stored-fil') || '',
+            label_hi: tr.getAttribute('data-stored-hi') || ''
         };
+        var token = input ? String(input.value || '').trim() : '';
+        var o = { sort_order: idx + 1 };
         var sid = parseInt(tr.getAttribute('data-sst-size-id') || '0', 10) || 0;
         if (sid > 0) {
             o.id = sid;
         }
-        if (o.label_ar === '' && o.label_en === '') {
+        var storedAny = ['label_ar', 'label_en', 'label_fil', 'label_hi'].some(function (key) {
+            return String(stored[key] || '').trim() !== '';
+        });
+        if (!explicit && storedAny) {
+            o.label_ar = stored.label_ar;
+            o.label_en = stored.label_en;
+            o.label_fil = stored.label_fil;
+            o.label_hi = stored.label_hi;
+            rows.push(o);
             return;
         }
+        if (token === '') {
+            return;
+        }
+        o.size_label = token;
+        o.label_ar = token;
+        o.label_en = token;
+        o.label_fil = token;
+        o.label_hi = token;
         rows.push(o);
     });
     return rows;
@@ -436,50 +477,11 @@ function sstSyncHeaderArFilHiFromEn() {
     hiEl.value = v;
 }
 
-function sstSyncRowArFilHiFromEn(tr) {
-    var le = tr.querySelector('.sst-le');
-    var la = tr.querySelector('.sst-la');
-    var lf = tr.querySelector('.sst-lf');
-    var lh = tr.querySelector('.sst-lh');
-    if (!le) {
-        return;
-    }
-    var v = le.value;
-    if (!String(v).trim()) {
-        if (la) {
-            la.value = '';
-        }
-        if (lf) {
-            lf.value = '';
-        }
-        if (lh) {
-            lh.value = '';
-        }
-        return;
-    }
-    if (la) {
-        la.value = v;
-    }
-    if (lf) {
-        lf.value = v;
-    }
-    if (lh) {
-        lh.value = v;
-    }
-}
-
 function scheduleSstHeaderFromEn() {
     clearTimeout(sstHeaderEnTimer);
     sstHeaderEnTimer = setTimeout(function () {
         sstSyncHeaderArFilHiFromEn();
     }, 600);
-}
-
-function scheduleSstRowFromEn(tr) {
-    clearTimeout(tr._sstEnTimer);
-    tr._sstEnTimer = setTimeout(function () {
-        sstSyncRowArFilHiFromEn(tr);
-    }, 550);
 }
 
 function sstSyncAllDerivedFromEnglish() {
@@ -489,12 +491,6 @@ function sstSyncAllDerivedFromEnglish() {
         return;
     }
     sstSyncHeaderArFilHiFromEn();
-    document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row').forEach(function (tr) {
-        var le = tr.querySelector('.sst-le');
-        if (le && String(le.value || '').trim()) {
-            sstSyncRowArFilHiFromEn(tr);
-        }
-    });
 }
 
 async function sstSave() {
@@ -557,14 +553,12 @@ async function sstLoadOne(tplId) {
                 if (r.id != null && parseInt(String(r.id), 10) > 0) {
                     tr.setAttribute('data-sst-size-id', String(parseInt(String(r.id), 10)));
                 }
+                var state = orangeSizeCodeState(r);
+                sstRememberStored(tr, state.stored);
                 tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
-                    '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
-                    '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
-                    '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
-                    '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
+                    '<td>' + sstSizeInputHtml(state) + '</td>' +
                     '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
                 tb.appendChild(tr);
-                sstSyncRowArFilHiFromEn(tr);
             });
             sstRefreshSizeRowOrder();
         }
@@ -596,8 +590,8 @@ async function sstLoadOne(tplId) {
         if (!tr) {
             return;
         }
-        if (t.classList && t.classList.contains('sst-le')) {
-            scheduleSstRowFromEn(tr);
+        if (t.classList && t.classList.contains('sst-size')) {
+            tr.setAttribute('data-size-explicit', '1');
         }
     });
 })();

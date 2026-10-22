@@ -293,6 +293,15 @@ function orange_size_display_label(?array $sizeRow, string $lang = 'ar'): string
     $e = trim((string) ($sizeRow['label_en'] ?? ''));
     $f = trim((string) ($sizeRow['label_fil'] ?? ''));
     $h = trim((string) ($sizeRow['label_hi'] ?? ''));
+    $unified = [];
+    foreach ([$a, $e, $f, $h] as $token) {
+        if ($token !== '' && !in_array($token, $unified, true)) {
+            $unified[] = $token;
+        }
+    }
+    if (count($unified) === 1) {
+        return $unified[0];
+    }
     $lang = strtolower($lang);
     $pick = static function (string $primary, string $fb1, string $fb2 = '', string $fb3 = ''): string {
         foreach ([$primary, $fb1, $fb2, $fb3] as $x) {

@@ -2465,6 +2465,25 @@ function orangeAdminProductPreviewColorOptionsHtml() {
     return '<div class="option-block"><label>اللون</label><div class="chips">' + chips.join('') + '</div></div>';
 }
 
+function orangeSizeCodeText(sz, fallbackId) {
+    var keys = ['label_ar', 'label_en', 'label_fil', 'label_hi'];
+    var filled = [];
+    var row = sz || {};
+    for (var i = 0; i < keys.length; i++) {
+        var token = String(row[keys[i]] || '').trim();
+        if (token !== '' && filled.indexOf(token) === -1) {
+            filled.push(token);
+        }
+    }
+    if (filled.length === 1) {
+        return filled[0];
+    }
+    if (filled.length === 0) {
+        return '#' + String(fallbackId || '');
+    }
+    return String(row.label_ar || row.label_en || ('#' + String(fallbackId || '')));
+}
+
 function orangeAdminProductPreviewSizeLabels() {
     if (!orangeProductEffectiveHasSizes()) {
         return [];
@@ -2480,7 +2499,7 @@ function orangeAdminProductPreviewSizeLabels() {
         if (sid <= 0) {
             return;
         }
-        byId[sid] = String((sz.label_ar || sz.label_en || ('#' + sid)) || '');
+        byId[sid] = orangeSizeCodeText(sz, sid);
     });
     const labels = [];
     const seen = Object.create(null);
@@ -4171,7 +4190,7 @@ function orangeFillColorwayRowSizes(rowEl) {
         cb.value = String(sid);
         cb.checked = false;
         const span = document.createElement('span');
-        span.textContent = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
+        span.textContent = orangeSizeCodeText(sz, sid).replace(/</g, '');
         wrap.appendChild(cb);
         wrap.appendChild(span);
         grid.appendChild(wrap);
@@ -4618,7 +4637,7 @@ function orangeRefreshSizePickPanel() {
         cb.value = String(sid);
         cb.checked = false;
         const span = document.createElement('span');
-        const t = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
+        const t = orangeSizeCodeText(sz, sid).replace(/</g, '');
         span.textContent = t;
         wrap.appendChild(cb);
         wrap.appendChild(span);
@@ -4860,7 +4879,7 @@ function generateVariants(opts) {
     html += '</tr></thead><tbody>';
     combos.forEach((c, idx) => {
         const sz = sizeLookupList.find(x => String(x.id) === String(c.size_family_size_id));
-        const szLabel = sz ? (sz.label_ar || sz.label_en || ('#' + sz.id)) : '-';
+        const szLabel = sz ? orangeSizeCodeText(sz, sz.id) : '-';
         const p = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.primary_color_id));
         const s = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.secondary_color_id));
         let colorLabel = '';
