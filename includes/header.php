@@ -23,7 +23,10 @@ extract(storefront_toolbar_state());
 require_once __DIR__ . '/countries.php';
 orange_storefront_send_country_cookie($countryCode ?? orange_storefront_current_country_code(db()));
 orange_storefront_send_channel_cookie($channelSlug);
-orange_storefront_send_lang_cookie($lang);
+require_once __DIR__ . '/orange_storefront_customer_lang.php';
+if (orange_storefront_customer_lang_cookie_allowed((string) $lang)) {
+    orange_storefront_send_lang_cookie($lang);
+}
 
 $taglineCycle = storefront_tagline_cycle_messages();
 $taglineInitial = $taglineCycle[0] ?? '';

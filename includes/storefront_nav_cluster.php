@@ -19,10 +19,16 @@ $dockRegisterCurrent = \in_array($pageKind, ['register', 'verify_email'], true);
 
 $langAria = htmlspecialchars(t('language'), ENT_QUOTES, 'UTF-8');
 
+$customerLangMode = isset($customerLangMode) ? (string) $customerLangMode : '';
+$customerLangReason = isset($customerLangReason) ? (string) $customerLangReason : '';
+$customerLangRender = isset($customerLangRender) ? (string) $customerLangRender : '';
+$customerLangUnready = isset($customerLangUnready) ? (string) $customerLangUnready : '';
+$customerWiredFlag = !empty($customerWired) ? '1' : '0';
+
 /** قائمة اللغات — نمط الهيدر (ليس dock) */
-$renderLangHeader = static function () use ($langOpts, $lang, $channelSlug, $pageKind, $storefrontExtra, $currentLangLabel): void {
+$renderLangHeader = static function () use ($langOpts, $lang, $channelSlug, $pageKind, $storefrontExtra, $currentLangLabel, $customerLangMode, $customerLangReason, $customerLangRender, $customerLangUnready, $customerWiredFlag): void {
     ?>
-                <details class="lang-dropdown">
+                <details class="lang-dropdown" data-customer-wired="<?php echo $customerWiredFlag; ?>" data-customer-lang-mode="<?php echo htmlspecialchars($customerLangMode, ENT_QUOTES, 'UTF-8'); ?>" data-customer-lang-reason="<?php echo htmlspecialchars($customerLangReason, ENT_QUOTES, 'UTF-8'); ?>" data-customer-render-lang="<?php echo htmlspecialchars($customerLangRender, ENT_QUOTES, 'UTF-8'); ?>" data-customer-unready="<?php echo htmlspecialchars($customerLangUnready, ENT_QUOTES, 'UTF-8'); ?>">
                     <summary class="lang-dropdown__summary" aria-label="<?php echo htmlspecialchars(t('language'), ENT_QUOTES, 'UTF-8'); ?>">
                         <span class="lang-dropdown__icon" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false">

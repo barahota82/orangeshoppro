@@ -165,6 +165,11 @@ function orange_country_locale_roles_replace(PDO $pdo, int $countryId, array $as
     }
 }
 
+function orange_country_locale_customer_wired(string $mode): bool
+{
+    return $mode !== 'legacy_unconfigured';
+}
+
 function orange_country_locale_roles_read(PDO $pdo, int $countryId): array
 {
     $st = $pdo->prepare('SELECT locale_code, role, sort_order FROM orange_country_locale_role WHERE country_id = ? ORDER BY sort_order ASC, locale_code ASC');
@@ -177,7 +182,7 @@ function orange_country_locale_roles_read(PDO $pdo, int $countryId): array
             'content' => [],
             'admin_ui' => [],
             'customer' => [],
-            'customer_wired' => false,
+            'customer_wired' => orange_country_locale_customer_wired('legacy_unconfigured'),
         ];
     }
     $bucket = ['base' => [], 'content' => [], 'admin_ui' => [], 'customer' => []];
@@ -194,7 +199,7 @@ function orange_country_locale_roles_read(PDO $pdo, int $countryId): array
             'content' => $bucket['content'],
             'admin_ui' => $bucket['admin_ui'],
             'customer' => $bucket['customer'],
-            'customer_wired' => false,
+            'customer_wired' => orange_country_locale_customer_wired('invalid_multiple_base'),
         ];
     }
     if (count($bucket['base']) === 0) {
@@ -204,7 +209,7 @@ function orange_country_locale_roles_read(PDO $pdo, int $countryId): array
             'content' => $bucket['content'],
             'admin_ui' => $bucket['admin_ui'],
             'customer' => $bucket['customer'],
-            'customer_wired' => false,
+            'customer_wired' => orange_country_locale_customer_wired('no_base'),
         ];
     }
     return [
@@ -213,7 +218,7 @@ function orange_country_locale_roles_read(PDO $pdo, int $countryId): array
         'content' => $bucket['content'],
         'admin_ui' => $bucket['admin_ui'],
         'customer' => $bucket['customer'],
-        'customer_wired' => false,
+        'customer_wired' => orange_country_locale_customer_wired('configured'),
     ];
 }
 

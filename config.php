@@ -355,30 +355,9 @@ function orange_is_admin_request_context(): bool
 
 function current_lang(): string
 {
-    $allowed = ['en', 'ar', 'fil', 'hi'];
-    if (isset($_GET['lang'])) {
-        $raw = strtolower(trim((string) $_GET['lang']));
-        if ($raw !== '' && in_array($raw, $allowed, true)) {
-            return $raw;
-        }
-        if ($raw !== '') {
-            return 'en';
-        }
-    }
-    if (orange_is_admin_request_context()) {
-        return 'en';
-    }
-    $fromShort = orange_storefront_lang_from_short_url_path();
-    if ($fromShort !== null && in_array($fromShort, $allowed, true)) {
-        return $fromShort;
-    }
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
 
-    $fromCookie = orange_storefront_read_saved_lang();
-    if ($fromCookie !== null) {
-        return $fromCookie;
-    }
-
-    return orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+    return orange_storefront_resolve_request_lang();
 }
 
 /**
@@ -386,13 +365,14 @@ function current_lang(): string
  */
 function orange_storefront_apply_lang_from_payload(array $data): void
 {
-    $lb = isset($data['lang']) ? strtolower(trim((string) $data['lang'])) : '';
-    if (in_array($lb, ['en', 'ar', 'fil', 'hi'], true)) {
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
+    $lb = orange_storefront_customer_payload_lang($data);
+    if ($lb !== null) {
         $_GET['lang'] = $lb;
     }
 }
 
-/** Storefront language picker labels (اسم كامل يظهر في القائمة المنسدلة وفي زر اللغة على سطح المكتب). */
+/** UI-ready language catalog. Slogan authority and the legacy visitor list use it. The visitor picker uses the customer-role resolution. */
 function storefront_lang_options(): array {
     return [
         'ar' => ['label' => 'العربية'],
@@ -990,6 +970,10 @@ function orange_storefront_send_lang_cookie(string $lang): void
     if (! in_array($lang, $allowed, true)) {
         return;
     }
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
+    if (!orange_storefront_customer_lang_cookie_allowed($lang)) {
+        return;
+    }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
         || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
@@ -1069,7 +1053,7 @@ function orange_storefront_lang_from_short_url_path(): ?string
         return null;
     }
     $path = orange_storefront_normalized_public_path();
-    if (!preg_match('#^/([a-z0-9\-]+)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
+    if (!preg_match('#^/([a-z0-9\-]+?)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
         return null;
     }
     $first = strtolower($m[1]);
@@ -1106,7 +1090,7 @@ function orange_storefront_lang_from_short_url_path(): ?string
 function orange_storefront_request_primary_path_segment(): ?string
 {
     $path = orange_storefront_normalized_public_path();
-    if (preg_match('#^/([a-z0-9\-]+)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
+    if (preg_match('#^/([a-z0-9\-]+?)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
         return strtolower($m[1]);
     }
 
@@ -1270,8 +1254,21 @@ function storefront_toolbar_state(): array {
     if ($pageKind === 'verify_email' && isset($_GET['token']) && (string) $_GET['token'] !== '') {
         $storefrontExtra['token'] = (string) $_GET['token'];
     }
-    $langOpts = storefront_lang_options();
-    $currentLangLabel = (string)($langOpts[$lang]['label'] ?? $lang);
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
+    if (orange_is_admin_request_context()) {
+        $customerLang = [
+            'mode' => '',
+            'reason' => '',
+            'render_lang' => $lang,
+            'excluded_unready' => [],
+            'customer_wired' => false,
+            'options' => storefront_lang_options(),
+        ];
+    } else {
+        $customerLang = orange_storefront_customer_lang_for_current_request();
+    }
+    $langOpts = $customerLang['options'];
+    $currentLangLabel = (string)($langOpts[$lang]['label'] ?? '—');
     $countryOptions = orange_countries_storefront_active($pdoTb, $lang);
     $countryLabel = $countryRow !== null ? orange_country_label_from_row($countryRow, $lang) : $countryCode;
     $countryCurrency = $countryRow !== null ? strtoupper(trim((string) ($countryRow['currency_code'] ?? ''))) : '';
@@ -1284,6 +1281,11 @@ function storefront_toolbar_state(): array {
         'storefrontExtra' => $storefrontExtra,
         'langOpts' => $langOpts,
         'currentLangLabel' => $currentLangLabel,
+        'customerLangMode' => (string) $customerLang['mode'],
+        'customerLangReason' => (string) $customerLang['reason'],
+        'customerLangRender' => (string) $customerLang['render_lang'],
+        'customerLangUnready' => implode(',', $customerLang['excluded_unready']),
+        'customerWired' => !empty($customerLang['customer_wired']),
         'countryId' => $countryId,
         'countryCode' => $countryCode,
         'countryLabel' => $countryLabel,
@@ -1379,8 +1381,10 @@ function storefront_absolute_url(string $relativePath): string
 function storefront_url(string $page, string $channelSlug, string $lang, array $extra = []): string {
     $prefix = PUBLIC_BASE_PATH;
     $pathPrefix = ($prefix === '' ? '' : $prefix);
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
+    $langPublic = orange_storefront_public_url_lang($lang);
 
-    $seg = storefront_short_segment($channelSlug, $lang);
+    $seg = storefront_short_segment($channelSlug, $langPublic === '' ? 'en' : $langPublic);
     if (!STOREFRONT_FORCE_LONG_URLS && $seg !== null) {
         $tail = match ($page) {
             'home' => $seg,
@@ -1401,7 +1405,12 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
         }
     }
 
-    $q = array_merge(['channel' => $channelSlug, 'lang' => $lang], $extra);
+    $q = array_merge($extra, ['channel' => $channelSlug]);
+    if ($langPublic !== '') {
+        $q['lang'] = $langPublic;
+    } else {
+        unset($q['lang']);
+    }
     $path = match ($page) {
         'home' => '/pages/home.php',
         'cart' => '/pages/cart.php',

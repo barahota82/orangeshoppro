@@ -80,11 +80,16 @@ function orange_department_integration_page_state(PDO $pdo, int $countryId): arr
     $roles['tables_present'] = true;
     $roles['active'] = $active;
     $roles['panel'] = orange_content_panel_locales($roles, $active);
-    $roles['visitor_list_activated'] = false;
+    $roles['visitor_list_activated'] = !empty($roles['customer_wired']);
     $roles['admin_ui_language_changed'] = false;
-    $roles['notice'] = ($roles['mode'] ?? '') === 'configured'
-        ? 'إعداد لغات المحتوى مهيأ لهذه الدولة.'
-        : 'إعداد لغات المحتوى غير مهيأ لهذه الدولة. المسار القديم يبقى إلى أن يُحفظ إعداد صريح. لا تُفترض العربية.';
+    $mode = (string) ($roles['mode'] ?? '');
+    if ($mode === 'configured') {
+        $roles['notice'] = 'إعداد لغات المحتوى مهيأ لهذه الدولة. قائمة الزائر تتبع دور customer.';
+    } elseif ($mode === 'legacy_unconfigured') {
+        $roles['notice'] = 'إعداد لغات المحتوى غير مهيأ لهذه الدولة. المسار القديم يبقى إلى أن يُحفظ إعداد صريح. لا تُفترض العربية.';
+    } else {
+        $roles['notice'] = 'إعداد أدوار الدولة موجود لكنه غير صالح. قائمة الزائر لا تعود إلى اللغات الأربع.';
+    }
     return $roles;
 }
 
@@ -219,10 +224,19 @@ function orange_department_integration_handle(PDO $pdo, array $serverAdmin, stri
             $assignments = is_array($data['assignments'] ?? null) ? $data['assignments'] : [];
             orange_country_locale_roles_replace($pdo, $countryId, $assignments);
             $saved = orange_department_integration_page_state($pdo, $countryId);
-            return orange_department_integration_response(true, 'حُفظ اختيار الأدوار. قائمة الزائر ولغة واجهة البرنامج لم تُفعَّلا.', 200, [
+            $wired = !empty($saved['customer_wired']);
+            $savedMode = (string) ($saved['mode'] ?? '');
+            if ($savedMode === 'configured') {
+                $message = 'حُفظ اختيار الأدوار. قائمة الزائر تتبع دور customer. لغة واجهة البرنامج لم تتغير.';
+            } elseif ($savedMode === 'legacy_unconfigured') {
+                $message = 'حُفظ اختيار الأدوار. لا توجد أدوار محفوظة، فتبقى قائمة الزائر على المسار القديم. لغة واجهة البرنامج لم تتغير.';
+            } else {
+                $message = 'حُفظ اختيار الأدوار. الإعداد غير صالح لقائمة الزائر، ولا تُعرض اللغات الأربع. لغة واجهة البرنامج لم تتغير.';
+            }
+            return orange_department_integration_response(true, $message, 200, [
                 'state' => $saved,
-                'customer_wired' => false,
-                'visitor_list_activated' => false,
+                'customer_wired' => $wired,
+                'visitor_list_activated' => $wired,
                 'admin_ui_language_changed' => false,
             ]);
         }
