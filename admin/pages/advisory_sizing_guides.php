@@ -110,18 +110,18 @@ if ($tablesReady) {
     }
 }
 
-$kindLabelsJson = json_encode($kindLabels, JSON_UNESCAPED_UNICODE);
+$kindLabelsJson = json_encode($kindLabels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 if ($kindLabelsJson === false) {
     $kindLabelsJson = '{}';
 }
 
 $prefSizeFamilyId = isset($_GET['size_family_id']) ? (int) $_GET['size_family_id'] : 0;
 
-$sizesJson = json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE);
+$sizesJson = json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 if ($sizesJson === false) {
     $sizesJson = '{}';
 }
-$familiesJson = json_encode($families, JSON_UNESCAPED_UNICODE);
+$familiesJson = json_encode($families, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 if ($familiesJson === false) {
     $familiesJson = '[]';
 }
@@ -359,8 +359,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var rowSeq = 0;
     var ASG_LOCALE = <?php echo $asgLocaleReady ? 'true' : 'false'; ?>;
-    var ASG_ROLES = <?php echo json_encode($asgLocaleRoles, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    var ASG_ACTIVE = <?php echo json_encode($asgLocaleActive, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    var ASG_ROLES = <?php echo json_encode($asgLocaleRoles, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+    var ASG_ACTIVE = <?php echo json_encode($asgLocaleActive, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 
     function mountAsgField(root, record) {
         if (!ASG_LOCALE || !root || !window.OrangeContentLocalePanel) return null;

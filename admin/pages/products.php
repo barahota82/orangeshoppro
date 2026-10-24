@@ -1032,28 +1032,28 @@ if (window.OrangeProductContentLocale) {
 </script>
 <?php endif; ?>
 <script>
-window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_ADMIN_CURRENCY_UNIT = <?php echo json_encode($prodMoney['unit'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_PATTERNS = <?php echo json_encode($patterns, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_ADMIN_CURRENCY_UNIT = <?php echo json_encode($prodMoney['unit'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_PATTERNS = <?php echo json_encode($patterns, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 window.ORANGE_CATALOG_NAV_UNIFIED = <?php echo $catalogNavUnified ? 'true' : 'false'; ?>;
 window.ORANGE_PT_DEPT_STEP_ENABLED = <?php echo $orangeProductTypeDeptStepEnabled ? 'true' : 'false'; ?>;
 window.ORANGE_PT_DEPT_OPTIONS_COUNT = <?php echo (int) count($productTypeDepartmentsForForm); ?>;
-window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_PT_DEFAULT_ADV_GUIDE = <?php echo json_encode($ptDefaultAdvGuideMap, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_PT_DEFAULT_ADV_GUIDE = <?php echo json_encode($ptDefaultAdvGuideMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
 window.ORANGE_MAIN_PENDING_IMAGE_URL = null;
 window.ORANGE_GALLERY_PENDING_URLS = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
-window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
-window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL = <?php echo json_encode($orangeAdminCardPreviewViewLabel, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS = <?php echo json_encode($orangeAdminSfProductUrlPartsForJs, JSON_UNESCAPED_UNICODE); ?>;
-window.ORANGE_PREVIEW_CHANNELS = <?php echo json_encode($orangePreviewChannelsForCountry, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL = <?php echo json_encode($orangeAdminCardPreviewViewLabel, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS = <?php echo json_encode($orangeAdminSfProductUrlPartsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+window.ORANGE_PREVIEW_CHANNELS = <?php echo json_encode($orangePreviewChannelsForCountry, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 window.ORANGE_PREVIEW_ADMIN_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
 
 const PRODUCT_MSG = {
