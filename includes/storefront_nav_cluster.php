@@ -66,6 +66,9 @@ if ($clusterPart === 'country') {
 }
 
 if ($clusterPart === 'lang') {
+    if (count($langOpts) < 2) {
+        return;
+    }
     echo '<nav class="lang-dropdown-nav" aria-label="' . $langAria . '">';
     $renderLangHeader();
     echo '</nav>';

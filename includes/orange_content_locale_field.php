@@ -4,7 +4,8 @@ declare(strict_types=1);
 /**
  * Shared locale text rows for one field on an existing entity.
  * Four legacy columns and their rows commit together.
- * Other locales are rows only. Does not create tables and does not load config.php.
+ * Other locales are rows only. A missing row stays empty and is not copied from another language.
+ * Does not create tables and does not load config.php.
  */
 
 require_once __DIR__ . '/orange_content_languages.php';
@@ -80,9 +81,7 @@ function orange_content_locale_pick(string $lang, ?array $localeRows, array $col
         return trim((string) ($columnValues['ar'] ?? ''));
     }
 
-    return $arabicFallback
-        ? trim((string) ($columnValues['ar'] ?? ''))
-        : trim((string) ($columnValues['en'] ?? ''));
+    return '';
 }
 
 /**

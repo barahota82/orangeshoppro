@@ -15,21 +15,42 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/orange_content_languages.php';
+require_once __DIR__ . '/orange_storefront_ui_readiness.php';
 
 /**
- * Languages the storefront can display and for which interface strings exist.
- * Slogan authority stays storefront_lang_options(); this is the same ready set.
+ * Live interface packs. This is not the language catalog.
+ * A catalog language stays out of the customer list until its pack is complete.
+ * Labels and direction come from the reference row when one is supplied.
+ * The four historical labels are only the fallback for those codes.
  *
- * @return array<string, string>
+ * @param array<string,array{native?:string,label?:string,dir?:string}> $catalogEntries
+ * @return array<string, array{label:string,dir:string}>
  */
-function orange_storefront_customer_ui_ready(): array
+function orange_storefront_customer_ui_ready(array $catalogEntries = []): array
 {
-    return [
+    $fallback = [
         'ar' => 'العربية',
         'en' => 'English',
         'fil' => 'Filipino',
         'hi' => 'हिन्दी',
     ];
+    $out = [];
+    foreach (orange_storefront_ui_live_ready_locales() as $code) {
+        $ref = $catalogEntries[$code] ?? null;
+        $native = is_array($ref) ? trim((string) ($ref['native'] ?? '')) : '';
+        $catalogDir = is_array($ref) ? (string) ($ref['dir'] ?? '') : null;
+        $out[$code] = [
+            'label' => $native !== '' ? $native : ($fallback[$code] ?? $code),
+            'dir' => orange_storefront_ui_direction($code, $catalogDir !== '' ? $catalogDir : null),
+        ];
+    }
+
+    return $out;
+}
+
+function orange_storefront_customer_switcher_should_render(array $resolution): bool
+{
+    return count($resolution['codes'] ?? []) >= 2;
 }
 
 /**
@@ -48,9 +69,14 @@ function orange_storefront_customer_ui_ready(): array
  */
 function orange_storefront_customer_lang_legacy_resolution(int $countryId = 0): array
 {
+    $historical = ['ar', 'en', 'fil', 'hi'];
+    $ready = orange_storefront_customer_ui_ready();
     $options = [];
-    foreach (orange_storefront_customer_ui_ready() as $code => $label) {
-        $options[$code] = ['label' => $label];
+    foreach ($historical as $code) {
+        if (!isset($ready[$code])) {
+            continue;
+        }
+        $options[$code] = $ready[$code];
     }
 
     return [
@@ -152,7 +178,26 @@ function orange_storefront_customer_lang_resolution(PDO $pdo, int $countryId): a
         return orange_storefront_customer_lang_legacy_resolution($countryId);
     }
 
-    $ready = orange_storefront_customer_ui_ready();
+    $catalogEntries = [];
+    $knownWithoutCatalogRead = ['ar' => true, 'en' => true, 'fil' => true, 'hi' => true];
+    $needsCatalog = false;
+    if ($mode === 'configured') {
+        foreach ($roles['customer'] ?? [] as $rawCode) {
+            $probe = strtolower(trim((string) $rawCode));
+            if ($probe !== '' && !isset($knownWithoutCatalogRead[$probe])) {
+                $needsCatalog = true;
+                break;
+            }
+        }
+    }
+    if ($needsCatalog) {
+        foreach (orange_language_catalog($pdo)['entries'] as $entry) {
+            if (is_array($entry) && isset($entry['code'])) {
+                $catalogEntries[(string) $entry['code']] = $entry;
+            }
+        }
+    }
+    $ready = orange_storefront_customer_ui_ready($catalogEntries);
     $base = strtolower(trim((string) ($roles['base'] ?? '')));
     $options = [];
     $excluded = [];
@@ -166,7 +211,7 @@ function orange_storefront_customer_lang_resolution(PDO $pdo, int $countryId): a
                 $excluded[] = $code;
                 continue;
             }
-            $options[$code] = ['label' => $ready[$code]];
+            $options[$code] = $ready[$code];
         }
     }
     $codes = array_keys($options);
@@ -252,7 +297,7 @@ function orange_storefront_legacy_request_lang(): string
     }
     if (function_exists('orange_storefront_read_saved_lang')) {
         $fromCookie = orange_storefront_read_saved_lang();
-        if ($fromCookie !== null) {
+        if ($fromCookie !== null && in_array($fromCookie, $allowed, true)) {
             return $fromCookie;
         }
     }
@@ -298,18 +343,16 @@ function orange_storefront_accept_language_offered(?string $header, array $codes
     usort($parsed, static fn (array $a, array $b): int => $b['q'] <=> $a['q']);
     foreach ($parsed as $row) {
         $primary = explode('-', $row['tag'])[0];
-        $mapped = null;
-        if ($primary === 'ar') {
-            $mapped = 'ar';
-        } elseif ($primary === 'hi') {
-            $mapped = 'hi';
-        } elseif ($primary === 'fil' || $primary === 'tl') {
-            $mapped = 'fil';
-        } elseif ($primary === 'en') {
-            $mapped = 'en';
+        $candidates = [$primary];
+        if ($primary === 'tl') {
+            $candidates[] = 'fil';
+        } elseif ($primary === 'fil') {
+            $candidates[] = 'tl';
         }
-        if ($mapped !== null && isset($allowed[$mapped])) {
-            return $mapped;
+        foreach ($candidates as $mapped) {
+            if (isset($allowed[$mapped])) {
+                return $mapped;
+            }
         }
     }
 
@@ -395,7 +438,7 @@ function orange_storefront_customer_payload_lang(array $data): ?string
     if ($lang === '') {
         return null;
     }
-    $ready = ['en', 'ar', 'fil', 'hi'];
+    $ready = array_keys(orange_storefront_customer_ui_ready());
     if (function_exists('orange_is_admin_request_context') && orange_is_admin_request_context()) {
         return in_array($lang, $ready, true) ? $lang : null;
     }
@@ -407,18 +450,24 @@ function orange_storefront_customer_payload_lang(array $data): ?string
     return in_array($lang, $resolution['codes'], true) ? $lang : null;
 }
 
+function orange_storefront_lang_cookie_deferred_for_channel_restore(): bool
+{
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    $channel = trim((string) ($_GET['channel'] ?? ''));
+
+    return str_contains($uri, '/pages/') && $channel === '';
+}
+
 function orange_storefront_customer_lang_cookie_allowed(string $lang): bool
 {
     $lang = strtolower(trim($lang));
-    if (!in_array($lang, ['en', 'ar', 'fil', 'hi'], true)) {
-        return false;
-    }
+    $ready = array_keys(orange_storefront_customer_ui_ready());
     if (function_exists('orange_is_admin_request_context') && orange_is_admin_request_context()) {
-        return true;
+        return in_array($lang, $ready, true);
     }
     $resolution = orange_storefront_customer_lang_for_current_request();
     if (empty($resolution['customer_wired'])) {
-        return true;
+        return in_array($lang, $ready, true);
     }
 
     return in_array($lang, $resolution['codes'], true);
@@ -442,4 +491,45 @@ function orange_storefront_public_url_lang(string $lang): string
     }
 
     return in_array($lang, $resolution['codes'], true) ? $lang : '';
+}
+
+/**
+ * Customer language codes offered for each active channel.
+ * One resolution per distinct country. An empty map means the redirect
+ * must not invent English.
+ *
+ * @return array<string, list<string>>
+ */
+function orange_storefront_customer_lang_codes_by_channel(PDO $pdo): array
+{
+    try {
+        $rows = $pdo->query('SELECT slug, country_id FROM channels WHERE is_active = 1')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        unset($e);
+
+        return [];
+    }
+    $byCountry = [];
+    $map = [];
+    foreach ($rows as $row) {
+        $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+        $countryId = (int) ($row['country_id'] ?? 0);
+        if ($slug === '' || !preg_match('/^[a-z0-9\-]+$/', $slug) || $countryId <= 0) {
+            continue;
+        }
+        if (!isset($byCountry[$countryId])) {
+            $resolution = orange_storefront_customer_lang_resolution($pdo, $countryId);
+            $codes = [];
+            foreach (is_array($resolution['codes'] ?? null) ? $resolution['codes'] : [] as $code) {
+                $code = strtolower(trim((string) $code));
+                if (preg_match('/^[a-z]{2,8}$/', $code)) {
+                    $codes[] = $code;
+                }
+            }
+            $byCountry[$countryId] = $codes;
+        }
+        $map[$slug] = $byCountry[$countryId];
+    }
+
+    return $map;
 }

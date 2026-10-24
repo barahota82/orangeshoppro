@@ -314,34 +314,82 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
 <div class="card" id="country-locale-roles">
     <h3>أدوار لغات المحتوى</h3>
     <p class="card-hint"><?php echo htmlspecialchars((string) $ctryLocale['notice'], ENT_QUOTES, 'UTF-8'); ?></p>
-    <p class="card-hint">حفظ الاختيار لا يفعّل قائمة لغات الزائر ولا يغيّر لغة واجهة البرنامج، ولا يفعّل لغة خامسة للعملاء.</p>
+    <p class="card-hint">الأساس لغة واحدة ويُحسب ضمن المحتوى. المحتوى يفتح الترجمة. العميل يحدد لغات المتجر عندما تكتمل نصوص الواجهة. الإنجليزية مرجع داخلي ولا تُفرض على العملاء ولا تتكرر إذا كانت الأساس. واجهة الإدارة لا تتبدل من هنا.</p>
+    <?php
+    $ctryCatalog = is_array($ctryLocale['catalog'] ?? null) ? $ctryLocale['catalog'] : ['source' => 'absent', 'entries' => [], 'names_available' => false];
+    $ctryEntries = is_array($ctryCatalog['entries'] ?? null) ? $ctryCatalog['entries'] : [];
+    $ctryUiReady = array_fill_keys(orange_storefront_ui_live_ready_locales(), true);
+    ?>
     <?php if (empty($ctryLocale['tables_present'])): ?>
     <p>لا يُعرض نموذج الحفظ لأن الجداول غير موجودة. فتح الصفحة لا ينشئها ولا يفترض أن الدولة عربية.</p>
-    <?php elseif ($ctryLocale['active'] === []): ?>
-    <p>مرجع اللغات لا يضم لغة نشطة يمكن اختيارها. لا يُفترض العربية.</p>
+    <?php elseif ($ctryEntries === []): ?>
+    <?php if (($ctryCatalog['source'] ?? '') === 'absent'): ?>
+    <p>مرجع اللغات غير متاح في هذا الاتصال. فتح الصفحة لا ينشئه.</p>
     <?php else: ?>
+    <p>مرجع اللغات لا يضم لغة نشطة يمكن اختيارها. لا يُفترض العربية.</p>
+    <?php endif; ?>
+    <?php else: ?>
+    <label for="locale-catalog-search">بحث في كتالوج اللغات</label>
+    <input type="search" id="locale-catalog-search" dir="auto" placeholder="الاسم أو الرمز" style="display:block;margin:0 0 12px;max-width:24rem;">
     <div id="locale-role-grid" style="direction:rtl;">
-        <?php foreach ($ctryLocale['active'] as $localeCode): ?>
-        <fieldset style="margin:0 0 12px;padding:8px 12px;">
-            <legend><?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?></legend>
-            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="base" <?php echo ($ctryLocale['base'] ?? '') === $localeCode ? 'checked' : ''; ?>> الأساس</label>
-            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="content" <?php echo in_array($localeCode, $ctryLocale['content'], true) ? 'checked' : ''; ?>> المحتوى</label>
-            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="admin_ui" <?php echo in_array($localeCode, $ctryLocale['admin_ui'], true) ? 'checked' : ''; ?>> واجهة الإدارة</label>
-            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars((string) $localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="customer" <?php echo in_array($localeCode, $ctryLocale['customer'], true) ? 'checked' : ''; ?>> العميل</label>
+        <?php foreach ($ctryEntries as $ctryEntry): ?>
+        <?php
+        $localeCode = (string) ($ctryEntry['code'] ?? '');
+        $nativeName = (string) ($ctryEntry['native'] ?? $localeCode);
+        $englishName = (string) ($ctryEntry['label'] ?? $localeCode);
+        $visibleName = $englishName !== $nativeName ? ($nativeName . ' / ' . $englishName) : $nativeName;
+        $entryDir = (string) ($ctryEntry['dir'] ?? '');
+        $dirKnown = !empty($ctryEntry['direction_known']);
+        $providerCode = orange_translate_provider_code($localeCode);
+        $uiReady = isset($ctryUiReady[$localeCode]);
+        $searchBlob = $nativeName . ' ' . $englishName . ' ' . $localeCode . ' ' . $entryDir;
+        $statusLine = $englishName;
+        if ($dirKnown && $entryDir !== '') {
+            $statusLine .= ' — ' . $entryDir;
+        }
+        $statusLine .= $providerCode !== null ? ' — الترجمة الآلية متاحة' : ' — لا تمر بالترجمة الآلية';
+        $statusLine .= $uiReady ? ' — نصوص الواجهة جاهزة' : ' — نصوص الواجهة غير جاهزة';
+        ?>
+        <fieldset style="margin:0 0 12px;padding:8px 12px;" data-search="<?php echo htmlspecialchars($searchBlob, ENT_QUOTES, 'UTF-8'); ?>">
+            <legend dir="<?php echo $entryDir === 'rtl' ? 'rtl' : 'ltr'; ?>"><?php echo htmlspecialchars($visibleName . ' (' . $localeCode . ')', ENT_QUOTES, 'UTF-8'); ?></legend>
+            <p class="card-hint" style="margin:0 0 8px;"><?php echo htmlspecialchars($statusLine, ENT_QUOTES, 'UTF-8'); ?></p>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars($localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="base" <?php echo ($ctryLocale['base'] ?? '') === $localeCode ? 'checked' : ''; ?>> الأساس</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars($localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="content" <?php echo in_array($localeCode, $ctryLocale['content'], true) ? 'checked' : ''; ?>> المحتوى</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars($localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="admin_ui" <?php echo in_array($localeCode, $ctryLocale['admin_ui'], true) ? 'checked' : ''; ?>> واجهة الإدارة</label>
+            <label><input type="checkbox" data-locale="<?php echo htmlspecialchars($localeCode, ENT_QUOTES, 'UTF-8'); ?>" data-role="customer" <?php echo $uiReady ? '' : 'disabled'; ?> <?php echo in_array($localeCode, $ctryLocale['customer'], true) ? 'checked' : ''; ?>> العميل</label>
+            <?php if (!$uiReady && in_array($localeCode, $ctryLocale['customer'], true)): ?>
+            <label><input type="checkbox" data-drop-customer="<?php echo htmlspecialchars($localeCode, ENT_QUOTES, 'UTF-8'); ?>"> إزالة الدور المحفوظ</label>
+            <p class="card-hint" style="margin:4px 0 0;">الدور محفوظ ولا يُعرض للعميل قبل اكتمال نصوص الواجهة. لا يُحذف عند حفظ دور آخر. الإزالة من هذا الخيار فقط.</p>
+            <?php endif; ?>
         </fieldset>
         <?php endforeach; ?>
     </div>
+    <script>
+    document.getElementById('locale-catalog-search').addEventListener('input', function () {
+        var q = this.value.trim().toLowerCase();
+        document.querySelectorAll('#locale-role-grid fieldset').forEach(function (box) {
+            var hay = (box.getAttribute('data-search') || '').toLowerCase();
+            box.hidden = q !== '' && hay.indexOf(q) === -1;
+        });
+    });
+    </script>
     <button type="button" id="locale-roles-save">حفظ أدوار اللغات</button>
     <script>
     document.getElementById('locale-roles-save').addEventListener('click', async function () {
         var assignments = [];
-        document.querySelectorAll('#locale-role-grid input[type="checkbox"]:checked').forEach(function (box) {
+        var drops = [];
+        document.querySelectorAll('#locale-role-grid input[type="checkbox"]:checked:not(:disabled)').forEach(function (box) {
+            if (box.getAttribute('data-drop-customer')) {
+                drops.push(box.getAttribute('data-drop-customer'));
+                return;
+            }
             assignments.push({ locale: box.getAttribute('data-locale'), role: box.getAttribute('data-role') });
         });
         var res = await postJSON('/admin/api/countries/locale-roles.php', {
             action: 'save_roles',
             country_id: <?php echo (int) $editRow['id']; ?>,
-            assignments: assignments
+            assignments: assignments,
+            drop_customer: drops
         });
         alert(res.message || (res.success ? 'تم' : 'فشل'));
         if (res.success) window.location.reload();

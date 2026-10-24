@@ -946,14 +946,18 @@ function orange_storefront_lang_cookie_name(): string
     return 'orange_sf_lang';
 }
 
-/** @return 'en'|'ar'|'fil'|'hi'|null */
+/**
+ * Reads the saved storefront language cookie.
+ * Any well-formed locale code is returned. The customer resolution keeps it
+ * only when that language is actually offered. The legacy path still keeps
+ * only ar, en, fil, and hi.
+ */
 function orange_storefront_read_saved_lang(): ?string
 {
-    $allowed = ['en', 'ar', 'fil', 'hi'];
     $raw = isset($_COOKIE[orange_storefront_lang_cookie_name()])
         ? strtolower(trim((string) $_COOKIE[orange_storefront_lang_cookie_name()]))
         : '';
-    if ($raw === '' || ! in_array($raw, $allowed, true)) {
+    if (!preg_match('/^[a-z]{2,8}$/', $raw)) {
         return null;
     }
 
@@ -965,9 +969,8 @@ function orange_storefront_send_lang_cookie(string $lang): void
     if (headers_sent()) {
         return;
     }
-    $allowed = ['en', 'ar', 'fil', 'hi'];
     $lang = strtolower(trim($lang));
-    if (! in_array($lang, $allowed, true)) {
+    if (!preg_match('/^[a-z]{2,8}$/', $lang)) {
         return;
     }
     require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
@@ -1594,7 +1597,11 @@ function storefront_product_seo_meta_description(array $product): string
 }
 
 function get_translations(): array {
-    return [
+    static $orangePackCache = null;
+    if (is_array($orangePackCache)) {
+        return $orangePackCache;
+    }
+    $orangeBuiltin = [
         'en' => [
             'home' => 'Home',
             'cart' => 'Cart',
@@ -2225,6 +2232,7 @@ function get_translations(): array {
             'storefront_merge_apply_err' => 'تعذّر تطبيق التحديث. حاول لاحقاً أو تواصل مع الدعم.',
             'api_request_failed' => 'تعذّر إكمال الطلب. حاول لاحقاً.',
             'api_post_only' => 'يجب الاستعلام عن الطلب عبر نموذج التتبع في الموقع (إرسال آمن فقط).',
+            'api_ok' => 'تم',
             'storefront_account_signed_in' => 'مسجّل الدخول كـ',
             'storefront_logout' => 'تسجيل الخروج',
             'storefront_verify_title' => 'تأكيد البريد',
@@ -2891,6 +2899,15 @@ function get_translations(): array {
             'storefront_install_close' => 'समझ गया',
         ],
     ];
+    $orangePackFile = __DIR__ . '/includes/orange_storefront_ui_packs.php';
+    if (is_file($orangePackFile)) {
+        require_once $orangePackFile;
+    }
+    $orangePackCache = function_exists('orange_storefront_ui_merge_packs')
+        ? orange_storefront_ui_merge_packs($orangeBuiltin)
+        : $orangeBuiltin;
+
+    return $orangePackCache;
 }
 
 function t(string $key): string {

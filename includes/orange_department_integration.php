@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/arabic_name_duplicate.php';
 require_once __DIR__ . '/orange_content_languages.php';
 require_once __DIR__ . '/orange_translate_contract.php';
+require_once __DIR__ . '/orange_storefront_ui_readiness.php';
 require_once __DIR__ . '/orange_translate_request_guard.php';
 require_once __DIR__ . '/orange_department_locale_save.php';
 require_once __DIR__ . '/orange_department_record.php';
@@ -71,14 +72,35 @@ function orange_department_integration_page_state(PDO $pdo, int $countryId): arr
         'admin_ui_language_changed' => false,
         'active' => [],
         'panel' => [],
+        'catalog' => [
+            'source' => 'absent',
+            'entries' => [],
+            'names_available' => false,
+        ],
+        'catalog_labels' => [],
     ];
     if (!$rolesTable || !$textTable) {
         return $blank;
     }
     $roles = orange_country_locale_roles_read($pdo, $countryId);
     $active = $refTable ? orange_language_reference_active_codes($pdo) : [];
+    $catalog = $refTable ? orange_language_catalog($pdo) : [
+        'source' => 'absent',
+        'entries' => [],
+        'names_available' => false,
+    ];
+    $labels = [];
+    foreach ($catalog['entries'] as $entry) {
+        $labels[$entry['code']] = [
+            'native' => $entry['native'],
+            'label' => $entry['label'],
+            'dir' => $entry['dir'],
+        ];
+    }
     $roles['tables_present'] = true;
     $roles['active'] = $active;
+    $roles['catalog'] = $catalog;
+    $roles['catalog_labels'] = $labels;
     $roles['panel'] = orange_content_panel_locales($roles, $active);
     $roles['visitor_list_activated'] = !empty($roles['customer_wired']);
     $roles['admin_ui_language_changed'] = false;
@@ -222,6 +244,8 @@ function orange_department_integration_handle(PDO $pdo, array $serverAdmin, stri
                 return orange_department_integration_response(false, $state['notice'], 422, ['code' => 'tables_absent']);
             }
             $assignments = is_array($data['assignments'] ?? null) ? $data['assignments'] : [];
+            $drops = is_array($data['drop_customer'] ?? null) ? $data['drop_customer'] : [];
+            $assignments = orange_country_locale_customer_save_policy($pdo, $countryId, $assignments, $drops);
             orange_country_locale_roles_replace($pdo, $countryId, $assignments);
             $saved = orange_department_integration_page_state($pdo, $countryId);
             $wired = !empty($saved['customer_wired']);

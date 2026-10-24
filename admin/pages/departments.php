@@ -99,6 +99,7 @@ window.DEPT_LOCALE_BOOT = <?php echo json_encode([
         'customer' => $depLocalePage['customer'],
     ],
     'active' => $depLocalePage['active'],
+    'catalog_labels' => $depLocalePage['catalog_labels'] ?? [],
     'country_id' => (int) $depCountryId,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 </script>

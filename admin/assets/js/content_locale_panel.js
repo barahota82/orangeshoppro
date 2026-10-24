@@ -168,6 +168,7 @@
         var saveLabel = options.saveLabel || 'حفظ القسم';
         var idPrefix = String(options.idPrefix || '');
         var multiline = options.multiline === true;
+        var catalog = options.catalog || {};
         var maxLength = parseInt(options.maxLength, 10) || 0;
         var maxAttr = maxLength > 0 ? ' maxlength="' + maxLength + '"' : '';
         function eid(name) { return idPrefix + name; }
@@ -252,7 +253,10 @@
                 var wrap = document.createElement('div');
                 wrap.className = 'locale-row';
                 var label = document.createElement('label');
-                label.textContent = code;
+                var meta = catalog[code] || null;
+                var nativeName = meta && meta.native ? String(meta.native) : '';
+                label.textContent = nativeName !== '' ? (nativeName + ' (' + code + ')') : code;
+                if (meta && (meta.dir === 'rtl' || meta.dir === 'ltr')) label.dir = meta.dir;
                 var input = document.createElement(multiline ? 'textarea' : 'input');
                 if (!multiline) input.type = 'text';
                 if (multiline) input.rows = 3;

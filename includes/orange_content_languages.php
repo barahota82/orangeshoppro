@@ -165,6 +165,61 @@ function orange_country_locale_roles_replace(PDO $pdo, int $countryId, array $as
     }
 }
 
+/**
+ * A disabled unready customer box is not an instruction to delete the stored role.
+ * A new unready customer role is not activated. Removal happens only through
+ * an explicit drop list. Ready customer roles follow the submitted checkboxes.
+ *
+ * @param list<array<string,mixed>> $assignments
+ * @param list<mixed> $explicitDrops
+ * @return list<array<string,mixed>>
+ */
+function orange_country_locale_customer_save_policy(PDO $pdo, int $countryId, array $assignments, array $explicitDrops): array
+{
+    $ready = array_fill_keys(function_exists('orange_storefront_ui_live_ready_locales') ? orange_storefront_ui_live_ready_locales() : [], true);
+    $drops = [];
+    foreach ($explicitDrops as $raw) {
+        $code = orange_content_locale_code((string) $raw);
+        if ($code !== null) {
+            $drops[$code] = true;
+        }
+    }
+    $existing = [];
+    $read = orange_country_locale_roles_read($pdo, $countryId);
+    foreach (is_array($read['customer'] ?? null) ? $read['customer'] : [] as $code) {
+        $existing[(string) $code] = true;
+    }
+    $out = [];
+    $keptCustomer = [];
+    foreach ($assignments as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $locale = orange_content_locale_code((string) ($item['locale'] ?? ''));
+        $role = (string) ($item['role'] ?? '');
+        if ($locale === null || $role !== 'customer') {
+            $out[] = $item;
+            continue;
+        }
+        if (isset($drops[$locale])) {
+            continue;
+        }
+        if (!isset($ready[$locale]) && !isset($existing[$locale])) {
+            continue;
+        }
+        $out[] = $item;
+        $keptCustomer[$locale] = true;
+    }
+    foreach (array_keys($existing) as $locale) {
+        if (isset($ready[$locale]) || isset($drops[$locale]) || isset($keptCustomer[$locale])) {
+            continue;
+        }
+        $out[] = ['locale' => $locale, 'role' => 'customer', 'sort_order' => 0];
+    }
+
+    return $out;
+}
+
 function orange_country_locale_customer_wired(string $mode): bool
 {
     return $mode !== 'legacy_unconfigured';
@@ -242,7 +297,121 @@ function orange_content_panel_locales(array $roles, array $activeLocales = []): 
     return array_values(array_unique($out));
 }
 
+/**
+ * Active rows of orange_language_reference. Not an invented ISO list.
+ * Rich columns match the brand-identity contract when they are present.
+ * A thin table keeps codes only and does not invent native names.
+ * An absent table does not fall back to the four-language slogan seed.
+ * This read does not create or fill the table.
+ *
+ * @return array{source:string,entries:list<array{code:string,label:string,native:string,dir:string,direction_known:bool}>,names_available:bool}
+ */
+function orange_language_catalog(PDO $pdo): array
+{
+    $empty = [
+        'source' => 'absent',
+        'entries' => [],
+        'names_available' => false,
+    ];
+    try {
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $st = $pdo->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'orange_language_reference'");
+            if (!$st || !$st->fetchColumn()) {
+                return $empty;
+            }
+            $info = $pdo->query('PRAGMA table_info(orange_language_reference)');
+            $names = [];
+            foreach ($info ? $info->fetchAll(PDO::FETCH_ASSOC) : [] as $row) {
+                $names[] = (string) ($row['name'] ?? '');
+            }
+        } else {
+            $st = $pdo->prepare('SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?');
+            $st->execute(['orange_language_reference']);
+            $names = [];
+            foreach ($st->fetchAll(PDO::FETCH_NUM) ?: [] as $row) {
+                $names[] = (string) ($row[0] ?? '');
+            }
+            if ($names === []) {
+                return $empty;
+            }
+        }
+    } catch (Throwable $e) {
+        return $empty;
+    }
+    $has = static function (string $column) use ($names): bool {
+        return in_array($column, $names, true);
+    };
+    $rich = $has('label_en') && $has('label_native') && $has('dir');
+    $order = 'locale_code ASC';
+    if ($has('sort_order') && $has('id')) {
+        $order = 'sort_order ASC, id ASC';
+    } elseif ($has('sort_order')) {
+        $order = 'sort_order ASC, locale_code ASC';
+    }
+    if ($rich) {
+        $sql = 'SELECT locale_code, label_en, label_native, dir FROM orange_language_reference WHERE is_active = 1 ORDER BY ' . $order;
+    } else {
+        $sql = 'SELECT locale_code FROM orange_language_reference WHERE is_active = 1 ORDER BY ' . $order;
+    }
+    try {
+        $rows = $pdo->query($sql);
+        $fetched = $rows ? $rows->fetchAll(PDO::FETCH_ASSOC) : [];
+    } catch (Throwable $e) {
+        return [
+            'source' => 'unreadable',
+            'entries' => [],
+            'names_available' => false,
+        ];
+    }
+    $entries = [];
+    $seen = [];
+    foreach ($fetched ?: [] as $row) {
+        $code = orange_content_locale_code((string) ($row['locale_code'] ?? ''));
+        if ($code === null || isset($seen[$code])) {
+            continue;
+        }
+        $seen[$code] = true;
+        if ($rich) {
+            $label = trim((string) ($row['label_en'] ?? ''));
+            $native = trim((string) ($row['label_native'] ?? ''));
+            $dirRaw = (string) ($row['dir'] ?? '');
+            $dir = $dirRaw === 'rtl' ? 'rtl' : 'ltr';
+            $entries[] = [
+                'code' => $code,
+                'label' => $label !== '' ? $label : $code,
+                'native' => $native !== '' ? $native : $code,
+                'dir' => $dir,
+                'direction_known' => true,
+            ];
+            continue;
+        }
+        $knownDir = in_array($code, ['ar', 'en', 'fil', 'hi'], true);
+        $entries[] = [
+            'code' => $code,
+            'label' => $code,
+            'native' => $code,
+            'dir' => $code === 'ar' ? 'rtl' : ($knownDir ? 'ltr' : ''),
+            'direction_known' => $knownDir,
+        ];
+    }
+
+    return [
+        'source' => $rich ? 'orange_language_reference' : 'orange_language_reference_codes_only',
+        'entries' => $entries,
+        'names_available' => $rich,
+    ];
+}
+
 function orange_content_customer_ready(string $locale): bool
 {
-    return false;
+    $code = orange_content_locale_code($locale);
+    if ($code === null) {
+        return false;
+    }
+    if (!function_exists('orange_storefront_ui_live_ready_locales')) {
+        require_once __DIR__ . '/orange_storefront_ui_readiness.php';
+    }
+
+    return in_array($code, orange_storefront_ui_live_ready_locales(), true);
 }

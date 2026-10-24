@@ -34,6 +34,7 @@
             }
             return post('/admin/api/departments/suggest.php', body);
         },
+        catalog: boot.catalog_labels || {},
         onSave: function (payload) {
             var url = payload.record_id ? '/admin/api/departments/update.php' : '/admin/api/departments/save.php';
             if (payload.record_id) payload.id = payload.record_id;
