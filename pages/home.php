@@ -407,8 +407,18 @@ foreach ($offersLazyRows as $p) {
     ];
 }
 
-/** اتجاه القائمة والشريط: عربي = يمين لليسار */
-$storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
+/** اتجاه القائمة والشريط يتبع لغة العرض وبيانات مرجعها، عبر عقد الاتجاه المركزي. */
+$listDirKnown = null;
+if (isset($tbState['langOpts'][$lang]) && is_array($tbState['langOpts'][$lang])) {
+    $optDir = (string) ($tbState['langOpts'][$lang]['dir'] ?? '');
+    if ($optDir === 'rtl' || $optDir === 'ltr') {
+        $listDirKnown = $optDir;
+    }
+}
+if (!function_exists('orange_storefront_ui_direction')) {
+    require_once __DIR__ . '/../includes/orange_storefront_ui_readiness.php';
+}
+$storefrontListDir = orange_storefront_ui_direction((string) $lang, $listDirKnown);
 ?>
 <div class="container">
     <section class="hero-banner hero-banner--intro hero-banner--rotator" aria-label="<?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?>">

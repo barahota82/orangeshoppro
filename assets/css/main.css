@@ -4282,20 +4282,21 @@ button.track-signup-cta__btn[hidden] {
 }
 
 /* RTL storefront: right-align text in customer forms (register, checkout, track) */
-html[dir="rtl"] .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="image"]):not([type="reset"]),
-html[dir="rtl"] .field textarea {
+html[dir="rtl"] .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="image"]):not([type="reset"]):not([dir="ltr"]),
+html[dir="rtl"] .field textarea:not([dir="ltr"]) {
     text-align: right;
     direction: rtl;
 }
 
-/* Email / phone / numeric: LTR typing with visual alignment to the right */
+/* Email / phone / numeric / explicit LTR: LTR typing with visual alignment to the right */
 html[dir="rtl"] .field input[type="email"],
 html[dir="rtl"] .field input[type="tel"],
 html[dir="rtl"] .field input[type="number"],
 html[dir="rtl"] .field input[inputmode="email"],
 html[dir="rtl"] .field input[inputmode="tel"],
 html[dir="rtl"] .field input[autocomplete="email"],
-html[dir="rtl"] .field input[autocomplete="tel"] {
+html[dir="rtl"] .field input[autocomplete="tel"],
+html[dir="rtl"] .field input[dir="ltr"] {
     direction: ltr;
     text-align: right;
     unicode-bidi: plaintext;
