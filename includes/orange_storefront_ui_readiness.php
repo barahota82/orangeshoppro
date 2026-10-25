@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 /**
- * Storefront interface readiness comes from get_translations() after pack merge.
+ * Storefront interface readiness uses the in-memory English key set.
+ * Built-in locales are checked from those arrays.
+ * Extra locales come from the pack manifest after the file fingerprint matches
+ * and the body covers the current English contract. A matching hash alone is not readiness.
  * Required keys are the non-empty English pack keys, not a short sample.
  * A locale is ready only when every required key is a non-empty string.
  * Names and direction are not decided here.
@@ -14,10 +17,10 @@ declare(strict_types=1);
  */
 function orange_storefront_ui_required_keys(): array
 {
-    if (!function_exists('get_translations')) {
+    if (!function_exists('orange_storefront_ui_builtin_translations')) {
         return [];
     }
-    $packs = get_translations();
+    $packs = orange_storefront_ui_builtin_translations();
     $keys = [];
     foreach ($packs['en'] ?? [] as $key => $value) {
         if (!is_string($key) || !is_string($value) || trim($value) === '') {
@@ -34,21 +37,30 @@ function orange_storefront_ui_required_keys(): array
  */
 function orange_storefront_ui_live_ready_locales(): array
 {
-    if (!function_exists('get_translations')) {
+    if (!function_exists('orange_storefront_ui_builtin_translations')) {
         return [];
     }
-    $packs = get_translations();
+    $packs = orange_storefront_ui_builtin_translations();
     $required = orange_storefront_ui_required_keys();
     if ($required === []) {
         return [];
     }
     $ready = [];
-    foreach ($packs as $code => $pack) {
-        if (!is_string($code) || !preg_match('/^[a-z]{2,3}$/', $code) || !is_array($pack)) {
-            continue;
-        }
-        if (orange_storefront_ui_pack_covers($pack, $required)) {
+    foreach (['en', 'ar', 'fil', 'hi'] as $code) {
+        $pack = $packs[$code] ?? null;
+        if (is_array($pack) && orange_storefront_ui_pack_covers($pack, $required)) {
             $ready[] = $code;
+        }
+    }
+    $packLib = __DIR__ . '/orange_storefront_ui_packs.php';
+    if (is_file($packLib)) {
+        require_once $packLib;
+    }
+    if (function_exists('orange_storefront_ui_manifest_ready_codes')) {
+        foreach (orange_storefront_ui_manifest_ready_codes() as $code) {
+            if (!in_array($code, $ready, true)) {
+                $ready[] = $code;
+            }
         }
     }
 
@@ -145,6 +157,6 @@ function orange_storefront_ui_inventory(array $catalogCodes): array
         'remaining_in_catalog' => array_values(array_unique($remaining)),
         'dormant_incomplete' => orange_storefront_ui_dormant_incomplete_locales(),
         'dormant_note' => 'includes/i18n/catalogs/v1/fr.php is an empty foundation and is not wired to t(). Listing it is not an implementation.',
-        'live_note' => 'Ready locales are discovered from get_translations() after the pack files are merged. One complete pack does not translate the rest of the catalog.',
+        'live_note' => 'Built-in locales are checked in memory. Extra locales come from the manifest fingerprint, not from loading every pack body. One complete pack does not translate the rest of the catalog.',
     ];
 }

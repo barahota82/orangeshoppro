@@ -236,6 +236,10 @@ function escCartHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
+function orangeBdiLtr(value) {
+    return '<bdi dir="ltr" style="white-space:nowrap">' + escCartHtml(value == null ? '' : String(value)) + '</bdi>';
+}
+
 function escCartAttr(s) {
     return String(s)
         .replace(/&/g, '&amp;')
@@ -1041,8 +1045,8 @@ function orangeBuildConfirmSummaryHtml() {
             inject +=
                 '<div class="cart-mini-total-line cart-mini-total-line--loyalty"><span>' +
                 escCartHtml(loyLbl) +
-                '</span><span>−' +
-                formatMoney(st.loyaltyValue) +
+                '</span><span>' +
+                orangeBdiLtr('−' + formatMoney(st.loyaltyValue)) +
                 '</span></div>';
             totalsHtml = totalsHtml.replace(
                 '<div class="cart-mini-total">',
@@ -1227,16 +1231,17 @@ function orangeUpdateLoyaltyRedeemUI(loyalty) {
     __orangeLoyaltyRedeemPoints = appliedPoints;
     const checked = appliedPoints > 0 ? ' checked' : '';
     const disabled = redeemablePoints > 0 ? '' : ' disabled';
-    const lblBalance = (T.loyalty_balance_label || 'رصيد نقاطك') + ': ' + balance;
-    let lblUse = T.loyalty_use_points_label || 'استخدم نقاطي في هذا الطلب';
+    const lblBalance = escCartHtml(T.loyalty_balance_label || 'رصيد نقاطك') + ': ' + orangeBdiLtr(String(balance));
+    let lblUse = escCartHtml(T.loyalty_use_points_label || 'استخدم نقاطي في هذا الطلب');
     if (redeemablePoints > 0) {
-        lblUse += ' (' + redeemablePoints + ' = ' + formatMoney(Number(loyalty.redeemable_value) || 0) + ')';
+        lblUse += ' ' + orangeBdiLtr('(' + redeemablePoints + ' = ' + formatMoney(Number(loyalty.redeemable_value) || 0) + ')');
     }
     let appliedHtml = '';
     if (appliedValue > 0) {
         appliedHtml = '<p class="cart-loyalty-applied" style="margin:0.35rem 0 0;color:#15803d;">'
-            + (T.loyalty_applied_label || 'خصم النقاط المطبّق') + ': −' + formatMoney(appliedValue)
-            + ' (' + appliedPoints + ')</p>';
+            + escCartHtml(T.loyalty_applied_label || 'خصم النقاط المطبّق') + ': '
+            + orangeBdiLtr('−' + formatMoney(appliedValue))
+            + ' ' + orangeBdiLtr('(' + appliedPoints + ')') + '</p>';
     }
     box.innerHTML =
         '<div class="cart-loyalty-redeem-inner" style="border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;">'

@@ -13,6 +13,12 @@ require_once __DIR__ . '/order_helpers.php';
 function orange_storefront_order_details_plain_language(array $order, array $items, string $langCode): string
 {
     $tr = get_translations();
+    if (!isset($tr[$langCode]) && function_exists('orange_storefront_ui_verified_pack')) {
+        $one = orange_storefront_ui_verified_pack($langCode);
+        if (is_array($one)) {
+            $tr[$langCode] = $one;
+        }
+    }
     $T = $tr[$langCode] ?? $tr['en'];
     $cur = (string) ($T['currency_kd'] ?? 'KD');
     $lines = [];

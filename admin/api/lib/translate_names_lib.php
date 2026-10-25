@@ -22,6 +22,46 @@ if (!function_exists('translate_names_fetch_url')) {
     }
 }
 
+if (!function_exists('orange_translate_names_parse_gtr_body')) {
+    /**
+     * Shared gtx body parser. Empty translation slots and invalid bodies fail closed.
+     *
+     * @return array{ok:bool,reason:string,text:string}
+     */
+    function orange_translate_names_parse_gtr_body($raw)
+    {
+        $fail = static function (string $reason): array {
+            return ['ok' => false, 'reason' => $reason, 'text' => ''];
+        };
+        if (!is_string($raw) || trim($raw) === '') {
+            return $fail('transport_failed');
+        }
+        $j = json_decode($raw, true);
+        $jsonOk = json_last_error() === JSON_ERROR_NONE && is_array($j);
+        if (!$jsonOk || !isset($j[0]) || !is_array($j[0])) {
+            return $fail('response_invalid');
+        }
+        $sawSlot = false;
+        $out = '';
+        foreach ($j[0] as $part) {
+            if (!is_array($part) || !array_key_exists(0, $part)) {
+                continue;
+            }
+            $sawSlot = true;
+            if (!is_string($part[0])) {
+                return $fail('response_invalid');
+            }
+            $out .= $part[0];
+        }
+        $out = trim($out);
+        if ($out === '') {
+            return $fail($sawSlot ? 'response_untranslated' : 'response_invalid');
+        }
+
+        return ['ok' => true, 'reason' => 'translated', 'text' => $out];
+    }
+}
+
 if (!function_exists('orange_translate_names_gtr_result')) {
     /**
      * Current gtx call.
@@ -66,39 +106,18 @@ if (!function_exists('orange_translate_names_gtr_result')) {
         if ($raw === false || $raw === null || !is_string($raw) || trim($raw) === '') {
             return $base;
         }
-        $j = json_decode($raw, true);
-        $jsonOk = json_last_error() === JSON_ERROR_NONE && is_array($j);
-        if (!$jsonOk || !isset($j[0]) || !is_array($j[0])) {
-            $base['reason'] = 'response_invalid';
-
-            return $base;
-        }
-        $sawSlot = false;
-        $out = '';
-        foreach ($j[0] as $p) {
-            if (!is_array($p) || !array_key_exists(0, $p)) {
-                continue;
-            }
-            $sawSlot = true;
-            if (!is_string($p[0])) {
-                $base['reason'] = 'response_invalid';
-                $base['text'] = '';
-
-                return $base;
-            }
-            $out .= $p[0];
-        }
-        $out = trim($out);
-        if ($out === '') {
-            $base['reason'] = $sawSlot ? 'response_untranslated' : 'response_invalid';
-
+        $parsed = orange_translate_names_parse_gtr_body($raw);
+        $base['ok'] = !empty($parsed['ok']);
+        $base['reason'] = (string) ($parsed['reason'] ?? 'response_invalid');
+        $base['text'] = (string) ($parsed['text'] ?? '');
+        if (empty($parsed['ok'])) {
             return $base;
         }
 
         return [
             'ok' => true,
             'reason' => 'translated',
-            'text' => $out,
+            'text' => (string) $parsed['text'],
             'provider_to' => $to,
             'provider_from' => $from,
             'url' => $url,

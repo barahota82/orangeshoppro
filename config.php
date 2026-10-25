@@ -1596,11 +1596,33 @@ function storefront_product_seo_meta_description(array $product): string
     return strlen($plain) > 160 ? substr($plain, 0, 157) . '...' : $plain;
 }
 
-function get_translations(): array {
-    static $orangePackCache = null;
-    if (is_array($orangePackCache)) {
-        return $orangePackCache;
+function orange_storefront_ui_builtin_slot(?array $set = null): ?array
+{
+    static $packs = null;
+    if ($set !== null) {
+        $packs = $set;
     }
+
+    return $packs;
+}
+
+function orange_storefront_ui_builtin_translations(): array
+{
+    $packs = orange_storefront_ui_builtin_slot();
+    if (is_array($packs)) {
+        return $packs;
+    }
+    get_translations();
+    $packs = orange_storefront_ui_builtin_slot();
+
+    return is_array($packs) ? $packs : [];
+}
+
+function get_translations(): array {
+    static $orangeMergedCache = null;
+    static $orangeMergedExtra = '__unset__';
+    static $orangeBuildLock = 0;
+    if (!is_array(orange_storefront_ui_builtin_slot())) {
     $orangeBuiltin = [
         'en' => [
             'home' => 'Home',
@@ -1924,6 +1946,9 @@ function get_translations(): array {
             'storefront_install_modal_intro' => 'The phone will ask you to confirm. The option may be called «Add to Home Screen» or «Install app».',
             'storefront_install_ios_steps' => "1. Tap Share in Safari.\n2. Choose «Add to Home Screen».\n3. Tap Add — the icon opens this store.",
             'storefront_install_other_steps' => "1. Open the browser menu (⋮).\n2. Tap «Install app» or «Add to Home screen».\n3. If you do not see it, look for «Add to Home screen» in the menu.",
+            'loyalty_balance_label' => 'Your points balance',
+            'loyalty_use_points_label' => 'Use my points on this order',
+            'loyalty_applied_label' => 'Points discount applied',
             'storefront_install_close' => 'Got it',
         ],
         'ar' => [
@@ -2248,6 +2273,9 @@ function get_translations(): array {
             'storefront_install_modal_intro' => 'سيظهر لك تأكيد من النظام. قد يُسمّى الخيار «إضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق» حسب المتصفح.',
             'storefront_install_ios_steps' => "1. اضغط «مشاركة» (□↑) في سفاري.\n2. اختر «إضافة إلى الشاشة الرئيسية».\n3. اضغط إضافة — الأيقونة تفتح نفس المتجر.",
             'storefront_install_other_steps' => "1. افتح قائمة المتصفح (⋮).\n2. اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».\n3. إن لم يظهر، ابحث عن «إضافة إلى الشاشة الرئيسية» في القائمة.",
+            'loyalty_balance_label' => 'رصيد نقاطك',
+            'loyalty_use_points_label' => 'استخدم نقاطي في هذا الطلب',
+            'loyalty_applied_label' => 'خصم النقاط المطبّق',
             'storefront_install_close' => 'فهمت',
         ],
         'fil' => [
@@ -2572,6 +2600,9 @@ function get_translations(): array {
             'storefront_install_modal_intro' => 'May magpapakita na kumpirmasyon. Puwedeng «Add to Home Screen» o «Install app» depende sa browser.',
             'storefront_install_ios_steps' => "1. I-tap ang Share (□↑) sa Safari.\n2. Piliin ang «Add to Home Screen».\n3. I-tap Add — ang icon ay bubuksan ang tindahang ito.",
             'storefront_install_other_steps' => "1. Buksan ang browser menu (⋮).\n2. Hanapin ang «Install app» o «Add to Home screen».\n3. Kung wala, hanapin ang «Add to Home screen» sa menu.",
+            'loyalty_balance_label' => 'Ang balanse ng iyong puntos',
+            'loyalty_use_points_label' => 'Gamitin ang aking mga punto sa order na ito',
+            'loyalty_applied_label' => 'Inilapat ang diskwento sa mga puntos',
             'storefront_install_close' => 'Okay',
         ],
         'hi' => [
@@ -2896,18 +2927,48 @@ function get_translations(): array {
             'storefront_install_modal_intro' => 'फ़ोन पुष्टि माँगेगा। विकल्प «Add to Home Screen» या «Install app» जैसा हो सकता है।',
             'storefront_install_ios_steps' => "1. Safari में Share (□↑) टैप करें।\n2. «Add to Home Screen» चुनें।\n3. Add टैप करें — आइकन यही स्टोर खोलेगा।",
             'storefront_install_other_steps' => "1. ब्राउज़र मेनू (⋮) खोलें।\n2. «Install app» या «Add to Home screen» टैप करें।\n3. न दिखे तो मेनू में «Add to Home screen» खोजें।",
+            'loyalty_balance_label' => 'आपके पॉइंट्स का बैलंस',
+            'loyalty_use_points_label' => 'इस ऑर्डर पर अपने पॉइंट्स इस्तेमाल करें',
+            'loyalty_applied_label' => 'पॉइंट्स की छूट लागू हुई',
             'storefront_install_close' => 'समझ गया',
         ],
     ];
-    $orangePackFile = __DIR__ . '/includes/orange_storefront_ui_packs.php';
-    if (is_file($orangePackFile)) {
-        require_once $orangePackFile;
+        orange_storefront_ui_builtin_slot($orangeBuiltin);
     }
-    $orangePackCache = function_exists('orange_storefront_ui_merge_packs')
-        ? orange_storefront_ui_merge_packs($orangeBuiltin)
-        : $orangeBuiltin;
+    $orangeBuiltin = orange_storefront_ui_builtin_slot();
+    if (!is_array($orangeBuiltin)) {
+        return [];
+    }
+    if ($orangeBuildLock > 0) {
+        return $orangeBuiltin;
+    }
+    $orangeBuildLock++;
+    try {
+        $orangePackFile = __DIR__ . '/includes/orange_storefront_ui_packs.php';
+        if (is_file($orangePackFile)) {
+            require_once $orangePackFile;
+        }
+        $extra = function_exists('orange_storefront_ui_active_extra_locale')
+            ? orange_storefront_ui_active_extra_locale()
+            : null;
+        $extraKey = is_string($extra) ? $extra : '';
+        if (is_array($orangeMergedCache) && $orangeMergedExtra === $extraKey) {
+            return $orangeMergedCache;
+        }
+        $merged = $orangeBuiltin;
+        if ($extraKey !== '' && !isset($merged[$extraKey]) && function_exists('orange_storefront_ui_verified_pack')) {
+            $pack = orange_storefront_ui_verified_pack($extraKey);
+            if (is_array($pack)) {
+                $merged[$extraKey] = $pack;
+            }
+        }
+        $orangeMergedCache = $merged;
+        $orangeMergedExtra = $extraKey;
 
-    return $orangePackCache;
+        return $orangeMergedCache;
+    } finally {
+        $orangeBuildLock--;
+    }
 }
 
 function t(string $key): string {
