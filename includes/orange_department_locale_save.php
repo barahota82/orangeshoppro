@@ -8,6 +8,8 @@ declare(strict_types=1);
  * Suggestions from orange_department_suggest() are not written here.
  */
 
+require_once __DIR__ . '/orange_content_languages.php';
+
 function orange_department_rows(PDO $pdo, int $departmentId): array
 {
     $st = $pdo->prepare('SELECT locale_code, text_value, origin, source_locale, source_hash FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ?');
@@ -54,6 +56,7 @@ function orange_department_effective_locales(array $dept, array $stored): array
 
 function orange_department_upsert_locale(PDO $pdo, int $departmentId, string $locale, string $text, string $origin, ?string $sourceLocale, ?string $sourceHash): void
 {
+    orange_language_catalog_assert_live_write($locale);
     $existing = $pdo->prepare('SELECT id FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ? AND locale_code = ?');
     $existing->execute(['department', $departmentId, 'name', $locale]);
     $id = $existing->fetchColumn();
@@ -249,6 +252,15 @@ function orange_department_suggest(string $baseLocale, string $baseText, array $
         $report['suggestions']['base'] = ['ok' => false, 'reason' => 'base_empty', 'apply' => false];
         return $report;
     }
+    $baseStatus = orange_language_catalog_support_status($baseLocale);
+    if ($baseStatus !== 'allow') {
+        $report['suggestions']['base'] = [
+            'ok' => false,
+            'reason' => $baseStatus === 'unresolved' ? 'operational_list_unresolved' : 'removed_locale_refused',
+            'apply' => false,
+        ];
+        return $report;
+    }
     $englishText = '';
     $englishReady = false;
     if ($correctedEnglish !== null) {
@@ -296,6 +308,10 @@ function orange_department_suggest(string $baseLocale, string $baseText, array $
     foreach ($panelLocales as $code) {
         $locale = orange_content_locale_code((string) $code);
         if ($locale === null || $locale === $baseLocale || $locale === 'en') {
+            continue;
+        }
+        if (orange_language_catalog_support_status($locale) !== 'allow') {
+            $report['suggestions'][$locale] = ['ok' => false, 'reason' => 'removed_locale_refused', 'apply' => false];
             continue;
         }
         $current = $known[$locale] ?? null;

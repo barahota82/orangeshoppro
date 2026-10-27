@@ -212,6 +212,9 @@ function orange_department_integration_message(Throwable $e): array
         'base_required' => [422, 'يلزم أساس واحد بالضبط'],
         'multiple_base' => [422, 'لا يمكن حفظ أكثر من أساس'],
         'locale_not_active' => [422, 'اللغة غير نشطة في مرجع اللغات'],
+        'removed_locale_refused' => [422, 'اللغة من اللغات المحذوفة ولا يُقبل دعم جديد لها'],
+        'operational_list_unresolved' => [422, 'قائمة اللغات التشغيلية غير متاحة. لم يُحفظ شيء'],
+        'removed_base_unresolved' => [422, 'لغة الأساس الحالية من اللغات المحذوفة. لا يُستبدل الأساس تلقائياً'],
         'admin_ui_not_ready' => [422, 'واجهة الإدارة تقبل العربية والإنجليزية والفلبينية والهندية فقط'],
         'base_not_in_content' => [422, 'لغة الأساس يجب أن تكون ضمن لغات المحتوى'],
         'role_invalid' => [422, 'دور اللغة غير معروف'],
@@ -243,6 +246,22 @@ function orange_department_integration_handle(PDO $pdo, array $serverAdmin, stri
             if (!$state['tables_present']) {
                 return orange_department_integration_response(false, $state['notice'], 422, ['code' => 'tables_absent']);
             }
+            $currentRoles = orange_country_locale_roles_read($pdo, $countryId);
+            $currentBase = strtolower(trim((string) ($currentRoles['base'] ?? '')));
+            if ($currentBase !== '') {
+                $baseStatus = orange_language_catalog_support_status($currentBase);
+                if ($baseStatus === 'unresolved') {
+                    return orange_department_integration_response(false, 'قائمة اللغات التشغيلية غير متاحة. لم يُحفظ شيء', 422, [
+                        'code' => 'operational_list_unresolved',
+                    ]);
+                }
+                if ($baseStatus === 'removed') {
+                    return orange_department_integration_response(false, 'لغة الأساس الحالية من اللغات المحذوفة. لا يُستبدل الأساس تلقائياً.', 422, [
+                        'code' => 'removed_base_unresolved',
+                        'base' => $currentBase,
+                    ]);
+                }
+            }
             $assignments = is_array($data['assignments'] ?? null) ? $data['assignments'] : [];
             $drops = is_array($data['drop_customer'] ?? null) ? $data['drop_customer'] : [];
             $assignments = orange_country_locale_customer_save_policy($pdo, $countryId, $assignments, $drops);
@@ -257,11 +276,21 @@ function orange_department_integration_handle(PDO $pdo, array $serverAdmin, stri
             } else {
                 $message = 'حُفظ اختيار الأدوار. الإعداد غير صالح لقائمة الزائر، ولا تُعرض اللغات الأربع. لغة واجهة البرنامج لم تتغير.';
             }
+            $retained = [];
+            $left = $pdo->prepare('SELECT locale_code, role FROM orange_country_locale_role WHERE country_id = ? ORDER BY locale_code ASC, role ASC');
+            $left->execute([$countryId]);
+            foreach ($left->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                $keptCode = orange_content_locale_code((string) ($row['locale_code'] ?? ''));
+                if ($keptCode !== null && orange_language_catalog_support_status($keptCode) === 'removed') {
+                    $retained[] = ['locale' => $keptCode, 'role' => (string) ($row['role'] ?? '')];
+                }
+            }
             return orange_department_integration_response(true, $message, 200, [
                 'state' => $saved,
                 'customer_wired' => $wired,
                 'visitor_list_activated' => $wired,
                 'admin_ui_language_changed' => false,
+                'retained_removed_roles' => $retained,
             ]);
         }
         if ($action === 'suggest') {

@@ -485,6 +485,7 @@ function orange_dictionary_locale_preview(PDO $pdo, int $countryId, string $kind
 
 function orange_dictionary_locale_upsert(PDO $pdo, string $kind, int $entityId, string $locale, string $text, string $origin, ?string $sourceLocale, ?string $sourceHash): void
 {
+    orange_language_catalog_assert_live_write($locale);
     $field = orange_dictionary_locale_spec($kind)['field'];
     $existing = $pdo->prepare('SELECT id FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ? AND locale_code = ?');
     $existing->execute([$kind, $entityId, $field, $locale]);

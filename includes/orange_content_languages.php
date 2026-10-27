@@ -83,7 +83,7 @@ function orange_language_reference_active_codes(PDO $pdo): array
     $out = [];
     foreach ($st ? $st->fetchAll(PDO::FETCH_COLUMN) : [] as $code) {
         $locale = orange_content_locale_code((string) $code);
-        if ($locale !== null) {
+        if ($locale !== null && orange_language_catalog_stored_code_operational($locale)) {
             $out[] = $locale;
         }
     }
@@ -92,8 +92,16 @@ function orange_language_reference_active_codes(PDO $pdo): array
 
 function orange_language_reference_is_active(PDO $pdo, string $locale): bool
 {
+    $status = orange_language_catalog_support_status($locale);
+    if ($status === 'unresolved') {
+        throw new RuntimeException('operational_list_unresolved');
+    }
+    if ($status !== 'allow') {
+        return false;
+    }
     $st = $pdo->prepare('SELECT is_active FROM orange_language_reference WHERE locale_code = ?');
     $st->execute([$locale]);
+
     return (int) $st->fetchColumn() === 1;
 }
 
@@ -109,6 +117,13 @@ function orange_country_locale_roles_replace(PDO $pdo, int $countryId, array $as
         $role = (string) ($item['role'] ?? '');
         if ($locale === null || !in_array($role, ['base', 'content', 'admin_ui', 'customer'], true)) {
             throw new InvalidArgumentException('role_invalid');
+        }
+        $status = orange_language_catalog_support_status($locale);
+        if ($status === 'unresolved') {
+            throw new RuntimeException('operational_list_unresolved');
+        }
+        if ($status !== 'allow') {
+            throw new RuntimeException('removed_locale_refused');
         }
         if (!orange_language_reference_is_active($pdo, $locale)) {
             throw new RuntimeException('locale_not_active');
@@ -143,10 +158,26 @@ function orange_country_locale_roles_replace(PDO $pdo, int $countryId, array $as
     if ($bases[0] !== 'en' && !orange_language_reference_is_active($pdo, 'en')) {
         throw new RuntimeException('english_reference_inactive');
     }
+    $baseLook = $pdo->prepare('SELECT locale_code FROM orange_country_locale_role WHERE country_id = ? AND role = ?');
+    $baseLook->execute([$countryId, 'base']);
+    foreach ($baseLook->fetchAll(PDO::FETCH_COLUMN) ?: [] as $existingBase) {
+        $existingStatus = orange_language_catalog_support_status((string) $existingBase);
+        if ($existingStatus === 'unresolved') {
+            throw new RuntimeException('operational_list_unresolved');
+        }
+        if ($existingStatus === 'removed') {
+            throw new RuntimeException('removed_base_unresolved');
+        }
+    }
+    $operational = orange_language_catalog_operational_codes();
+    if ($operational === []) {
+        throw new RuntimeException('operational_list_unresolved');
+    }
     $pdo->beginTransaction();
     try {
-        $del = $pdo->prepare('DELETE FROM orange_country_locale_role WHERE country_id = ?');
-        $del->execute([$countryId]);
+        $marks = implode(',', array_fill(0, count($operational), '?'));
+        $del = $pdo->prepare('DELETE FROM orange_country_locale_role WHERE country_id = ? AND locale_code IN (' . $marks . ')');
+        $del->execute(array_merge([$countryId], $operational));
         $ins = $pdo->prepare('INSERT INTO orange_country_locale_role (country_id, locale_code, role, sort_order) VALUES (?, ?, ?, ?)');
         foreach ($rows as $row) {
             $ins->execute([$countryId, $row[0], $row[1], $row[2]]);
@@ -167,8 +198,10 @@ function orange_country_locale_roles_replace(PDO $pdo, int $countryId, array $as
 
 /**
  * A disabled unready customer box is not an instruction to delete the stored role.
- * A new unready customer role is not activated. Removal happens only through
- * an explicit drop list. Ready customer roles follow the submitted checkboxes.
+ * A new unready customer role is not activated. Ready customer roles follow the
+ * submitted checkboxes. A stored role outside the operational list stays in
+ * place: it is not deleted here and it is not written again as a new acceptance.
+ * An explicit assignment of a removed code is refused before any delete.
  *
  * @param list<array<string,mixed>> $assignments
  * @param list<mixed> $explicitDrops
@@ -197,6 +230,15 @@ function orange_country_locale_customer_save_policy(PDO $pdo, int $countryId, ar
         }
         $locale = orange_content_locale_code((string) ($item['locale'] ?? ''));
         $role = (string) ($item['role'] ?? '');
+        if ($locale !== null) {
+            $status = orange_language_catalog_support_status($locale);
+            if ($status === 'unresolved') {
+                throw new RuntimeException('operational_list_unresolved');
+            }
+            if ($status === 'removed') {
+                throw new RuntimeException('removed_locale_refused');
+            }
+        }
         if ($locale === null || $role !== 'customer') {
             $out[] = $item;
             continue;
@@ -211,6 +253,9 @@ function orange_country_locale_customer_save_policy(PDO $pdo, int $countryId, ar
         $keptCustomer[$locale] = true;
     }
     foreach (array_keys($existing) as $locale) {
+        if (orange_language_catalog_support_status((string) $locale) !== 'allow') {
+            continue;
+        }
         if (isset($ready[$locale]) || isset($drops[$locale]) || isset($keptCustomer[$locale])) {
             continue;
         }
@@ -313,6 +358,13 @@ function orange_language_catalog(PDO $pdo): array
         'entries' => [],
         'names_available' => false,
     ];
+    if (orange_language_catalog_support_status('en') === 'unresolved') {
+        return [
+            'source' => 'operational_list_unresolved',
+            'entries' => [],
+            'names_available' => false,
+        ];
+    }
     try {
         $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         if ($driver === 'sqlite') {
@@ -368,7 +420,7 @@ function orange_language_catalog(PDO $pdo): array
     $seen = [];
     foreach ($fetched ?: [] as $row) {
         $code = orange_content_locale_code((string) ($row['locale_code'] ?? ''));
-        if ($code === null || isset($seen[$code])) {
+        if ($code === null || isset($seen[$code]) || !orange_language_catalog_stored_code_operational($code)) {
             continue;
         }
         $seen[$code] = true;
@@ -403,6 +455,45 @@ function orange_language_catalog(PDO $pdo): array
     ];
 }
 
+function orange_language_catalog_support_status(string $code, ?string $catalogPath = null): string
+{
+    $path = $catalogPath ?? (__DIR__ . '/orange_language_catalog_data.php');
+    if ($catalogPath !== null && !is_file($catalogPath)) {
+        return 'unresolved';
+    }
+    if (!function_exists('orange_language_catalog_code_operational')) {
+        if (!is_file($path)) {
+            return 'unresolved';
+        }
+        require_once $path;
+    }
+    if (!function_exists('orange_language_catalog_code_operational')) {
+        return 'unresolved';
+    }
+    $normalized = strtolower(trim($code));
+    if ($normalized === '' || !orange_language_catalog_code_operational($normalized)) {
+        return 'removed';
+    }
+
+    return 'allow';
+}
+
+function orange_language_catalog_assert_live_write(string $code): void
+{
+    $status = orange_language_catalog_support_status($code);
+    if ($status === 'unresolved') {
+        throw new RuntimeException('operational_list_unresolved');
+    }
+    if ($status !== 'allow') {
+        throw new RuntimeException('removed_locale_refused');
+    }
+}
+
+function orange_language_catalog_stored_code_operational(string $code): bool
+{
+    return orange_language_catalog_support_status($code) === 'allow';
+}
+
 function orange_content_customer_ready(string $locale): bool
 {
     $code = orange_content_locale_code($locale);
@@ -413,5 +504,6 @@ function orange_content_customer_ready(string $locale): bool
         require_once __DIR__ . '/orange_storefront_ui_readiness.php';
     }
 
-    return in_array($code, orange_storefront_ui_live_ready_locales(), true);
+    return in_array($code, orange_storefront_ui_live_ready_locales(), true)
+        && orange_language_catalog_stored_code_operational($code);
 }

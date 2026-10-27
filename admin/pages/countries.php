@@ -323,7 +323,9 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     <?php if (empty($ctryLocale['tables_present'])): ?>
     <p>لا يُعرض نموذج الحفظ لأن الجداول غير موجودة. فتح الصفحة لا ينشئها ولا يفترض أن الدولة عربية.</p>
     <?php elseif ($ctryEntries === []): ?>
-    <?php if (($ctryCatalog['source'] ?? '') === 'absent'): ?>
+    <?php if (($ctryCatalog['source'] ?? '') === 'operational_list_unresolved'): ?>
+    <p>قائمة اللغات التشغيلية غير متاحة. لم يُحفظ شيء ولن تُحذف الأدوار المخزنة.</p>
+    <?php elseif (($ctryCatalog['source'] ?? '') === 'absent'): ?>
     <p>مرجع اللغات غير متاح في هذا الاتصال. فتح الصفحة لا ينشئه.</p>
     <?php else: ?>
     <p>مرجع اللغات لا يضم لغة نشطة يمكن اختيارها. لا يُفترض العربية.</p>

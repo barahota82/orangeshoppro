@@ -2,124 +2,61 @@
 declare(strict_types=1);
 
 /**
- * Local curated map for orange_language_reference.
+ * Operational language map for orange_language_reference.
  *
- * The rows are a maintained local selection of codes this project is willing
- * to store and to send as tl on the current gtx endpoint. Membership in this
- * map is not proof that the external service accepts the code, and it is not
- * a dated export of every language that service offers. fil is stored as fil
- * and sent as tl. The country screen reads the table. This file does not run
- * on page open and does not assign country roles.
+ * Owner decision 2026-10-26: these 41 codes are the only operational list.
+ * import_missing inserts a code only when it is in this map and absent from
+ * the table. A restored row whose code is absent from this map is not offered,
+ * is not a new role, and is not deleted by this file. fil is stored as fil
+ * and sent as tl. This file does not run on page open, does not assign
+ * country roles, and does not change a stored base language.
  *
  * @return list<array{code:string,provider:string,dir:string,label:string,native:string,aliases:list<string>}>
  */
 function orange_language_catalog_data(): array
 {
     $rows = [
-        ['af', 'af', 'ltr', 'Afrikaans', 'Afrikaans', []],
-        ['am', 'am', 'ltr', 'Amharic', 'አማርኛ', []],
         ['ar', 'ar', 'rtl', 'Arabic', 'العربية', []],
-        ['az', 'az', 'ltr', 'Azerbaijani', 'Azərbaycan', []],
         ['be', 'be', 'ltr', 'Belarusian', 'Беларуская', []],
         ['bg', 'bg', 'ltr', 'Bulgarian', 'Български', []],
         ['bn', 'bn', 'ltr', 'Bengali', 'বাংলা', []],
-        ['bs', 'bs', 'ltr', 'Bosnian', 'Bosanski', []],
-        ['ca', 'ca', 'ltr', 'Catalan', 'Català', []],
-        ['ceb', 'ceb', 'ltr', 'Cebuano', 'Cebuano', []],
-        ['co', 'co', 'ltr', 'Corsican', 'Corsu', []],
         ['cs', 'cs', 'ltr', 'Czech', 'Čeština', []],
-        ['cy', 'cy', 'ltr', 'Welsh', 'Cymraeg', []],
         ['da', 'da', 'ltr', 'Danish', 'Dansk', []],
         ['de', 'de', 'ltr', 'German', 'Deutsch', []],
         ['el', 'el', 'ltr', 'Greek', 'Ελληνικά', []],
         ['en', 'en', 'ltr', 'English', 'English', []],
-        ['eo', 'eo', 'ltr', 'Esperanto', 'Esperanto', []],
         ['es', 'es', 'ltr', 'Spanish', 'Español', []],
-        ['et', 'et', 'ltr', 'Estonian', 'Eesti', []],
-        ['eu', 'eu', 'ltr', 'Basque', 'Euskara', []],
         ['fa', 'fa', 'rtl', 'Persian', 'فارسی', []],
-        ['fi', 'fi', 'ltr', 'Finnish', 'Suomi', []],
         ['fil', 'tl', 'ltr', 'Filipino', 'Filipino', ['tl']],
         ['fr', 'fr', 'ltr', 'French', 'Français', []],
-        ['fy', 'fy', 'ltr', 'Frisian', 'Frysk', []],
         ['ga', 'ga', 'ltr', 'Irish', 'Gaeilge', []],
-        ['gd', 'gd', 'ltr', 'Scottish Gaelic', 'Gàidhlig', []],
-        ['gl', 'gl', 'ltr', 'Galician', 'Galego', []],
-        ['gu', 'gu', 'ltr', 'Gujarati', 'ગુજરાતી', []],
-        ['ha', 'ha', 'ltr', 'Hausa', 'Hausa', []],
-        ['haw', 'haw', 'ltr', 'Hawaiian', 'Ōlelo Hawaiʻi', []],
         ['he', 'he', 'rtl', 'Hebrew', 'עברית', ['iw']],
         ['hi', 'hi', 'ltr', 'Hindi', 'हिन्दी', []],
-        ['hmn', 'hmn', 'ltr', 'Hmong', 'Hmoob', []],
         ['hr', 'hr', 'ltr', 'Croatian', 'Hrvatski', []],
-        ['ht', 'ht', 'ltr', 'Haitian Creole', 'Kreyòl Ayisyen', []],
-        ['hu', 'hu', 'ltr', 'Hungarian', 'Magyar', []],
         ['hy', 'hy', 'ltr', 'Armenian', 'Հայերեն', []],
         ['id', 'id', 'ltr', 'Indonesian', 'Bahasa Indonesia', []],
-        ['ig', 'ig', 'ltr', 'Igbo', 'Igbo', []],
         ['is', 'is', 'ltr', 'Icelandic', 'Íslenska', []],
         ['it', 'it', 'ltr', 'Italian', 'Italiano', []],
         ['ja', 'ja', 'ltr', 'Japanese', '日本語', []],
-        ['jv', 'jv', 'ltr', 'Javanese', 'Basa Jawa', []],
         ['ka', 'ka', 'ltr', 'Georgian', 'ქართული', []],
-        ['kk', 'kk', 'ltr', 'Kazakh', 'Қазақ тілі', []],
-        ['km', 'km', 'ltr', 'Khmer', 'ខ្មែរ', []],
         ['kn', 'kn', 'ltr', 'Kannada', 'ಕನ್ನಡ', []],
         ['ko', 'ko', 'ltr', 'Korean', '한국어', []],
-        ['ku', 'ku', 'ltr', 'Kurdish', 'Kurdî', []],
-        ['ky', 'ky', 'ltr', 'Kyrgyz', 'Кыргызча', []],
-        ['lb', 'lb', 'ltr', 'Luxembourgish', 'Lëtzebuergesch', []],
-        ['lo', 'lo', 'ltr', 'Lao', 'ລາວ', []],
-        ['lt', 'lt', 'ltr', 'Lithuanian', 'Lietuvių', []],
-        ['lv', 'lv', 'ltr', 'Latvian', 'Latviešu', []],
-        ['mg', 'mg', 'ltr', 'Malagasy', 'Malagasy', []],
-        ['mi', 'mi', 'ltr', 'Maori', 'Māori', []],
-        ['mk', 'mk', 'ltr', 'Macedonian', 'Македонски', []],
-        ['ml', 'ml', 'ltr', 'Malayalam', 'മലയാളം', []],
-        ['mn', 'mn', 'ltr', 'Mongolian', 'Монгол', []],
-        ['mr', 'mr', 'ltr', 'Marathi', 'मराठी', []],
-        ['ms', 'ms', 'ltr', 'Malay', 'Bahasa Melayu', []],
-        ['mt', 'mt', 'ltr', 'Maltese', 'Malti', []],
-        ['my', 'my', 'ltr', 'Myanmar', 'မြန်မာ', []],
         ['ne', 'ne', 'ltr', 'Nepali', 'नेपाली', []],
         ['nl', 'nl', 'ltr', 'Dutch', 'Nederlands', []],
         ['no', 'no', 'ltr', 'Norwegian', 'Norsk', []],
-        ['ny', 'ny', 'ltr', 'Nyanja', 'Chichewa', []],
-        ['or', 'or', 'ltr', 'Odia', 'ଓଡ଼ିଆ', []],
-        ['pa', 'pa', 'ltr', 'Punjabi', 'ਪੰਜਾਬੀ', []],
         ['pl', 'pl', 'ltr', 'Polish', 'Polski', []],
-        ['ps', 'ps', 'rtl', 'Pashto', 'پښتو', []],
         ['pt', 'pt', 'ltr', 'Portuguese', 'Português', []],
         ['ro', 'ro', 'ltr', 'Romanian', 'Română', []],
         ['ru', 'ru', 'ltr', 'Russian', 'Русский', []],
-        ['rw', 'rw', 'ltr', 'Kinyarwanda', 'Kinyarwanda', []],
-        ['sd', 'sd', 'rtl', 'Sindhi', 'سنڌي', []],
         ['si', 'si', 'ltr', 'Sinhala', 'සිංහල', []],
-        ['sk', 'sk', 'ltr', 'Slovak', 'Slovenčina', []],
-        ['sl', 'sl', 'ltr', 'Slovenian', 'Slovenščina', []],
-        ['sm', 'sm', 'ltr', 'Samoan', 'Gagana Samoa', []],
-        ['sn', 'sn', 'ltr', 'Shona', 'chiShona', []],
         ['so', 'so', 'ltr', 'Somali', 'Soomaali', []],
-        ['sq', 'sq', 'ltr', 'Albanian', 'Shqip', []],
-        ['sr', 'sr', 'ltr', 'Serbian', 'Српски', []],
-        ['st', 'st', 'ltr', 'Sesotho', 'Sesotho', []],
-        ['su', 'su', 'ltr', 'Sundanese', 'Basa Sunda', []],
         ['sv', 'sv', 'ltr', 'Swedish', 'Svenska', []],
-        ['sw', 'sw', 'ltr', 'Swahili', 'Kiswahili', []],
-        ['ta', 'ta', 'ltr', 'Tamil', 'தமிழ்', []],
-        ['te', 'te', 'ltr', 'Telugu', 'తెలుగు', []],
-        ['tg', 'tg', 'ltr', 'Tajik', 'Тоҷикӣ', []],
         ['th', 'th', 'ltr', 'Thai', 'ไทย', []],
         ['tr', 'tr', 'ltr', 'Turkish', 'Türkçe', []],
         ['uk', 'uk', 'ltr', 'Ukrainian', 'Українська', []],
         ['ur', 'ur', 'rtl', 'Urdu', 'اردو', []],
-        ['uz', 'uz', 'ltr', 'Uzbek', 'Oʻzbek', []],
         ['vi', 'vi', 'ltr', 'Vietnamese', 'Tiếng Việt', []],
-        ['xh', 'xh', 'ltr', 'Xhosa', 'isiXhosa', []],
-        ['yi', 'yi', 'rtl', 'Yiddish', 'ייִדיש', []],
-        ['yo', 'yo', 'ltr', 'Yoruba', 'Yorùbá', []],
         ['zh', 'zh-CN', 'ltr', 'Chinese', '中文', []],
-        ['zu', 'zu', 'ltr', 'Zulu', 'isiZulu', []],
     ];
     $out = [];
     foreach ($rows as $row) {
@@ -158,6 +95,31 @@ function orange_language_catalog_provider_map(): array
 /**
  * @return list<string>
  */
+
+/**
+ * Operational codes. Membership is this map, not a restored database row.
+ *
+ * @return list<string>
+ */
+function orange_language_catalog_operational_codes(): array
+{
+    $codes = [];
+    foreach (orange_language_catalog_data() as $row) {
+        $codes[] = $row['code'];
+    }
+
+    return $codes;
+}
+
+function orange_language_catalog_code_operational(string $code): bool
+{
+    static $set = null;
+    if ($set === null) {
+        $set = array_fill_keys(orange_language_catalog_operational_codes(), true);
+    }
+
+    return isset($set[strtolower(trim($code))]);
+}
 function orange_language_catalog_reference_columns(PDO $pdo): array
 {
     try {
@@ -286,8 +248,8 @@ function orange_language_catalog_unexecuted_sql(): string
     $lines[] = '-- named in the INSERT below. Confirm DATABASE() and those columns with a';
     $lines[] = '-- targeted read before any later run. scripts/orange_db.sql does not contain';
     $lines[] = '-- this table; that absence is not proof the live columns are missing.';
-    $lines[] = '-- Source: the local curated map in includes/orange_language_catalog_data.php.';
-    $lines[] = '-- Map membership is not a dated export of every language the service offers.';
+    $lines[] = '-- Source: the 41-code operational map in includes/orange_language_catalog_data.php.';
+    $lines[] = '-- This statement does not delete codes that are outside the map.';
     $lines[] = '-- Structure check before any later run: locale_code, label_en, label_native,';
     $lines[] = '-- aliases_json, dir, is_active, sort_order, created_at, updated_at.';
     $lines[] = '-- If one of those columns is absent, stop. This file does not add columns.';

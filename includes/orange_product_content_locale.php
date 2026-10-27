@@ -583,6 +583,7 @@ function orange_product_content_locale_name_conflict(PDO $pdo, int $productTypeI
 
 function orange_product_content_locale_upsert(PDO $pdo, int $entityId, string $field, string $locale, string $text, string $origin, ?string $sourceLocale, ?string $sourceHash): void
 {
+    orange_language_catalog_assert_live_write($locale);
     $existing = $pdo->prepare('SELECT id FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ? AND locale_code = ?');
     $existing->execute([ORANGE_PRODUCT_CONTENT_KIND, $entityId, $field, $locale]);
     $id = $existing->fetchColumn();

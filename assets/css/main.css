@@ -332,6 +332,10 @@ h1, h2, h3, .brand-text h1 {
     box-shadow: var(--card-shadow-hover);
     /* فوق الشريط السفلي المثبت (9999) حتى لا تُقص القائمة */
     z-index: 10020;
+    /* القائمة الطويلة تُمرَّر داخلها. الصفحة القصيرة لا تُستخدم بديلاً عن ذلك. */
+    max-height: calc(100dvh - 8.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .lang-dropdown__option {

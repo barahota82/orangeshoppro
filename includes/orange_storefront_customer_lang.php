@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/orange_content_languages.php';
 require_once __DIR__ . '/orange_storefront_ui_readiness.php';
+require_once __DIR__ . '/orange_language_catalog_data.php';
 
 /**
  * Live interface packs. This is not the language catalog.
@@ -36,6 +37,9 @@ function orange_storefront_customer_ui_ready(array $catalogEntries = []): array
     ];
     $out = [];
     foreach (orange_storefront_ui_live_ready_locales() as $code) {
+        if (!orange_language_catalog_code_operational($code)) {
+            continue;
+        }
         $ref = $catalogEntries[$code] ?? null;
         $native = is_array($ref) ? trim((string) ($ref['native'] ?? '')) : '';
         $catalogDir = is_array($ref) ? (string) ($ref['dir'] ?? '') : null;

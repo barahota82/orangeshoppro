@@ -157,6 +157,7 @@ function orange_content_locale_field_effective(array $record, array $stored): ar
 
 function orange_content_locale_field_upsert(PDO $pdo, string $entityKind, int $entityId, string $locale, string $text, string $origin, ?string $sourceLocale, ?string $sourceHash): void
 {
+    orange_language_catalog_assert_live_write($locale);
     $existing = $pdo->prepare('SELECT id FROM orange_content_locale_text WHERE entity_kind = ? AND entity_id = ? AND field_key = ? AND locale_code = ?');
     $existing->execute([$entityKind, $entityId, 'text', $locale]);
     $id = $existing->fetchColumn();

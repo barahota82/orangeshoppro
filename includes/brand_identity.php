@@ -505,8 +505,23 @@ function orange_brand_identity_language_reference(PDO $controlPdo): array
     }
 
     $activeRaw = [];
+    if (!function_exists('orange_language_catalog_support_status')) {
+        require_once __DIR__ . '/orange_content_languages.php';
+    }
+    if (orange_language_catalog_support_status('en') === 'unresolved') {
+        return orange_brand_identity_language_reference_pack(
+            'operational_list_unresolved',
+            false,
+            true,
+            'operational_list_unresolved',
+            []
+        );
+    }
     foreach ($rows as $row) {
         if ((int) ($row['is_active'] ?? 0) !== 1) {
+            continue;
+        }
+        if (!orange_language_catalog_code_operational((string) ($row['code'] ?? ''))) {
             continue;
         }
         $decoded = orange_brand_identity_decode_aliases_json((string) ($row['aliases_json'] ?? ''));
@@ -621,6 +636,10 @@ function orange_brand_identity_assert_reference_locale(PDO $controlPdo, string $
     if ($loc === null) {
         throw new RuntimeException('BRAND_IDENTITY_UNSUPPORTED_LOCALE');
     }
+    if (!function_exists('orange_language_catalog_assert_live_write')) {
+        require_once __DIR__ . '/orange_content_languages.php';
+    }
+    orange_language_catalog_assert_live_write($loc);
     $codes = orange_brand_identity_reference_locale_codes($controlPdo);
     if (!in_array($loc, $codes, true)) {
         throw new RuntimeException('BRAND_IDENTITY_UNSUPPORTED_LOCALE');
