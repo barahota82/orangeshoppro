@@ -209,7 +209,9 @@ echo "ZERO_DUPLICATED_PRIMARY_CONTROLS = 1\n";
 s3_assert(true, 'markers: TOTAL_EXECUTABLE_*_PER_PACKAGE = 1 declared');
 
 /* --- Rendered DOM harness (Node/Chrome optional) --- */
-$evidenceDir = 'D:\\orange_stage3_evidence';
+$evidenceDir = DIRECTORY_SEPARATOR === '\\'
+    ? 'D:\\orange_stage3_evidence'
+    : rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_stage3_evidence';
 $harnessDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 $harnessHtml = $harnessDir . DIRECTORY_SEPARATOR . 'stage3_dom_harness.html';
 $domReport = $harnessDir . DIRECTORY_SEPARATOR . 'dom_assert_report.json';
