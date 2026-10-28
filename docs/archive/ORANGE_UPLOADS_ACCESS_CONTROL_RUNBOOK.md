@@ -24,10 +24,9 @@ These paths are used by the storefront, admin previews, and printed documents. *
 | Web path | Usage |
 |----------|--------|
 | `uploads/products/` | Product images (`storefront_product_image_web_path`, catalog cards, product pages) |
-| `uploads/channels/` | Channel logos (storefront header, admin channel settings) |
 | `uploads/company/` | Company logo on invoices, sales print, company settings preview |
 
-**Verification (after merge):** open a known product image URL, channel logo URL, and company logo URL in a browser without admin login — expect **200** and image content.
+**Verification (after merge):** open a known product image URL and company logo URL in a browser without admin login — expect **200** and image content.
 
 ---
 
@@ -119,7 +118,6 @@ Without admin login:
 | Test URL | Expected |
 |----------|----------|
 | `{base}/uploads/products/{known_product_image}` | **200** |
-| `{base}/uploads/channels/{known_channel_logo}` | **200** |
 | `{base}/uploads/company/{known_company_logo}` | **200** |
 
 Also spot-check storefront home/category pages and a printed invoice preview for broken images.
