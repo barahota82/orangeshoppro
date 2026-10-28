@@ -45,7 +45,6 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'recovery_validation.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
 
-const STEP5_XR_SESSION = 'orange_step5_xr_shared_session_v1';
 const STEP5_XR_PASSWORD = 'restore-test-password';
 
 $failures = 0;
@@ -84,11 +83,6 @@ function step5_xr_rmtree(string $dir): void
         }
     }
     @rmdir($dir);
-}
-
-function step5_xr_expected_session_hash(): string
-{
-    return hash('sha256', STEP5_XR_SESSION);
 }
 
 /**
@@ -704,7 +698,6 @@ step5_xr_test($grantCount === 2, 'matrix6: single approval forensic pair (no dup
 
 // ========== Matrix 8: country fence ==========
 step5_xr_reset_work_root($workRoot);
-$countryBlocked = false;
 $jobCountry = orange_restore_fw_create($workRoot, [
     'package_id' => '2026-08-15_130000',
     'package_type' => 'country_recovery',
@@ -724,11 +717,6 @@ orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot,
     'dry_run_fingerprint' => 'y',
 ]));
 // Minimal plan + dry artifacts insufficient — expect country or earlier fence
-try {
-    orange_restore_final_approval_precheck($workRoot, $cid, $backupRoot, $admin, $pdo, true);
-} catch (Throwable $e) {
-    $countryBlocked = true;
-}
 $preC = orange_restore_final_approval_precheck($workRoot, $cid, $backupRoot, $admin, $pdo, true);
 step5_xr_test(
     ($preC['ok'] ?? true) === false
