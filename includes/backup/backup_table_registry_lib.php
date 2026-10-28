@@ -147,14 +147,27 @@ function orange_backup_registry_parse_sql_dump_tables(string $dumpPath): array
     if (!is_file($dumpPath)) {
         throw new RuntimeException('SQL dump not found: ' . $dumpPath);
     }
-    $raw = file_get_contents($dumpPath);
-    if ($raw === false) {
+    $handle = fopen($dumpPath, 'rb');
+    if ($handle === false) {
         throw new RuntimeException('Cannot read SQL dump: ' . $dumpPath);
     }
-    if (!preg_match_all('/CREATE TABLE `([^`]+)`/i', $raw, $matches)) {
+
+    $names = [];
+    try {
+        while (($line = fgets($handle)) !== false) {
+            if (preg_match('/CREATE TABLE (?:IF NOT EXISTS )?`([^`]+)`/i', $line, $match)) {
+                $names[] = $match[1];
+            }
+        }
+    } finally {
+        fclose($handle);
+    }
+
+    if ($names === []) {
         return [];
     }
-    $names = array_values(array_unique($matches[1]));
+
+    $names = array_values(array_unique($names));
     sort($names, SORT_STRING);
 
     return $names;

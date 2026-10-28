@@ -3,7 +3,7 @@
 **Document type:** Engineering archive — operational runbook  
 **Scope:** PR-BAK-01, PR-BAK-02 — backup and pre-migration snapshot foundation  
 **Implementation:** `scripts/backup/run_full_backup.php` (primary — Plesk Scheduled Tasks) and `scripts/backup/orange_backup.ps1` (optional — RDP/command line)  
-**Phase 1A (current):** Full disaster backup only — database + uploads + manifest + checksums + health report
+**Current implemented phases:** Phase 1A full disaster backup — database + uploads + manifest + checksums + health report — plus Phase 1B.1 table registry inventory only. Country Recovery Package export is still deferred.
 
 ---
 
@@ -28,7 +28,7 @@ Pre-flight (read-only):
 php D:\orange\scripts\backup\backup_environment_check.php
 ```
 
-The PHP entry point handles locking, backend selection, logging under `{BackupRoot}/logs/`, and delegates to PowerShell only when explicitly executable; otherwise it uses **PHP + mysqldump via `proc_open`**.
+The PHP entry point handles locking, backend selection, logging under `{BackupRoot}/logs/`, and delegates to PowerShell only when explicitly executable; otherwise it uses **PHP + mysqldump via `proc_open`**, with the guarded PDO SQL fallback only when mysqldump is unavailable and PDO preflight permits it.
 
 **Required server-only `.env.php` keys (Plesk example):**
 
@@ -39,7 +39,7 @@ The PHP entry point handles locking, backend selection, logging under `{BackupRo
 // 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 ```
 
-Create the BackupRoot folder outside `httpdocs`, grant write permission to the scheduled-task PHP user, and verify `proc_open` is enabled. If `proc_open` is disabled, the scheduled task **must fail** — there is no PDO fallback in Phase 1A.
+Create the BackupRoot folder outside `httpdocs`, grant write permission to the scheduled-task PHP user, and verify `proc_open` is enabled for the preferred mysqldump path. If PowerShell/mysqldump cannot run and the PDO fallback preflight is not safe, the scheduled task **must fail closed**.
 
 ---
 
