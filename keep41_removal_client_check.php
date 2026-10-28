@@ -44,6 +44,30 @@ function keep41_proc_open_blocked(): bool
 /**
  * @return array{exit_code:int,stdout:string,stderr:string,timed_out:bool}
  */
+function keep41_redact_text(string $text): string
+{
+    $text = str_replace("\0", '', $text);
+    $text = preg_replace('/([a-z][a-z0-9+.-]*:\/\/)[^\s@\/]+:[^\s@\/]+@/i', '$1[redacted]@', $text) ?? $text;
+    $text = preg_replace('/\b(password|passwd|pwd|secret|token|api[_-]?key)\b(\s*[=:]\s*)(\S+)/i', '$1$2[redacted]', $text) ?? $text;
+    $text = preg_replace('/\b(identified\s+by\s+)(\S+)/i', '$1[redacted]', $text) ?? $text;
+    $text = preg_replace('/(--password(?:=|\s+))(\S+)/i', '$1[redacted]', $text) ?? $text;
+
+    return $text;
+}
+
+function keep41_one_line(string $text, int $limit = 400): string
+{
+    $text = keep41_redact_text($text);
+    $text = str_replace(["\r\n", "\r", "\n"], ' ', $text);
+    $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+    $text = trim($text);
+    if (strlen($text) > $limit) {
+        return substr($text, 0, $limit) . '...';
+    }
+
+    return $text;
+}
+
 function keep41_capture(array $command, int $timeoutSeconds = 15): array
 {
     $empty = ['exit_code' => -1, 'stdout' => '', 'stderr' => '', 'timed_out' => false];
@@ -64,9 +88,9 @@ function keep41_capture(array $command, int $timeoutSeconds = 15): array
     }
     $stdin = DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
     $pipes = [];
-    $opened = null;
+    $opened = '';
     set_error_handler(static function (int $severity, string $message) use (&$opened): bool {
-        $opened = $message;
+        $opened .= $message . "\n";
 
         return true;
     });
@@ -90,7 +114,7 @@ function keep41_capture(array $command, int $timeoutSeconds = 15): array
         @unlink($stdoutFile);
         @unlink($stderrFile);
         $empty['exit_code'] = 127;
-        $empty['stderr'] = 'proc_open_failed';
+        $empty['stderr'] = trim('proc_open_failed ' . keep41_one_line($opened));
 
         return $empty;
     }
@@ -249,8 +273,16 @@ function keep41_where_from_capture(array $found): array
 function keep41_where(string $name): array
 {
     $finder = DIRECTORY_SEPARATOR === '\\' ? 'where.exe' : 'which';
+    $command = [$finder, $name];
+    $found = keep41_capture($command, 10);
+    $parsed = keep41_where_from_capture($found);
+    $parsed['command'] = implode(' ', $command);
+    $parsed['exit_code'] = (int) ($found['exit_code'] ?? -1);
+    $parsed['timed_out'] = !empty($found['timed_out']);
+    $parsed['stdout'] = keep41_one_line((string) ($found['stdout'] ?? ''));
+    $parsed['stderr'] = keep41_one_line((string) ($found['stderr'] ?? ''));
 
-    return keep41_where_from_capture(keep41_capture([$finder, $name], 10));
+    return $parsed;
 }
 
 function keep41_version_line(string $stdout): string
@@ -379,11 +411,13 @@ function keep41_scan(): array
 {
     $ordered = keep41_client_candidates();
     $pathSearchFailed = false;
+    $pathSearchDiag = [];
     $names = DIRECTORY_SEPARATOR === '\\' ? ['mariadb.exe', 'mysql.exe'] : ['mariadb', 'mysql'];
     foreach ($names as $name) {
         $where = keep41_where($name);
         if (!$where['ok']) {
             $pathSearchFailed = true;
+            $pathSearchDiag[] = $where;
             break;
         }
         foreach ($where['paths'] as $path) {
@@ -417,9 +451,31 @@ function keep41_scan(): array
 
     return [
         'path_search_failed' => $pathSearchFailed,
+        'path_search_diag' => $pathSearchDiag,
         'examined' => $examined,
         'chosen' => $chosen,
     ];
+}
+
+function keep41_path_search_lines(array $scan): string
+{
+    $text = '';
+    $rows = $scan['path_search_diag'] ?? [];
+    if (!is_array($rows)) {
+        return '';
+    }
+    foreach ($rows as $diag) {
+        if (!is_array($diag)) {
+            continue;
+        }
+        $text .= 'path_search_command=' . keep41_one_line((string) ($diag['command'] ?? '')) . "\n";
+        $text .= 'path_search_exit=' . (int) ($diag['exit_code'] ?? -1) . "\n";
+        $text .= 'path_search_timed_out=' . (!empty($diag['timed_out']) ? 'yes' : 'no') . "\n";
+        $text .= 'path_search_stdout=' . keep41_one_line((string) ($diag['stdout'] ?? '')) . "\n";
+        $text .= 'path_search_stderr=' . keep41_one_line((string) ($diag['stderr'] ?? '')) . "\n";
+    }
+
+    return $text;
 }
 
 /**
@@ -457,12 +513,14 @@ function keep41_build_report(array $scan, bool $procBlocked = false): array
         }
         if ($scan['path_search_failed']) {
             $text .= "path_search=failed\n";
+            $text .= keep41_path_search_lines($scan);
         }
 
         return ['exit' => 0, 'text' => $text];
     }
     if ($scan['path_search_failed']) {
         $text .= "result=CHECK_UNAVAILABLE\nclient_path=\nclient_name=\nversion=\nabort_source_on_error=no\nreason=path_search_failed\n";
+        $text .= keep41_path_search_lines($scan);
         foreach ($scan['examined'] as $row) {
             $text .= keep41_seen_line($row);
         }
