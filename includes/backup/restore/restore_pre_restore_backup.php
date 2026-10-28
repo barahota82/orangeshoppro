@@ -76,8 +76,8 @@ function orange_restore_pre_backup_lock_status(string $workRoot): array
     $pid = (int) ($payload['pid'] ?? 0);
     $pidAlive = null;
     if ($pid > 0) {
-        if (function_exists('posix_kill')) {
-            $pidAlive = @posix_kill($pid, 0);
+        if (function_exists('orange_backup_process_alive')) {
+            $pidAlive = orange_backup_process_alive($pid);
         } elseif (PHP_OS_FAMILY === 'Windows' && function_exists('shell_exec')) {
             $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
             if (!in_array('shell_exec', $disabled, true)) {

@@ -767,7 +767,18 @@ function orange_backup_process_alive(int $pid): bool
     }
 
     if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0);
+        if (@posix_kill($pid, 0)) {
+            return true;
+        }
+
+        // EPERM means the process exists but this PHP user cannot signal it.
+        // Treating it as dead would allow an active lock owned by another user
+        // to be reclaimed and can start overlapping backup jobs.
+        if (function_exists('posix_get_last_error') && posix_get_last_error() === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     return true;
