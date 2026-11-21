@@ -1,0 +1,16 @@
+---
+description: Owner policy for reversible ORANGE company and customer tests, clean restore, and measured performance work
+alwaysApply: true
+---
+
+# ORANGE test and clean restore gate
+
+Read `docs/archive/ORANGE_TEST_AND_CLEAN_RESTORE_POLICY.md` and the current round record before test writes, backup/restore or performance work. Follow ORANGE_AGENT_READ_FIRST.txt as well. The policy was approved by the owner on 2026-11-21; use later explicit owner decisions if changed and archive them.
+
+Never infer a ready baseline from a filename, nonempty ZIP, old chat, or empty products table. Record baseline identity/status, schema+commit, retention protection, writer, test effects and last safe action. If readiness or round state is unknown, continue independent reading/preparation but do not create test business data. Destructive restore/delete requires owner approval for the concrete snapshot and scope at execution time. Preserve real and enduring data, test evidence, and cross-session history.
+
+Never open `.env.php`, extract passwords, or download hosting backups. Backups remain private on the hosting. DB+uploads does not cover all runtime flags, caches or sessions; verify these after cleanup without indiscriminate deletion.
+
+Track OR-PERF-016 with before/after measurements. A browser timeout is not proof of server cause. Do not remove schema guards, validation, country isolation or authorization to improve speed. Keep minimal diffs and the existing Git deployment workflow.
+
+Current round state is external and must be read fresh from https://chatgpt.com/space/page_50fb21e7e8388191a414234def513012 or a current owner-provided verified handoff. This rule does not create a backup or start a test. Refresh these committed instructions in the existing local workspace while preserving uncommitted work; never force-reset it.

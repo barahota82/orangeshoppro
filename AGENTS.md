@@ -1,5 +1,10 @@
 # AGENTS.md — Orange Shop Pro
 
+**قرار المالك OR-TEST-POLICY-016 — 21 نوفمبر 2026:** قبل أي اختبار يكتب بيانات أو نسخ/استعادة أو إصلاح أداء، اقرأ `docs/archive/ORANGE_TEST_AND_CLEAN_RESTORE_POLICY.md` كاملاً، ثم حالة الجولة الحالية من المرجع المركزي أو آخر تسليم موثق. لا كتابة اختبار قبل baseline=VERIFIED_CLEAN؛ لا استعادة/حذف فعلي بلا موافقة المالك على النسخة والنطاق. لا فتح `.env.php` ولا تنزيل نسخ الاستضافة. مشكلة البطء OR-PERF-016 مفتوحة للقياس ثم الإصلاح بالدليل. هذا يضيف إلى القراءات السابقة ولا يستبدلها.
+
+**تحديث مسار المهمة الحالية:** مستودع M05 المبلّغ عنه `D:\ORANGE_WORK_ARCHIVE_20260922\TASKS\M05_SLOGAN_LANGUAGE_TABLE_20260928\m05_slogan_ws`؛ الإشارات الأقدم إلى `D:\orange` لا تفرض نقل الجذر لهذه المهمة. `D:\orangetest` ليس مستودع Git وفق تقرير Cursor؛ لا تنقل الجذر إليه ولا تستخدم git init/checkout قسرياً. احفظ الأعمال المحلية وتحقق من المسار/الفرع فعلياً.
+
+
 **Audience:** AI coding agents, reviewers, and automation working in this repository.  
 **Project:** Production e-commerce (PHP 8.2+, MySQL/MariaDB, HTML, CSS, JavaScript).  
 **Canonical workspace:** `D:\orange` (do not mirror or work from another folder unless the owner explicitly asks).
