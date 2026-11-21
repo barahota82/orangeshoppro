@@ -71,6 +71,13 @@ foreach ($countries as $c) {
                 value="<?php echo $editRow ? htmlspecialchars((string) ($editRow['timezone'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
             <p class="card-hint" style="margin:6px 0 0;font-size:12px;line-height:1.45;">مثال: Asia/Kuwait أو Africa/Cairo أو Europe/London — من إعدادات الدولة وليس من كود التطبيق.</p>
         </div>
+        <div class="ctry-whatsapp">
+            <label for="ctry_whatsapp">واتساب المتجر (اختياري)</label>
+            <input type="text" id="ctry_whatsapp" dir="ltr" lang="en" maxlength="32" autocomplete="off"
+                placeholder="965XXXXXXXX"
+                value="<?php echo $editRow ? htmlspecialchars((string) ($editRow['whatsapp_number'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
+            <p class="card-hint" style="margin:6px 0 0;font-size:12px;line-height:1.45;">رقم واحد للدولة — يظهر خطوة واتساب بعد حفظ طلب الموقع فقط إن وُجد. فارغ = الطلب يُقبل بلا واتساب.</p>
+        </div>
         <div class="ctry-sort">
             <label for="ctry_sort">الترتيب</label>
             <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
@@ -295,6 +302,9 @@ async function saveCountry() {
         name_ar: document.getElementById('ctry_name_ar').value.trim(),
         name_en: document.getElementById('ctry_name_en').value.trim(),
         timezone: tz,
+        whatsapp_number: (document.getElementById('ctry_whatsapp') || {}).value
+            ? document.getElementById('ctry_whatsapp').value.trim()
+            : '',
         is_active: document.getElementById('ctry_is_active').checked ? 1 : 0
     });
     showProvisionReport(res);

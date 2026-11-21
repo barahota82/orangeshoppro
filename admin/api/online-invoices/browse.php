@@ -117,6 +117,9 @@ try {
         if (orange_table_has_column($pdo, 'orders', 'invoice_number')) {
             $sql .= ', o.invoice_number';
         }
+        if (orange_table_has_column($pdo, 'orders', 'order_source')) {
+            $sql .= ', o.order_source';
+        }
         $sql .= ' FROM orders o
             LEFT JOIN channels ch ON ch.id = o.channel_id
             WHERE 1=1' . $countrySql . $scopeSql;
@@ -199,7 +202,8 @@ try {
                 'phone' => (string) ($row['phone'] ?? ''),
                 'channel_name' => orange_sales_order_channel_label(
                     isset($row['channel_id']) ? (int) $row['channel_id'] : 0,
-                    (string) ($row['channel_name'] ?? '')
+                    (string) ($row['channel_name'] ?? ''),
+                    isset($row['order_source']) ? (string) $row['order_source'] : 'website'
                 ),
                 'notes' => (string) ($row['notes'] ?? ''),
                 'total' => (float) ($row['total'] ?? 0),

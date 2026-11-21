@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Мы рекомендуем зарегистрироваться, указав адрес электронной почты, чтобы отслеживать все ваши заказы в одном месте и получать обновления о предложениях и скидках. Нажмите кнопку ниже, чтобы открыть регистрацию вверху этой страницы.',
     'track_signup_nudge_open_btn' => 'Открыть регистрацию выше',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'ваш@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Ваше имя, как вы хотите, чтобы оно было сохранено',
     'register_placeholder_phone' => 'Введите свой номер телефона (только национальные цифры)',
     'register_placeholder_area' => 'Район или регион',

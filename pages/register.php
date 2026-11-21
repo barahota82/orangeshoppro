@@ -359,7 +359,8 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             delivery_area_id: deliveryAreaId,
                             address: address,
                             notes: notes,
-                            channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : <?php echo json_encode(orange_storefront_default_channel_slug($pdo), JSON_UNESCAPED_UNICODE); ?>,
+                            channel: '',
+                            country_id: (typeof window.APP_COUNTRY_ID === 'number' ? window.APP_COUNTRY_ID : parseInt(String(window.APP_COUNTRY_ID || '0'), 10)) || 0,
                             lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en'
                         })
                     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })

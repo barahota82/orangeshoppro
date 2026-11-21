@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Խորհուրդ ենք տալիս գրանցվել ձեր էլ.փոստով՝ ձեր բոլոր պատվերները մեկ տեղում հետևելու և առաջարկների և զեղչերի մասին թարմացումներ ստանալու համար: Հպեք ներքևի կոճակին՝ գրանցումը բացելու համար այս էջի վերևում:',
     'track_signup_nudge_open_btn' => 'Բացեք գրանցումը վերևում',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'your@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Ձեր անունը, ինչպես ցանկանում եք, պահպանված է',
     'register_placeholder_phone' => 'Մուտքագրեք ձեր հեռախոսահամարը (միայն ազգային թվերը)',
     'register_placeholder_area' => 'Տարածք կամ շրջան',

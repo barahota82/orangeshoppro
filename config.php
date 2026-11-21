@@ -36,8 +36,9 @@ orange_error_boundary_register_once();
 | Database Config
 |--------------------------------------------------------------------------
 */
-const DB_HOST = 'localhost';
-const DB_NAME = 'orangetest';
+define('DB_HOST', (string) ($env['DB_HOST'] ?? 'localhost'));
+define('DB_NAME', (string) ($env['DB_NAME'] ?? 'orangetest'));
+define('DB_PORT', (int) ($env['DB_PORT'] ?? 3306));
 
 define('DB_USER', (string)($env['DB_USER'] ?? ''));
 define('DB_PASS', (string)($env['DB_PASS'] ?? ''));
@@ -90,6 +91,21 @@ define('ORANGE_STOREFRONT_PREVIEW_TOKEN', trim((string) ($env['ORANGE_STOREFRONT
 
 /** اختياري: تجاوز Geo للتطوير المحلي (مثل kw) — راجع .env.example.php */
 define('ORANGE_STOREFRONT_GEO_OVERRIDE', trim((string) ($env['ORANGE_STOREFRONT_GEO_OVERRIDE'] ?? '')));
+/** تطوير فقط: السماح برؤوس Geo من العميل مباشرة (غير آمن على أصل IIS بدون وكيل حافة). */
+define(
+    'ORANGE_STOREFRONT_GEO_ALLOW_CLIENT_HEADERS',
+    $env['ORANGE_STOREFRONT_GEO_ALLOW_CLIENT_HEADERS'] ?? false
+);
+/** عناوين/CIDR لـ REMOTE_ADDR الموثوقة (فاصلة) قبل قبول HTTP_CF_IPCOUNTRY. */
+define(
+    'ORANGE_STOREFRONT_GEO_TRUSTED_PROXIES',
+    trim((string) ($env['ORANGE_STOREFRONT_GEO_TRUSTED_PROXIES'] ?? ''))
+);
+/** مسار ملف قائمة ثقة مُدار (سطر لكل IP/CIDR) — يُحدَّث بصيانة، لا عند كل زيارة. */
+define(
+    'ORANGE_STOREFRONT_GEO_TRUSTED_PROXIES_FILE',
+    trim((string) ($env['ORANGE_STOREFRONT_GEO_TRUSTED_PROXIES_FILE'] ?? ''))
+);
 
 /** Isolated Brand Identity Control (SQLite). Empty = fail-closed CSS/static identity. */
 $__biSqlite = trim((string) ($env['ORANGE_BRAND_IDENTITY_CONTROL_SQLITE'] ?? ''));
@@ -273,7 +289,10 @@ function db(): PDO
     }
 
     if ($pdo === null) {
-    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    $dsn = 'mysql:host=' . DB_HOST
+        . ';port=' . (string) DB_PORT
+        . ';dbname=' . DB_NAME
+        . ';charset=utf8mb4';
 
     $pdo = new PDO($dsn, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -1068,6 +1087,11 @@ function orange_storefront_lang_from_short_url_path(): ?string
     if (empty($m[2])) {
         try {
             $pdo = db();
+            require_once __DIR__ . '/includes/countries.php';
+            $cc = orange_countries_normalize_code($first);
+            if ($cc !== '' && orange_country_row_by_code($pdo, $cc, true) !== null) {
+                return 'en';
+            }
             $slug = orange_channel_slug_for_path_segment($pdo, $first, true);
             if ($slug !== null && $slug !== '') {
                 return 'en';
@@ -1171,9 +1195,25 @@ function storefront_channel_display_name(array $channel, string $channelSlug): s
 }
 
 /**
- * مسار الواجهة القصير (مثل tiktok-ar) من جدول channels.path_segment أو القيم الافتراضية القديمة.
+ * مسار الواجهة القصير (مثل kw-ar) — سلطة الدولة (س32). احتياطي: مقاطع قنوات قديمة لتوليد روابط توافق.
  */
 function storefront_short_segment(string $channelSlug, string $lang): ?string {
+    require_once __DIR__ . '/includes/storefront_country_store.php';
+    require_once __DIR__ . '/includes/countries.php';
+    $raw = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
+    if ($raw !== '') {
+        try {
+            $pdo = db();
+            $code = orange_countries_normalize_code($raw);
+            if ($code !== '' && orange_country_row_by_code($pdo, $code, true) !== null) {
+                $seg = orange_storefront_country_path_segment($code, $lang);
+                if ($seg !== null) {
+                    return $seg;
+                }
+            }
+        } catch (Throwable $e) {
+        }
+    }
     $suffix = match ($lang) {
         'en' => '',
         'ar' => '-ar',
@@ -1184,7 +1224,7 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     if ($suffix === null) {
         return null;
     }
-    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
+    $slug = $raw;
     try {
         $pdo = db();
         $base = orange_channel_path_segment_for_slug($pdo, $slug);
@@ -1206,17 +1246,67 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     return $base . $suffix;
 }
 
-/** @return 'home'|'cart'|'track'|'product'|'register'|'verify_email' */
+/**
+ * Short paths rewrite to storefront-dispatch.php, so SCRIPT_NAME alone
+ * would always look like the home page. Prefer the real page script when
+ * present, then the dispatch tail, then the public path.
+ *
+ * @return 'home'|'cart'|'track'|'product'|'register'|'verify_email'
+ */
 function storefront_current_page_kind(): string {
-    $base = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    return match ($base) {
+    $base = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $fromScript = match ($base) {
         'cart.php' => 'cart',
         'track.php' => 'track',
         'product.php' => 'product',
         'register.php' => 'register',
         'verify-email.php' => 'verify_email',
-        default => 'home',
+        'home.php' => 'home',
+        default => null,
     };
+    if ($fromScript !== null) {
+        return $fromScript;
+    }
+
+    $tail = isset($_GET['sf_tail']) ? trim(str_replace('\\', '/', (string) $_GET['sf_tail']), '/') : '';
+    if ($tail !== '') {
+        if ($tail === 'cart') {
+            return 'cart';
+        }
+        if ($tail === 'track') {
+            return 'track';
+        }
+        if ($tail === 'signup' || $tail === 'signin') {
+            return 'register';
+        }
+        if ($tail === 'verify-email') {
+            return 'verify_email';
+        }
+        if (preg_match('#^product/(\d+)$#', $tail) === 1) {
+            return 'product';
+        }
+    }
+
+    $path = function_exists('orange_storefront_normalized_public_path')
+        ? orange_storefront_normalized_public_path()
+        : (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
+    if (preg_match('~/(cart)(?:/|$)~i', $path) === 1) {
+        return 'cart';
+    }
+    if (preg_match('~/(track)(?:/|$)~i', $path) === 1) {
+        return 'track';
+    }
+    if (preg_match('~/(signup|signin)(?:/|$)~i', $path) === 1) {
+        return 'register';
+    }
+    if (preg_match('~/(verify-email)(?:/|$)~i', $path) === 1) {
+        return 'verify_email';
+    }
+    if (preg_match('~/product/(\d+)(?:/|$)~i', $path) === 1) {
+        return 'product';
+    }
+
+    return 'home';
 }
 
 /**
@@ -1230,25 +1320,15 @@ function storefront_toolbar_state(): array {
         return $memo;
     }
     require_once __DIR__ . '/includes/countries.php';
+    require_once __DIR__ . '/includes/storefront_country_store.php';
     $pdoTb = db();
     $lang = current_lang();
     $countryId = orange_storefront_current_country_id($pdoTb);
     $countryCode = orange_storefront_current_country_code($pdoTb);
     $countryRow = orange_country_row_by_id($pdoTb, $countryId, false)
         ?? orange_country_row_by_code($pdoTb, $countryCode, false);
-    $slug = current_channel_slug();
-    $channel = get_channel_by_slug($slug);
-    $defSlug = orange_storefront_default_channel_slug($pdoTb, $countryId);
-    if (!$channel) {
-        $channel = [
-            'id' => 0,
-            'name' => 'Orange',
-            'slug' => $slug !== '' ? $slug : $defSlug,
-            'logo' => 'logo-orange.png',
-            'whatsapp_number' => '',
-        ];
-    }
-    $channelSlug = (string) ($channel['slug'] ?? $defSlug);
+    $channel = orange_storefront_country_context_row($pdoTb, $countryId, $countryCode !== '' ? $countryCode : 'store');
+    $channelSlug = $countryCode !== '' ? $countryCode : (string) ($channel['slug'] ?? 'store');
     $pageKind = storefront_current_page_kind();
     $storefrontExtra = [];
     if ($pageKind === 'product' && isset($_GET['id'])) {
@@ -1300,7 +1380,7 @@ function storefront_toolbar_state(): array {
 }
 
 /**
- * رابط تبديل الدولة عبر القناة الرئيسية الموثوقة للدولة (لا ?country= كسلطة).
+ * رابط تبديل الدولة — مسار/معلمة دولة (س32)؛ يحفظ الصفحة الحالية عند الإمكان.
  */
 function storefront_country_switch_href(string $countryCode, ?string $lang = null): string
 {
@@ -1318,17 +1398,22 @@ function storefront_country_switch_href(string $countryCode, ?string $lang = nul
     if ($row === null) {
         return '';
     }
-    $cid = (int) ($row['id'] ?? 0);
-    $slug = orange_storefront_main_channel_slug_for_country($pdo, $cid);
-    if ($slug === null || $slug === '') {
-        return '';
-    }
     $useLang = $lang;
     if ($useLang === null || $useLang === '') {
         $useLang = function_exists('current_lang') ? current_lang() : 'ar';
     }
+    require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
+    $useLang = orange_storefront_entry_select_public_lang($pdo, (int) ($row['id'] ?? 0), [(string) $useLang]);
+    $pageKind = function_exists('storefront_current_page_kind') ? storefront_current_page_kind() : 'home';
+    $extra = [];
+    if ($pageKind === 'product' && isset($_GET['id']) && (int) $_GET['id'] > 0) {
+        $extra['id'] = (int) $_GET['id'];
+    }
+    if ($pageKind === 'verify_email' && isset($_GET['token']) && (string) $_GET['token'] !== '') {
+        $extra['token'] = (string) $_GET['token'];
+    }
 
-    return storefront_url('home', $slug, $useLang);
+    return storefront_url($pageKind, $code, $useLang, $extra);
 }
 
 /** wa.me link for channel WhatsApp (digits only). */
@@ -1385,30 +1470,48 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
     $prefix = PUBLIC_BASE_PATH;
     $pathPrefix = ($prefix === '' ? '' : $prefix);
     require_once __DIR__ . '/includes/orange_storefront_customer_lang.php';
-    $langPublic = orange_storefront_public_url_lang($lang);
+    require_once __DIR__ . '/includes/countries.php';
+    /* لا تُمرَّر حقول النماذج أو بيانات العملاء في روابط تبديل اللغة/الدولة. */
+    $safeExtra = [];
+    if (isset($extra['id']) && (int) $extra['id'] > 0) {
+        $safeExtra['id'] = (int) $extra['id'];
+    }
+    if (isset($extra['token']) && is_string($extra['token']) && $extra['token'] !== '') {
+        $safeExtra['token'] = $extra['token'];
+    }
 
-    $seg = storefront_short_segment($channelSlug, $langPublic === '' ? 'en' : $langPublic);
+    $countryKey = orange_countries_normalize_code($channelSlug);
+    if ($countryKey === '') {
+        $countryKey = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
+    }
+    // حارس اللغة حسب الدولة المستهدفة في الرابط (لا دولة الطلب الحالية غير المختارة).
+    $langPublic = orange_storefront_public_url_lang_for_country($lang, $countryKey !== '' ? $countryKey : null);
+
+    $seg = storefront_short_segment($countryKey !== '' ? $countryKey : $channelSlug, $langPublic === '' ? 'en' : $langPublic);
     if (!STOREFRONT_FORCE_LONG_URLS && $seg !== null) {
         $tail = match ($page) {
             'home' => $seg,
             'cart' => $seg . '/cart',
             'track' => $seg . '/track',
-            'product' => !empty($extra['id']) ? $seg . '/product/' . (int)$extra['id'] : null,
+            'product' => !empty($safeExtra['id']) ? $seg . '/product/' . (int) $safeExtra['id'] : null,
             'register' => $seg . '/signup',
-            'verify_email' => !empty($extra['token']) ? $seg . '/verify-email' : null,
+            'verify_email' => !empty($safeExtra['token']) ? $seg . '/verify-email' : null,
             default => $seg,
         };
         if ($tail !== null) {
             $base = ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $tail;
-            if ($page === 'verify_email' && !empty($extra['token'])) {
-                return $base . '?' . http_build_query(['token' => (string) $extra['token']]);
+            if ($page === 'verify_email' && !empty($safeExtra['token'])) {
+                return $base . '?' . http_build_query(['token' => (string) $safeExtra['token']]);
             }
 
             return $base;
         }
     }
 
-    $q = array_merge($extra, ['channel' => $channelSlug]);
+    $q = $safeExtra;
+    if ($countryKey !== '') {
+        $q['country'] = $countryKey;
+    }
     if ($langPublic !== '') {
         $q['lang'] = $langPublic;
     } else {
@@ -3149,6 +3252,12 @@ function orange_fatal_shutdown_handler(): void
 }
 
 function json_response($data, int $httpCode = 200): void {
+    // خطاف مختبر: لا يعمل إلا مع حارس runtime + DSN معزول (انظر includes/orange_lab_runtime.php).
+    require_once __DIR__ . '/includes/orange_lab_runtime.php';
+    if (orange_lab_runtime_is_active() && !empty($GLOBALS['orange_lab_json_capture'])) {
+        $GLOBALS['orange_lab_json_last'] = ['http' => $httpCode, 'body' => $data];
+        throw new RuntimeException('ORANGE_LAB_JSON_CAPTURE');
+    }
     if (!defined('ORANGE_JSON_RESPONSE_EMITTED')) {
         define('ORANGE_JSON_RESPONSE_EMITTED', true);
     }
@@ -3315,6 +3424,9 @@ function orange_api_debug_may_expose_to_client(): bool
 
 function api_error(Throwable $e, string $userMessage): void
 {
+    if ($e->getMessage() === 'ORANGE_LAB_JSON_CAPTURE') {
+        throw $e;
+    }
     if (function_exists('error_log')) {
         error_log(
             '[orange] API: ' . $userMessage . ' | ' . $e->getMessage()
@@ -3337,6 +3449,9 @@ function api_error(Throwable $e, string $userMessage): void
  */
 function orange_admin_api_catch(Throwable $e, string $genericMessage, int $businessHttpCode = 422): void
 {
+    if ($e->getMessage() === 'ORANGE_LAB_JSON_CAPTURE') {
+        throw $e;
+    }
     if ($e instanceof RuntimeException) {
         json_response(['success' => false, 'message' => $e->getMessage()], $businessHttpCode);
     }
@@ -3344,6 +3459,15 @@ function orange_admin_api_catch(Throwable $e, string $genericMessage, int $busin
 }
 
 function get_json_input(): array {
+    // خطاف مختبر فقط خلف حارس runtime + DSN — بلا تفعيل بـ GLOBAL وحدَه.
+    require_once __DIR__ . '/includes/orange_lab_runtime.php';
+    if (
+        orange_lab_runtime_is_active()
+        && isset($GLOBALS['orange_lab_json_input'])
+        && is_array($GLOBALS['orange_lab_json_input'])
+    ) {
+        return $GLOBALS['orange_lab_json_input'];
+    }
     $raw = file_get_contents('php://input');
     if ($raw === false || trim($raw) === '') {
         return [];

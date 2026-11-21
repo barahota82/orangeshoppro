@@ -61,7 +61,81 @@ $renderLangHeader = static function () use ($langOpts, $lang, $channelSlug, $pag
 };
 
 if ($clusterPart === 'country') {
-    // قرار المالك: القناة = الدولة — لا مبدّل دولة في واجهة المتجر (2026-05).
+    // س32: مبدّل دولة عند تعدد الدول النشطة؛ يحفظ الصفحة والمعلمات الآمنة.
+    $countryOpts = isset($countryOptions) && is_array($countryOptions) ? $countryOptions : [];
+    if (count($countryOpts) < 2) {
+        return;
+    }
+    $curCode = isset($countryCode) ? (string) $countryCode : '';
+    $curLabel = isset($countryLabel) && (string) $countryLabel !== ''
+        ? (string) $countryLabel
+        : $curCode;
+    $countryAria = htmlspecialchars(t('storefront_country'), ENT_QUOTES, 'UTF-8');
+    $leaveMsg = htmlspecialchars(
+        t('storefront_country_switch_leave_cart') !== 'storefront_country_switch_leave_cart'
+            ? t('storefront_country_switch_leave_cart')
+            : 'تغيير الدولة يفتح سلة منفصلة. المتابعة؟',
+        ENT_QUOTES,
+        'UTF-8'
+    );
+    ?>
+                <details class="lang-dropdown country-dropdown" data-orange-country-switch="1">
+                    <summary class="lang-dropdown__summary" aria-label="<?php echo $countryAria; ?>">
+                        <span class="lang-dropdown__current"><?php echo htmlspecialchars($curLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="lang-dropdown__chev" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="lang-dropdown__list">
+                        <?php foreach ($countryOpts as $opt) {
+                            $code = orange_countries_normalize_code((string) ($opt['code'] ?? ''));
+                            if ($code === '') {
+                                continue;
+                            }
+                            $href = storefront_country_switch_href($code, $lang);
+                            if ($href === '') {
+                                continue;
+                            }
+                            $isActive = $code === $curCode;
+                            $label = (string) ($opt['name'] ?? $code);
+                            ?>
+                        <li>
+                            <a class="lang-dropdown__option<?php echo $isActive ? ' is-active' : ''; ?>"
+                               href="<?php echo htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"
+                               data-orange-country-code="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>"
+                               data-orange-country-leave="<?php echo $leaveMsg; ?>"
+                               <?php echo $isActive ? 'aria-current="true"' : ''; ?>>
+                                <span class="lang-dropdown__check" aria-hidden="true"><?php echo $isActive ? '✓' : ''; ?></span>
+                                <span class="lang-dropdown__label"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span>
+                            </a>
+                        </li>
+                        <?php } ?>
+                    </ul>
+                </details>
+                <script>
+                (function () {
+                    document.addEventListener('click', function (ev) {
+                        var a = ev.target && ev.target.closest ? ev.target.closest('a[data-orange-country-code]') : null;
+                        if (!a) return;
+                        var next = String(a.getAttribute('data-orange-country-code') || '').toLowerCase();
+                        var cur = String(window.APP_COUNTRY_CODE || '').toLowerCase();
+                        if (!next || next === cur) return;
+                        var cartLen = 0;
+                        try {
+                            if (typeof window.orangeSfCartKey === 'function') {
+                                var raw = localStorage.getItem(window.orangeSfCartKey());
+                                var arr = raw ? JSON.parse(raw) : [];
+                                cartLen = Array.isArray(arr) ? arr.length : 0;
+                            }
+                        } catch (e) {}
+                        if (cartLen > 0) {
+                            var msg = a.getAttribute('data-orange-country-leave') || '';
+                            if (msg && !window.confirm(msg)) {
+                                ev.preventDefault();
+                            }
+                        }
+                    }, true);
+                })();
+                </script>
+    <?php
     return;
 }
 

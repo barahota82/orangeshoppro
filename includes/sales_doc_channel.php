@@ -102,19 +102,35 @@ function orange_sales_company_direct_channel_label(): string
     return 'الشركة';
 }
 
-function orange_sales_is_company_direct_channel(?int $channelId): bool
+/**
+ * س32: «شركة» فقط عند order_source=company — غياب القناة وحده لا يكفي.
+ */
+function orange_sales_is_company_direct_channel(?int $channelId, ?string $orderSource = null): bool
 {
-    return $channelId === null || (int) $channelId <= 0;
+    if ($orderSource !== null) {
+        return trim((string) $orderSource) === 'company';
+    }
+    // بدون مصدر صريح: لا تُعامل القناة الفارغة كشركة (طلبات المتجر website بلا قناة).
+    unset($channelId);
+
+    return false;
 }
 
-function orange_sales_order_channel_label(?int $channelId, ?string $channelNameFromDb = null): string
-{
-    if (orange_sales_is_company_direct_channel($channelId)) {
+function orange_sales_order_channel_label(
+    ?int $channelId,
+    ?string $channelNameFromDb = null,
+    ?string $orderSource = null
+): string {
+    if (trim((string) ($orderSource ?? '')) === 'company') {
         return orange_sales_company_direct_channel_label();
     }
-    $name = trim((string) ($channelNameFromDb ?? ''));
+    if ($channelId !== null && (int) $channelId > 0) {
+        $name = trim((string) ($channelNameFromDb ?? ''));
 
-    return $name !== '' ? $name : '—';
+        return $name !== '' ? $name : '—';
+    }
+
+    return trim((string) ($orderSource ?? '')) === 'website' ? 'المتجر' : '—';
 }
 
 /**

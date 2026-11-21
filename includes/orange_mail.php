@@ -7,6 +7,34 @@ declare(strict_types=1);
  */
 function orange_mail_send_text(string $to, string $subject, string $body): bool
 {
+    require_once __DIR__ . '/orange_lab_runtime.php';
+    // عزل نقل المختبر: حارس runtime + DSN معزول إلزامي؛ فشل الكتابة = فشل الإرسال.
+    if (orange_lab_runtime_is_active()) {
+        $labSink = getenv('ORANGE_MAIL_LAB_SINK');
+        if (is_string($labSink) && $labSink !== '') {
+            $payload = json_encode(
+                ['to' => $to, 'subject' => $subject, 'body' => $body, 'ts' => date('c')],
+                JSON_UNESCAPED_UNICODE
+            );
+            if ($payload === false) {
+                return false;
+            }
+            $dir = dirname($labSink);
+            if ($dir !== '' && !is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
+                return false;
+            }
+            $wrote = @file_put_contents($labSink, $payload . "\n", FILE_APPEND | LOCK_EX);
+            if ($wrote === false) {
+                return false;
+            }
+
+            return true;
+        }
+        if (isset($GLOBALS['orange_mail_lab_transport']) && is_callable($GLOBALS['orange_mail_lab_transport'])) {
+            return (bool) call_user_func($GLOBALS['orange_mail_lab_transport'], $to, $subject, $body);
+        }
+    }
+
     if (!function_exists('mail')) {
         return false;
     }

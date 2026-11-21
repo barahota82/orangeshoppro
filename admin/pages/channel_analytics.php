@@ -100,13 +100,18 @@ foreach ($channelRows as &$cr) {
 }
 unset($cr);
 
+/* س32: طلبات website بلا قناة ليست «يتيماً» ولا شركة — تُستبعد من orphan. */
 $orphanSql = '
     SELECT
         COUNT(*) AS cnt_all,
         SUM(CASE WHEN status = \'completed\' THEN 1 ELSE 0 END) AS cnt_completed,
         COALESCE(SUM(CASE WHEN status = \'completed\' THEN total END), 0) AS revenue_completed
     FROM orders
-    WHERE (channel_id IS NULL OR channel_id = 0)' . orange_sql_country_and_fragment($pdo, 'orders', 'orders', $caCountryId) . '
+    WHERE (channel_id IS NULL OR channel_id = 0)'
+    . (orange_table_has_column($pdo, 'orders', 'order_source')
+        ? " AND (order_source IS NULL OR order_source NOT IN ('company','website'))"
+        : '')
+    . orange_sql_country_and_fragment($pdo, 'orders', 'orders', $caCountryId) . '
 ';
 $orphanParams = [];
 if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
@@ -117,6 +122,27 @@ if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
 $stOr = $pdo->prepare($orphanSql);
 $stOr->execute($orphanParams);
 $orphan = $stOr->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
+
+$websiteStorefrontSql = '
+    SELECT
+        COUNT(*) AS cnt_all,
+        SUM(CASE WHEN status = \'completed\' THEN 1 ELSE 0 END) AS cnt_completed,
+        COALESCE(SUM(CASE WHEN status = \'completed\' THEN total END), 0) AS revenue_completed
+    FROM orders
+    WHERE 1=1'
+    . (orange_table_has_column($pdo, 'orders', 'order_source')
+        ? " AND order_source = 'website'"
+        : ' AND 0=1')
+    . orange_sql_country_and_fragment($pdo, 'orders', 'orders', $caCountryId);
+$websiteParams = [];
+if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
+    $websiteStorefrontSql .= ' AND created_at >= ? AND created_at < ?';
+    $websiteParams[] = $caRangeStartUtc;
+    $websiteParams[] = $caRangeEndExclusiveUtc;
+}
+$stWeb = $pdo->prepare($websiteStorefrontSql);
+$stWeb->execute($websiteParams);
+$websiteStorefront = $stWeb->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
 
 $companyDirectSql = '
     SELECT
@@ -350,10 +376,22 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <?php endif; ?>
 </div>
 
-<?php if ((int) ($orphan['cnt_all'] ?? 0) > (int) ($companyDirect['cnt_all'] ?? 0)): ?>
+<?php if ((int) ($websiteStorefront['cnt_all'] ?? 0) > 0): ?>
 <div class="card">
-    <h3 class="card-title">طلبات بلا قناة (أخرى — غير «الشركة» المباشرة)</h3>
-    <p class="card-hint">طلبات بدون <code>channel_id</code> ولا تُحسب ضمن صف «الشركة» أعلاه.</p>
+    <h3 class="card-title">طلبات المتجر (website)</h3>
+    <p class="card-hint">س32: <code>order_source = website</code> — ليست شركة حتى لو غاب <code>channel_id</code>.</p>
+    <ul style="line-height:1.7;">
+        <li>إجمالي الطلبات: <strong><?php echo (int) $websiteStorefront['cnt_all']; ?></strong></li>
+        <li>مكتملة: <strong><?php echo (int) $websiteStorefront['cnt_completed']; ?></strong></li>
+        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) $websiteStorefront['revenue_completed']); ?></strong></li>
+    </ul>
+</div>
+<?php endif; ?>
+
+<?php if ((int) ($orphan['cnt_all'] ?? 0) > 0): ?>
+<div class="card">
+    <h3 class="card-title">طلبات بلا قناة (أخرى — غير الشركة وغير المتجر)</h3>
+    <p class="card-hint">صفوف بلا <code>channel_id</code> وخارج <code>company</code>/<code>website</code>.</p>
     <ul style="line-height:1.7;">
         <li>إجمالي الطلبات: <strong><?php echo (int) $orphan['cnt_all']; ?></strong></li>
         <li>مكتملة: <strong><?php echo (int) $orphan['cnt_completed']; ?></strong></li>

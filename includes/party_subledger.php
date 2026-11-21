@@ -466,10 +466,15 @@ function orange_ensure_customer(PDO $pdo, string $nameAr, string $phone, ?int $c
 
         return (int) $id;
     }
+    // Schema: area/address NOT NULL بلا DEFAULT — إدراج صريح فارغ (نفس سياسة checkout).
     if ($hasCustCountry && $countryId !== null && $countryId > 0) {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone, country_id) VALUES (?, ?, ?)')->execute([$nameAr ?: 'عميل', $phone, $countryId]);
+        $pdo->prepare(
+            'INSERT INTO customers (name_ar, phone, country_id, area, address) VALUES (?, ?, ?, ?, ?)'
+        )->execute([$nameAr ?: 'عميل', $phone, $countryId, '', '']);
     } else {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone) VALUES (?, ?)')->execute([$nameAr ?: 'عميل', $phone]);
+        $pdo->prepare(
+            'INSERT INTO customers (name_ar, phone, area, address) VALUES (?, ?, ?, ?)'
+        )->execute([$nameAr ?: 'عميل', $phone, '', '']);
     }
 
     return (int) $pdo->lastInsertId();

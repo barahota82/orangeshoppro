@@ -13,8 +13,10 @@ require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
 require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+require_once __DIR__ . '/../../includes/order_intake_control.php';
 
 orange_restore_maint_enforcement_api_mutation_guard('order_create');
+orange_order_intake_reject_if_paused();
 
 try {
     $pdo = db();
@@ -60,13 +62,51 @@ try {
     } else {
         $data['_buyer_registered'] = 0;
     }
+    require_once __DIR__ . '/../../includes/storefront_country_store.php';
+    require_once __DIR__ . '/../../includes/countries.php';
+    // ثبّت دولة الحمولة قبل تطبيع منطقة التوصيل (تعتمد الدولة الحالية).
+    $checkoutCountryId = orange_storefront_resolve_checkout_country_id($pdo, $data);
+    if ($checkoutCountryId <= 0) {
+        json_response([
+            'success' => false,
+            'code' => 'checkout_country_required',
+            'message' => t('checkout_country_required') !== 'checkout_country_required'
+                ? t('checkout_country_required')
+                : 'اختر دولة التسوق أولاً',
+        ], 422);
+    }
+    $data['country_id'] = $checkoutCountryId;
+    $countryRowCo = orange_country_row_by_id($pdo, $checkoutCountryId, true);
+    if ($countryRowCo === null) {
+        json_response([
+            'success' => false,
+            'code' => 'checkout_country_required',
+            'message' => t('checkout_country_required') !== 'checkout_country_required'
+                ? t('checkout_country_required')
+                : 'اختر دولة التسوق أولاً',
+        ], 422);
+    }
+    $prevOverrideCo = $GLOBALS['orange_storefront_country_override'] ?? null;
+    orange_storefront_set_country_override(
+        orange_countries_normalize_code((string) ($countryRowCo['code'] ?? ''))
+    );
     try {
         orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCo);
     } catch (RuntimeException $e) {
+        if (is_string($prevOverrideCo) && $prevOverrideCo !== '') {
+            orange_storefront_set_country_override($prevOverrideCo);
+        } else {
+            orange_storefront_set_country_override(null);
+        }
         orange_storefront_api_json_runtime_error($e, 'create-order delivery area');
     }
+    if (is_string($prevOverrideCo) && $prevOverrideCo !== '') {
+        orange_storefront_set_country_override($prevOverrideCo);
+    } else {
+        orange_storefront_set_country_override(null);
+    }
 
-    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
+    require_fields($data, ['name', 'phone', 'area', 'address', 'items']);
 
     $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
     if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
@@ -89,13 +129,8 @@ try {
         json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);
     }
 
-    $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $channelStmt->execute([(int) $data['channel_id']]);
-    $channel = $channelStmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$channel) {
-        json_response(['success' => false, 'code' => 'invalid_channel', 'message' => t('checkout_invalid_channel')], 422);
-    }
+    // س32: لا اشتراط قناة لطلبات website.
+    $data['channel_id'] = (int) ($data['channel_id'] ?? 0);
 
     $enq = orange_order_intake_enqueue($pdo, $data);
     $queueId = $enq['id'];

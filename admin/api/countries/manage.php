@@ -230,7 +230,19 @@ try {
         $nameAr = orange_country_api_str($data['name_ar'] ?? '', 191);
         $nameEn = orange_country_api_str($data['name_en'] ?? '', 191);
         $timezone = orange_country_api_str($data['timezone'] ?? '', 64);
+        require_once __DIR__ . '/../../../includes/storefront_country_store.php';
+        $whatsappRaw = orange_country_api_str($data['whatsapp_number'] ?? '', 40);
+        $waNorm = orange_storefront_whatsapp_normalize_for_country($whatsappRaw);
+        if (!$waNorm['ok']) {
+            json_response([
+                'success' => false,
+                'code' => 'invalid_whatsapp_number',
+                'message' => $waNorm['message'] !== '' ? $waNorm['message'] : 'رقم واتساب غير صالح',
+            ], 422);
+        }
+        $whatsappNumber = $waNorm['digits'];
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $hasWaCol = orange_table_has_column($pdo, 'countries', 'whatsapp_number');
 
         if ($id > 0) {
             $existing = orange_country_row_by_id($pdo, $id);
@@ -279,10 +291,26 @@ try {
             if ($dup->fetch()) {
                 json_response(['success' => false, 'message' => 'رمز الدولة مستخدم'], 409);
             }
-            $st = $pdo->prepare(
-                'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, timezone = ?, is_active = ? WHERE id = ?'
-            );
-            $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $isActive, $id]);
+            if ($hasWaCol) {
+                $st = $pdo->prepare(
+                    'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, timezone = ?, whatsapp_number = ?, is_active = ? WHERE id = ?'
+                );
+                $st->execute([
+                    $code,
+                    $nameAr,
+                    $nameEn,
+                    $currency,
+                    $timezone,
+                    $whatsappNumber !== '' ? $whatsappNumber : null,
+                    $isActive,
+                    $id,
+                ]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, timezone = ?, is_active = ? WHERE id = ?'
+                );
+                $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $isActive, $id]);
+            }
             $countryId = $id;
         } else {
             $dup = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
@@ -291,10 +319,26 @@ try {
                 json_response(['success' => false, 'message' => 'رمز الدولة مستخدم'], 409);
             }
             $sortOrder = orange_countries_next_sort_order($pdo);
-            $st = $pdo->prepare(
-                'INSERT INTO countries (code, name_ar, name_en, currency_code, timezone, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)'
-            );
-            $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $sortOrder, $isActive]);
+            if ($hasWaCol) {
+                $st = $pdo->prepare(
+                    'INSERT INTO countries (code, name_ar, name_en, currency_code, timezone, whatsapp_number, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $st->execute([
+                    $code,
+                    $nameAr,
+                    $nameEn,
+                    $currency,
+                    $timezone,
+                    $whatsappNumber !== '' ? $whatsappNumber : null,
+                    $sortOrder,
+                    $isActive,
+                ]);
+            } else {
+                $st = $pdo->prepare(
+                    'INSERT INTO countries (code, name_ar, name_en, currency_code, timezone, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                );
+                $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $sortOrder, $isActive]);
+            }
             $countryId = (int) $pdo->lastInsertId();
         }
 

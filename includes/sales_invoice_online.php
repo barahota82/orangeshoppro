@@ -69,7 +69,8 @@ function orange_sales_invoice_online_load_order(PDO $pdo, int $orderId): array
 
     $order['channel_name'] = orange_sales_order_channel_label(
         isset($order['channel_id']) ? (int) $order['channel_id'] : 0,
-        (string) ($order['channel_name'] ?? '')
+        (string) ($order['channel_name'] ?? ''),
+        isset($order['order_source']) ? (string) $order['order_source'] : null
     );
 
     orange_admin_assert_entity_country($pdo, 'orders', $orderId);

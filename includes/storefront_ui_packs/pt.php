@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Recomendamos registrar-se com seu e-mail para acompanhar todos os seus pedidos em um só lugar e receber atualizações sobre ofertas e descontos. Toque no botão abaixo para abrir a inscrição no topo desta página.',
     'track_signup_nudge_open_btn' => 'Abra a inscrição acima',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'seu@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Seu nome como você deseja que seja salvo',
     'register_placeholder_phone' => 'Digite seu número de telefone (somente dígitos nacionais)',
     'register_placeholder_area' => 'Área ou região',

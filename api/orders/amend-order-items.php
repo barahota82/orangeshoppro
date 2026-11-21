@@ -75,9 +75,23 @@ try {
 
         $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([(int) $order['id']]);
 
+        require_once __DIR__ . '/../../includes/countries.php';
+        require_once __DIR__ . '/../../includes/storefront_country_store.php';
+        $amendCountryId = (int) ($order['country_id'] ?? 0);
+        if ($amendCountryId <= 0 && isset($order['channel_id'])) {
+            $amendCountryId = orange_country_id_for_channel($pdo, (int) $order['channel_id']);
+        }
+        if ($amendCountryId <= 0) {
+            throw new RuntimeException('amend_country_required');
+        }
+        $crowAmend = orange_country_row_by_id($pdo, $amendCountryId, false);
+        if ($crowAmend === null) {
+            throw new RuntimeException('amend_country_required');
+        }
+        orange_storefront_set_country_override(orange_countries_normalize_code((string) ($crowAmend['code'] ?? '')));
+
         [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $items, true);
 
-        $amendCountryId = (int) ($order['country_id'] ?? 0);
         $amendCountryArg = $amendCountryId > 0 ? $amendCountryId : null;
         // سياسة «العرض بديل» (س4/2): استبعاد البنود ذات عرض المنتج من أساس الكومبو/خصم السلة.
         $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $amendCountryArg);
@@ -217,15 +231,8 @@ try {
 
         orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
-        require_once __DIR__ . '/../../includes/countries.php';
-        $stockCountryId = isset($order['country_id']) ? (int) $order['country_id'] : 0;
+        $stockCountryId = $amendCountryId;
         $stockWarehouseId = isset($order['warehouse_id']) ? (int) $order['warehouse_id'] : 0;
-        if ($stockCountryId <= 0 && isset($order['channel_id'])) {
-            $stockCountryId = orange_country_id_for_channel($pdo, (int) $order['channel_id']);
-        }
-        if ($stockCountryId <= 0) {
-            $stockCountryId = orange_storefront_current_country_id($pdo);
-        }
         if ($stockWarehouseId <= 0) {
             $stockWarehouseId = orange_warehouse_default_id_for_country($pdo, $stockCountryId);
         }
@@ -245,9 +252,11 @@ try {
         throw $e;
     }
 
-    $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? LIMIT 1');
-    $channelStmt->execute([(int) ($order['channel_id'] ?? 0)]);
-    $channel = $channelStmt->fetch(PDO::FETCH_ASSOC) ?: ['whatsapp_number' => ''];
+    // دولة الطلب محفوظة (لا كوكي زائر متعدد التبويبات).
+    $amendCountryId = (int) ($order['country_id'] ?? 0);
+    if ($amendCountryId <= 0 && isset($order['channel_id'])) {
+        $amendCountryId = orange_country_id_for_channel($pdo, (int) $order['channel_id']);
+    }
 
     $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
     $payAr = orange_order_payment_terms_label_ar($paymentTerms);
@@ -289,8 +298,10 @@ try {
     }
     $messageLines[] = 'Total: ' . number_format($orderTotal, 2) . ' KD';
 
-    $whatsAppNumber = clean_whatsapp_number((string) ($channel['whatsapp_number'] ?? ''));
-    $whatsAppUrl = 'https://wa.me/' . $whatsAppNumber . '?text=' . rawurlencode(implode("\n", $messageLines));
+    $whatsAppNumber = orange_storefront_country_whatsapp_digits($pdo, $amendCountryId);
+    $whatsAppUrl = $whatsAppNumber !== ''
+        ? ('https://wa.me/' . $whatsAppNumber . '?text=' . rawurlencode(implode("\n", $messageLines)))
+        : '';
 
     orange_storefront_set_guest_orders_phone($phoneNorm);
 

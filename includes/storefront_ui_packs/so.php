@@ -8,7 +8,7 @@ declare(strict_types=1);
  */
 return [
     'home' => 'Guriga',
-    'cart' => 'Gaariga',
+    'cart' => 'Dambiil',
     'offers' => 'Soo jeedin',
     'all' => 'Dhammaan',
     'currency_kd' => 'KD',
@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Waxaan kugula talineynaa inaad iska diiwaan geliso iimaylkaaga si aad ula socoto dhammaan dalabaadkaaga hal meel oo aad u hesho warar cusub oo ku saabsan soo jeedinta iyo qiimo dhimista. Taabo badhanka hoose si aad u furto is-diiwaangelinta xagga sare ee boggan.',
     'track_signup_nudge_open_btn' => 'Fur is-diiwaangelinta sare',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'your@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Magacaaga sidaad rabto ayaa loo keydiyay',
     'register_placeholder_phone' => 'Geli lambarka taleefankaaga (lambarka qaranka oo keliya)',
     'register_placeholder_area' => 'Deegaan ama gobol',
@@ -194,8 +194,8 @@ return [
     'storefront_menu_whole_department' => 'Waaxda oo dhan',
     'storefront_menu_whole_category' => 'Qaybta oo dhan',
     'storefront_menu_other_categories' => 'Qaybaha kale',
-    'cart_tab_basket' => 'Gaariga',
-    'cart_tab_my_orders' => 'Awaamiirtayda',
+    'cart_tab_basket' => 'Dambiil',
+    'cart_tab_my_orders' => 'Dalabadayda',
     'cart_tab_delivered' => 'la keenay',
     'cart_account_orders_heading_active' => 'Dalabkaaga hadda',
     'cart_account_orders_heading_delivered' => 'Dalabka la keenay',

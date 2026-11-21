@@ -54,20 +54,58 @@ try {
     $addressRaw = isset($data['address']) ? trim((string) $data['address']) : '';
     $notesRaw = isset($data['notes']) ? trim((string) $data['notes']) : '';
 
+    // س32: سلطة الدولة من المتجر؛ القناة اختيارية للتوافق مع registered_channel_slug القديم.
     $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
     $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
 
+    require_once __DIR__ . '/../../includes/storefront_country_store.php';
     $sfCountryId = orange_storefront_current_country_id($pdo);
-    if ($sfCountryId > 0 && orange_channels_has_country_column($pdo)) {
-        $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
-        $channelRowSt->execute([$channelSlug, $sfCountryId]);
-    } else {
-        $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
-        $channelRowSt->execute([$channelSlug]);
+    $payloadCountryId = (int) ($data['country_id'] ?? 0);
+    if ($payloadCountryId > 0 && orange_country_row_by_id($pdo, $payloadCountryId, true) !== null) {
+        $sfCountryId = $payloadCountryId;
     }
-    $channelIdForCountry = (int) ($channelRowSt->fetchColumn() ?: 0);
-    $accountCountryId = orange_country_id_for_channel($pdo, $channelIdForCountry);
+    $channelIdForCountry = 0;
+    if ($channelSlug !== '') {
+        if ($sfCountryId > 0 && orange_channels_has_country_column($pdo)) {
+            $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
+            $channelRowSt->execute([$channelSlug, $sfCountryId]);
+        } else {
+            $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+            $channelRowSt->execute([$channelSlug]);
+        }
+        $channelIdForCountry = (int) ($channelRowSt->fetchColumn() ?: 0);
+        if ($channelIdForCountry <= 0) {
+            $channelSlug = '';
+        }
+    }
+    $accountCountryId = $channelIdForCountry > 0
+        ? orange_country_id_for_channel($pdo, $channelIdForCountry)
+        : 0;
+    if ($accountCountryId <= 0) {
+        $accountCountryId = $sfCountryId > 0 ? $sfCountryId : 0;
+    }
+    if ($accountCountryId <= 0) {
+        json_response([
+            'success' => false,
+            'code' => 'checkout_country_required',
+            'message' => t('checkout_country_required') !== 'checkout_country_required'
+                ? t('checkout_country_required')
+                : 'اختر دولة التسوق أولاً',
+        ], 422);
+    }
     $hasAccountCountryCol = orange_table_has_column($pdo, 'storefront_accounts', 'country_id');
+    $countryCodeForUrl = '';
+    $crowUrl = orange_country_row_by_id($pdo, $accountCountryId, false);
+    if ($crowUrl !== null) {
+        $countryCodeForUrl = orange_countries_normalize_code((string) ($crowUrl['code'] ?? ''));
+    }
+    if ($countryCodeForUrl === '') {
+        json_response([
+            'success' => false,
+            'code' => 'checkout_country_required',
+            'message' => 'دولة الحساب غير صالحة',
+        ], 422);
+    }
 
     /** @var list<array<string, mixed>>|null */
     $trackSignupItemsForMail = null;
@@ -241,20 +279,25 @@ try {
                     }
                     json_response(['success' => false, 'code' => 'server_error', 'message' => t('api_request_failed')], 500);
                 }
-                $chRow = get_channel_by_slug($channelSlug);
                 $waTemplate = t('storefront_register_phone_merge_wa_body');
                 $waText = str_replace(
                     ['{token}', '{email}', '{site}'],
                     [$mergeCreated['plain_token'], $email, orange_site_public_origin()],
                     $waTemplate
                 );
-                $waHref = is_array($chRow) ? storefront_whatsapp_href($chRow, $waText) : null;
+                // س32: واتساب الدمج من رقم الدولة فقط — لا رجوع لرقم قناة.
+                $waHref = null;
+                $waDigits = orange_storefront_country_whatsapp_digits($pdo, $accountCountryId);
+                if ($waDigits !== '') {
+                    $waHref = 'https://wa.me/' . $waDigits . '?text=' . rawurlencode($waText);
+                }
                 json_response([
                     'success' => true,
                     'merge_required' => true,
                     'merge_token' => $mergeCreated['plain_token'],
                     'merge_request_id' => $mergeCreated['id'],
                     'whatsapp_href' => $waHref,
+                    'whatsapp_available' => $waHref !== null,
                     'existing_email_masked' => orange_storefront_mask_email_for_display((string) ($dupAcc['email'] ?? '')),
                     'message' => t('storefront_register_phone_merge_intro'),
                     'channel' => $channelSlug,
@@ -413,7 +456,8 @@ try {
         orange_storefront_link_order_to_account_row($pdo, $orderNumberLink, $accountIdAfter);
     }
 
-    $rel = storefront_url('verify_email', $channelSlug, $lang, ['token' => $token]);
+    // س32: رابط التحقق بمفتاح الدولة (لا slug قناة) حتى يُحفظ token عبر شاشة اختيار الدولة إن لزم.
+    $rel = storefront_url('verify_email', $countryCodeForUrl, $lang, ['token' => $token]);
     $link = orange_site_public_origin() . $rel;
 
     $subjEn = 'Confirm your registration — Orange';

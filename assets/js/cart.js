@@ -3109,7 +3109,12 @@ function orangeFinishCheckoutSuccess(result, opts) {
         } catch (e) {}
         orangeCartClearLineChoiceState();
     }
-    window.open(result.whatsapp_url, '_blank');
+    // س32: واتساب اختياري بعد نجاح الحفظ — يُفتح فقط إن وُجد رابط صالح من إعداد الدولة.
+    if (result && result.whatsapp_url) {
+        try {
+            window.open(String(result.whatsapp_url), '_blank');
+        } catch (eWa) {}
+    }
     const T = window.APP_T || {};
     let okMsg = (T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
     if (typeof result.total === 'number' && Number.isFinite(result.total)) {
@@ -3153,7 +3158,7 @@ async function orangePollIntakeUntilDone(token) {
         if (!r.ok && j && typeof j === 'object') {
             throw { checkoutResult: j };
         }
-        if (j && j.status === 'completed' && j.whatsapp_url) {
+        if (j && j.status === 'completed') {
             return j;
         }
         if (j && j.status === 'failed') {
@@ -3367,7 +3372,9 @@ async function sendOrderNow() {
         delivery_area_id: deliveryAreaId,
         address: document.getElementById('customer_address').value.trim(),
         notes: document.getElementById('customer_notes').value.trim(),
-        channel_id: window.APP_CHANNEL_ID || 0,
+        channel_id: 0,
+        country_id: window.APP_COUNTRY_ID || 0,
+        country_code: typeof window.APP_COUNTRY_CODE === 'string' ? window.APP_COUNTRY_CODE : '',
         items: itemsForOrder,
         payment_terms: paymentTerms,
         redeem_points: __orangeLoyaltyRedeemPoints,

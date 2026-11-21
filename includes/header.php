@@ -22,7 +22,7 @@ orange_send_html_no_cache_headers();
 extract(storefront_toolbar_state());
 require_once __DIR__ . '/countries.php';
 orange_storefront_send_country_cookie($countryCode ?? orange_storefront_current_country_code(db()));
-orange_storefront_send_channel_cookie($channelSlug);
+/* س32: سلطة الدولة؛ كوكي القناة لم يعد مصدر دخول المتجر */
 require_once __DIR__ . '/orange_storefront_customer_lang.php';
 if (!orange_storefront_lang_cookie_deferred_for_channel_restore()
     && orange_storefront_customer_lang_cookie_allowed((string) $lang)) {
@@ -70,7 +70,10 @@ $orangeWordmarkUrl = orange_brand_identity_runtime_consume_slot_url(
         storefront_asset_image_preferred_path('/assets/images/orange-company.webp')
     ))
 );
-$orangeManifestHref = storefront_public_path('/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]));
+$orangeManifestHref = storefront_public_path('/manifest.php?' . http_build_query([
+    'country' => (string) ($countryCode ?? $channelSlug),
+    'lang' => $lang,
+]));
 
 $pdoSfHdr = db();
 [$_sfPathToSlug, $_sfSlugToPath, $_sfValidSlugs, $_sfPathAlt] = orange_storefront_path_maps_for_js($pdoSfHdr);
@@ -150,7 +153,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <script>
         window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
-        window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
+        window.APP_CHANNEL_ID = 0;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_PREVIEW = <?php echo !empty($orangePreviewActiveGlobal) ? 'true' : 'false'; ?>;
         window.APP_COUNTRY_ID = <?php echo (int)($countryId ?? 0); ?>;
@@ -162,21 +165,12 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_STOREFRONT_CART_URL = <?php echo json_encode(storefront_url('cart', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         window.orangeSfCartKey = function () {
-            var allowed = window.ORANGE_SF_VALID_SLUGS || {};
-            var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || '').toLowerCase();
-            var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : def;
-            ch = String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
-            if (!ch || !allowed[ch]) {
-                ch = (def && allowed[def]) ? def : '';
-                if (!ch) {
-                    var keys = Object.keys(allowed || {});
-                    ch = keys.length === 1 ? keys[0] : '';
-                }
-            }
-            if (!ch) {
+            var cc = (typeof window.APP_COUNTRY_CODE === 'string') ? window.APP_COUNTRY_CODE : '';
+            cc = String(cc).replace(/[^a-z0-9]/gi, '').toLowerCase();
+            if (!cc) {
                 return 'orange_sf_cart__none';
             }
-            return 'orange_sf_cart_' + ch;
+            return 'orange_sf_cart_c_' + cc;
         };
         window.orangeSfPersistChannel = function (rawCh) {
             try {
@@ -368,6 +362,13 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             </div>
         </div>
         <div class="header-actions-cluster">
+            <div class="header-actions header-actions--country">
+                <?php
+                $SF_NAV_PLACEMENT = 'header';
+                $SF_NAV_CLUSTER_PART = 'country';
+                include __DIR__ . '/storefront_nav_cluster.php';
+                ?>
+            </div>
             <div class="header-actions header-actions--lang">
                 <?php
                 $SF_NAV_PLACEMENT = 'header';

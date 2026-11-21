@@ -9,21 +9,39 @@ require_once __DIR__ . '/includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_read_bootstrap($pdo);
+require_once __DIR__ . '/includes/countries.php';
 
-$slug = isset($_GET['channel']) && (string) $_GET['channel'] !== ''
-    ? (string) $_GET['channel']
-    : (orange_storefront_read_saved_channel_slug() ?? orange_storefront_default_channel_slug($pdo));
-$slug = orange_storefront_valid_channel_slug($pdo, $slug);
+$countryCode = '';
+if (isset($_GET['country']) && (string) $_GET['country'] !== '') {
+    $countryCode = orange_countries_normalize_code((string) $_GET['country']);
+}
+if ($countryCode === '') {
+    $countryCode = orange_storefront_current_country_code($pdo);
+}
+if ($countryCode === '') {
+    $saved = orange_storefront_read_saved_country_code();
+    if ($saved !== null) {
+        $countryCode = $saved;
+    }
+}
 
 $lang = current_lang();
-
-$startUrl = storefront_url('home', $slug, $lang);
+$startKey = $countryCode !== '' ? $countryCode : 'store';
+$startUrl = storefront_url('home', $startKey, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 
-/* لون PWA موحّد — اسم التطبيق يتبع القناة (WEB / ONLINE / TIKTOK) */
+/* لون PWA موحّد — اسم التطبيق من علامة المتجر (س32: دولة لا قناة) */
 $themeColor = '#ff6a00';
-$ch = get_channel_by_slug($slug);
-$fullName = storefront_channel_display_name($ch ?? ['name' => ''], $slug);
+$fullName = t('storefront_brand');
+if ($countryCode !== '') {
+    $crow = orange_country_row_by_code($pdo, $countryCode, false);
+    if ($crow !== null) {
+        $label = orange_country_label_from_row($crow, $lang);
+        if ($label !== '') {
+            $fullName = $fullName . ' — ' . $label;
+        }
+    }
+}
 
 $shortName = $fullName;
 if (function_exists('mb_strlen') && function_exists('mb_substr')) {

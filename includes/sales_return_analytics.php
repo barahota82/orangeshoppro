@@ -200,10 +200,13 @@ function orange_sales_return_marketing_channel_label(
     ?string $sourceKind = null
 ): string {
     if ($channelId !== null && (int) $channelId > 0) {
-        return orange_sales_order_channel_label($channelId, $channelNameFromDb);
+        return orange_sales_order_channel_label($channelId, $channelNameFromDb, $sourceKind);
     }
     if (trim((string) ($sourceKind ?? '')) === 'company') {
         return orange_sales_company_direct_channel_label();
+    }
+    if (trim((string) ($sourceKind ?? '')) === 'website') {
+        return orange_sales_order_channel_label(null, null, 'website');
     }
 
     return '— بلا قناة —';

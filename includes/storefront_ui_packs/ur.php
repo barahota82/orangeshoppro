@@ -111,7 +111,7 @@ return [
     'track_signup_nudge_after_track' => 'مشورہ ہے کہ ای میل سے رجسٹر ہوں تاکہ تمام آرڈر ایک جگہ ٹریک ہوں اور آفرز کی خبر ملتی رہے۔ نیچے بٹن سے اس صفحے کے اوپر سائن اپ کھولیں۔',
     'track_signup_nudge_open_btn' => 'اوپر سائن اپ کھولیں',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'your@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'نام جیسا آپ محفوظ کروانا چاہتے ہیں',
     'register_placeholder_phone' => 'فون نمبر درج کریں (صرف ملکی ہندسے)',
     'register_placeholder_area' => 'علاقہ یا خطہ',

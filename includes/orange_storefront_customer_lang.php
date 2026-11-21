@@ -256,11 +256,20 @@ function orange_storefront_customer_lang_resolution(PDO $pdo, int $countryId): a
  *   country_id: int
  * }
  */
+/**
+ * Clear per-request customer-lang memo after country override / entry apply
+ * so public_url_lang sees the target country roles (no global public-lang bypass).
+ */
+function orange_storefront_customer_lang_reset_request_memo(): void
+{
+    unset($GLOBALS['orange_storefront_customer_lang_request_memo']);
+}
+
 function orange_storefront_customer_lang_for_current_request(): array
 {
-    static $memo = null;
-    if ($memo !== null) {
-        return $memo;
+    if (isset($GLOBALS['orange_storefront_customer_lang_request_memo'])
+        && is_array($GLOBALS['orange_storefront_customer_lang_request_memo'])) {
+        return $GLOBALS['orange_storefront_customer_lang_request_memo'];
     }
     $resolverReady = orange_storefront_customer_lang_ensure_country_resolver();
     if (!$resolverReady || !function_exists('db')) {
@@ -274,6 +283,7 @@ function orange_storefront_customer_lang_for_current_request(): array
         unset($e);
         $memo = orange_storefront_customer_lang_closed_resolution('read_failed', 0);
     }
+    $GLOBALS['orange_storefront_customer_lang_request_memo'] = $memo;
 
     return $memo;
 }
@@ -485,9 +495,40 @@ function orange_storefront_customer_lang_cookie_allowed(string $lang): bool
  */
 function orange_storefront_public_url_lang(string $lang): string
 {
+    return orange_storefront_public_url_lang_for_country($lang, null);
+}
+
+/**
+ * حارس لغة رابط عام حسب أدوار الدولة المستهدفة ∩ اللغات الجاهزة.
+ * إن مُرّر رمز دولة: لا يُستخدم حارس الدولة الحالية / دولة غير مختارة.
+ */
+function orange_storefront_public_url_lang_for_country(string $lang, ?string $targetCountryCode): string
+{
     $lang = strtolower(trim($lang));
     if (function_exists('orange_is_admin_request_context') && orange_is_admin_request_context()) {
         return $lang;
+    }
+    $targetCountryCode = $targetCountryCode !== null
+        ? (function_exists('orange_countries_normalize_code')
+            ? orange_countries_normalize_code($targetCountryCode)
+            : strtolower(trim($targetCountryCode)))
+        : '';
+    if ($targetCountryCode !== '' && function_exists('db')) {
+        try {
+            $pdo = db();
+            require_once __DIR__ . '/countries.php';
+            $crow = orange_country_row_by_code($pdo, $targetCountryCode, false);
+            if ($crow !== null) {
+                $resolution = orange_storefront_customer_lang_resolution($pdo, (int) ($crow['id'] ?? 0));
+                if (empty($resolution['customer_wired'])) {
+                    return $lang;
+                }
+
+                return in_array($lang, $resolution['codes'], true) ? $lang : '';
+            }
+        } catch (Throwable $e) {
+            unset($e);
+        }
     }
     $resolution = orange_storefront_customer_lang_for_current_request();
     if (empty($resolution['customer_wired'])) {
@@ -495,6 +536,19 @@ function orange_storefront_public_url_lang(string $lang): string
     }
 
     return in_array($lang, $resolution['codes'], true) ? $lang : '';
+}
+
+/**
+ * لغة عامة لروابط الدخول (جذر / لغة فقط) حسب أدوار الدولة المستهدفة ∩ الجاهز للواجهة.
+ * لا يتجاوز حارس العميل؛ اللغة المطلوبة تُقبل فقط إن كانت ضمن codes.
+ *
+ * @param list<string> $candidates
+ */
+function orange_storefront_entry_select_public_lang(PDO $pdo, int $countryId, array $candidates): string
+{
+    $resolution = orange_storefront_customer_lang_resolution($pdo, $countryId);
+
+    return orange_storefront_pick_customer_lang($resolution, $candidates);
 }
 
 /**

@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Vi anbefaler å registrere deg med e-posten din for å spore alle bestillingene dine på ett sted og få oppdateringer om tilbud og rabatter. Trykk på knappen nedenfor for å åpne registreringen øverst på denne siden.',
     'track_signup_nudge_open_btn' => 'Åpne påmelding ovenfor',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'din@e-post.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Navnet ditt slik du vil ha det lagret',
     'register_placeholder_phone' => 'Skriv inn telefonnummeret ditt (kun nasjonale sifre)',
     'register_placeholder_area' => 'Område eller region',

@@ -13,6 +13,9 @@ function orange_countries_row_select_sql(PDO $pdo): string
     if (orange_table_has_column($pdo, 'countries', 'timezone')) {
         $cols .= ', timezone';
     }
+    if (orange_table_has_column($pdo, 'countries', 'whatsapp_number')) {
+        $cols .= ', whatsapp_number';
+    }
 
     return $cols;
 }
@@ -432,10 +435,9 @@ function orange_storefront_read_saved_country_code(): ?string
 }
 
 /**
- * كود الدولة الحالية للواجهة.
- * الترتيب النهائي (2026-07-26): override موثوق (Geo/entry) → Channel DB country
- * → cookie من زيارة قناة سابقة → وإلا فارغ (fail-closed).
- * ممنوع: ?country= كسلطة؛ ممنوع fallback صامت إلى kw/default.
+ * كود الدولة الحالية للواجهة (س32).
+ * الترتيب: override (دخول) → مسار/?country= لدولة نشطة → كوكي دولة نشطة → وإلا فارغ (fail-closed).
+ * القناة لم تعد سلطة للدولة. ممنوع fallback صامت إلى kw/default.
  */
 function orange_storefront_current_country_code(PDO $pdo): string
 {
@@ -449,35 +451,19 @@ function orange_storefront_current_country_code(PDO $pdo): string
     if ($memo !== null) {
         return $memo;
     }
-    if (function_exists('orange_storefront_request_channel_country_state')) {
-        $chState = orange_storefront_request_channel_country_state($pdo);
-        if (!empty($chState['matched'])) {
-            if (!empty($chState['invalid']) || empty($chState['code'])) {
-                $memo = '';
+    require_once __DIR__ . '/storefront_country_store.php';
+    $fromPath = orange_storefront_request_country_code_from_path_or_query($pdo);
+    if ($fromPath !== null && $fromPath !== '') {
+        $memo = $fromPath;
 
-                return $memo;
-            }
-            $memo = (string) $chState['code'];
-
-            return $memo;
-        }
-    } elseif (function_exists('orange_storefront_country_code_from_request_channel')) {
-        $fromChannel = orange_storefront_country_code_from_request_channel($pdo);
-        if ($fromChannel !== null && $fromChannel !== ''
-            && orange_country_row_by_code($pdo, $fromChannel, true) !== null) {
-            $memo = $fromChannel;
-
-            return $memo;
-        }
+        return $memo;
     }
-    // ?country= ليس Country Authority — التبديل يتم عبر قناة رئيسية موثوقة (storefront_country_switch_href).
     $fromCookie = orange_storefront_read_saved_country_code();
     if ($fromCookie !== null && orange_country_row_by_code($pdo, $fromCookie, true) !== null) {
         $memo = $fromCookie;
 
         return $memo;
     }
-    // لا kw / لا أول دولة Active — Missing Channel Country = fail-closed.
     $memo = '';
 
     return $memo;
@@ -528,6 +514,16 @@ function orange_storefront_currency_unit(PDO $pdo, ?int $countryId = null): stri
 function orange_storefront_current_country_id(PDO $pdo): int
 {
     static $memo = null;
+    // Geo/entry override must win even if this request already memoized fail-closed 0.
+    if (!empty($GLOBALS['orange_storefront_country_override'])) {
+        $forced = orange_countries_normalize_code((string) $GLOBALS['orange_storefront_country_override']);
+        if ($forced !== '') {
+            $rowForced = orange_country_row_by_code($pdo, $forced, false);
+            if ($rowForced !== null) {
+                return (int) $rowForced['id'];
+            }
+        }
+    }
     if ($memo !== null) {
         return $memo;
     }

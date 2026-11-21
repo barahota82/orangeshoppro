@@ -29,30 +29,37 @@ function orange_order_intake_error_for_queue(Throwable $e): string
 }
 
 /**
- * دولة صف الطابور: قناة الحمولة، ثم الطلب المرتبط، ثم الدولة الافتراضية.
+ * سلطة دولة الطابور الموحّدة (س32): country_id في الحمولة فقط.
+ * بلا كوكي / بلا دولة افتراضية / بلا توافق قناة تاريخي.
+ * يُقبل country_id حتى لو الدولة غير نشطة حتى لا تُعاد نسبة الصف لدولة أخرى.
+ *
+ * @param array<string, mixed> $payload
+ */
+function orange_order_intake_payload_country_id(PDO $pdo, array $payload): int
+{
+    require_once __DIR__ . '/countries.php';
+    $fromId = (int) ($payload['country_id'] ?? 0);
+    if ($fromId > 0) {
+        return orange_country_row_by_id($pdo, $fromId, false) !== null ? $fromId : 0;
+    }
+
+    return 0;
+}
+
+/**
+ * دولة صف الطابور = payload.country_id فقط (س32) — بلا fallback إلى orders.country_id.
+ * fail-closed = 0 عند غياب/فساد الحمولة حتى مع order_id صالح.
  *
  * @param array<string, mixed> $row
  */
 function orange_order_intake_row_country_id(PDO $pdo, array $row): int
 {
     $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
-    if (is_array($payload) && isset($payload['channel_id'])) {
-        $chCid = orange_country_id_for_channel($pdo, (int) $payload['channel_id']);
-        if ($chCid > 0) {
-            return $chCid;
-        }
-    }
-    $orderId = (int) ($row['order_id'] ?? 0);
-    if ($orderId > 0 && orange_table_has_country_id($pdo, 'orders')) {
-        $st = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
-        $st->execute([$orderId]);
-        $oc = (int) ($st->fetchColumn() ?: 0);
-        if ($oc > 0) {
-            return $oc;
-        }
+    if (!is_array($payload)) {
+        return 0;
     }
 
-    return orange_countries_default_id($pdo);
+    return orange_order_intake_payload_country_id($pdo, $payload);
 }
 
 /**
@@ -108,7 +115,7 @@ function orange_order_intake_filter_rows_by_context(PDO $pdo, array $rows): arra
 }
 
 /**
- * فلترة SQL لطابور الطلبات حسب channel_id في payload_json (بند 13).
+ * فلترة SQL لطابور الطلبات — نفس سلطة الحمولة: payload.country_id فقط (س32).
  *
  * @return array{join:string, where:string, params:list<int>}|null
  */
@@ -117,17 +124,15 @@ function orange_order_intake_sql_country_scope(PDO $pdo, string $alias = 'oiq', 
     if ($countryId === null) {
         $countryId = orange_admin_context_country_id($pdo);
     }
-    if ($countryId <= 0 || !orange_channels_has_country_column($pdo)) {
+    if ($countryId <= 0) {
         return null;
     }
-    $defaultCid = orange_countries_default_id($pdo);
     $a = trim($alias) !== '' ? trim($alias) : 'oiq';
-    $chAlias = $a . '_ch';
+    $payloadCid = 'CAST(JSON_UNQUOTE(JSON_EXTRACT(' . $a . '.payload_json, \'$.country_id\')) AS UNSIGNED)';
 
     return [
-        'join' => ' LEFT JOIN channels ' . $chAlias . ' ON ' . $chAlias . '.id = CAST(JSON_UNQUOTE(JSON_EXTRACT('
-            . $a . '.payload_json, \'$.channel_id\')) AS UNSIGNED) ',
-        'where' => ' AND COALESCE(NULLIF(' . $chAlias . '.country_id, 0), ' . (int) $defaultCid . ') = ? ',
+        'join' => '',
+        'where' => ' AND ' . $payloadCid . ' = ? ',
         'params' => [$countryId],
     ];
 }
@@ -404,44 +409,73 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     if (!preg_match('/^(ar|en|fil|hi)$/', $langCheckout)) {
         $langCheckout = 'en';
     }
-    orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCheckout);
 
-    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
-
-    $emailCheck = trim((string) ($data['email'] ?? ''));
-    if ($emailCheck !== '' && !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
-        orange_storefront_throw_customer('checkout_invalid_email', 'Invalid email in checkout payload');
+    require_once __DIR__ . '/storefront_country_store.php';
+    require_once __DIR__ . '/countries.php';
+    // سلطة الدولة من الحمولة أولاً (س32) — قبل أي قراءة تعتمد الدولة الحالية (مناطق/رسوم).
+    $orderCountryId = orange_order_intake_payload_country_id($pdo, $data);
+    if ($orderCountryId <= 0) {
+        orange_storefront_throw_customer('checkout_country_required', 'payload country_id required for website checkout');
     }
-    $data['email'] = $emailCheck;
-
-    $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
-    if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
-        orange_storefront_throw_customer('phone_country_required', 'phone_country missing in checkout');
+    $countryRowActive = orange_country_row_by_id($pdo, $orderCountryId, true);
+    if ($countryRowActive === null) {
+        orange_storefront_throw_customer('checkout_country_inactive', 'country inactive for checkout id=' . $orderCountryId);
     }
-    $phoneRawIn = trim((string) ($data['phone'] ?? ''));
-    $dialForNational = $pcParsed['full_intl'] ? null : $pcParsed['dial'];
-    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $dialForNational, $pcParsed['full_intl']);
-    if ($phoneNorm === null) {
-        orange_storefront_throw_customer('checkout_invalid_phone', 'phone normalization failed');
-    }
-    $data['phone'] = $phoneNorm;
-    $data['phone_country'] = $pcParsed['full_intl'] ? '' : $pcParsed['dial'];
-    $partsStore = orange_storefront_phone_storage_parts($phoneRawIn, $dialForNational);
-    $data['phone_country_dial'] = $partsStore['country_dial'];
-    $data['phone_national'] = $partsStore['national'];
+    $data['country_id'] = $orderCountryId;
+    $prevOverride = $GLOBALS['orange_storefront_country_override'] ?? null;
+    $overrideCode = orange_countries_normalize_code((string) ($countryRowActive['code'] ?? ''));
+    orange_storefront_set_country_override($overrideCode);
 
-    if (!is_array($data['items']) || count($data['items']) === 0) {
-        orange_storefront_throw_customer('checkout_cart_items_required', 'Cart items are required');
-    }
+    try {
+        orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCheckout);
 
-    $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $channelStmt->execute([(int) $data['channel_id']]);
-    $channel = $channelStmt->fetch(PDO::FETCH_ASSOC);
-    if (!$channel) {
-        orange_storefront_throw_customer('checkout_invalid_channel', 'channel_id=' . (int) $data['channel_id']);
-    }
+        require_fields($data, ['name', 'phone', 'area', 'address', 'items']);
 
-    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
+        $emailCheck = trim((string) ($data['email'] ?? ''));
+        if ($emailCheck !== '' && !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
+            orange_storefront_throw_customer('checkout_invalid_email', 'Invalid email in checkout payload');
+        }
+        $data['email'] = $emailCheck;
+
+        $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
+        if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
+            orange_storefront_throw_customer('phone_country_required', 'phone_country missing in checkout');
+        }
+        $phoneRawIn = trim((string) ($data['phone'] ?? ''));
+        $dialForNational = $pcParsed['full_intl'] ? null : $pcParsed['dial'];
+        $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $dialForNational, $pcParsed['full_intl']);
+        if ($phoneNorm === null) {
+            orange_storefront_throw_customer('checkout_invalid_phone', 'phone normalization failed');
+        }
+        $data['phone'] = $phoneNorm;
+        $data['phone_country'] = $pcParsed['full_intl'] ? '' : $pcParsed['dial'];
+        $partsStore = orange_storefront_phone_storage_parts($phoneRawIn, $dialForNational);
+        $data['phone_country_dial'] = $partsStore['country_dial'];
+        $data['phone_national'] = $partsStore['national'];
+
+        if (!is_array($data['items']) || count($data['items']) === 0) {
+            orange_storefront_throw_customer('checkout_cart_items_required', 'Cart items are required');
+        }
+
+        // س32: طلبات المتجر بلا اشتراط قناة؛ channel_id اختياري إن وُجد صالحاً ضمن الدولة.
+        $channelIdIns = (int) ($data['channel_id'] ?? 0);
+    $channel = null;
+    if ($channelIdIns > 0) {
+        $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
+        $channelStmt->execute([$channelIdIns]);
+        $channel = $channelStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        if ($channel) {
+            $chCid = orange_country_id_for_channel($pdo, $channelIdIns);
+            if ($chCid > 0 && $chCid !== $orderCountryId) {
+                $channel = null;
+                $channelIdIns = 0;
+            }
+        } else {
+            $channelIdIns = 0;
+        }
+    }
+    $data['channel_id'] = $channelIdIns > 0 ? $channelIdIns : 0;
+
     $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
     $orderNumber = orange_generate_order_number_for_country($pdo, $orderCountryId);
 
@@ -558,7 +592,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         trim((string) $data['email']),
         isset($data['notes']) ? trim((string) $data['notes']) : '',
         $orderNumber,
-        orange_country_id_for_channel($pdo, (int) $data['channel_id'])
+        $orderCountryId
     );
 
     // استبدال نقاط الولاء (للحساب المسجَّل فقط): يقلّل المبلغ المستحق؛ الاستهلاك FIFO بعد إدراج الطلب.
@@ -606,16 +640,17 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $params[] = $data['phone_national'] ?? null;
     }
-    // Bound values: phone, area, address, notes, channel_id, total — status is literal 'pending'.
+    // Bound values: phone, area, address, notes, channel_id (nullable), total — status is literal 'pending'.
     $cols .= ', phone, area, address, notes, channel_id, status, total';
     $ph .= ', ?, ?, ?, ?, ?, \'pending\', ?';
+    $channelIdForDb = (int) ($data['channel_id'] ?? 0);
     array_push(
         $params,
         trim((string) $data['phone']),
         trim((string) $data['area']),
         trim((string) $data['address']),
         isset($data['notes']) ? trim((string) $data['notes']) : '',
-        (int) $data['channel_id'],
+        $channelIdForDb > 0 ? $channelIdForDb : null,
         $orderTotal
     );
     if ($hasSource) {
@@ -854,20 +889,32 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $messageLines[] = 'Total: ' . number_format($orderTotal, 2) . ' KD';
 
-    $whatsAppNumber = clean_whatsapp_number((string) $channel['whatsapp_number']);
-    $whatsAppUrl = 'https://wa.me/' . $whatsAppNumber . '?text=' . rawurlencode(implode("\n", $messageLines));
+    // س32/C6: واتساب من إعداد الدولة — اختياري؛ غياب الرقم لا يفشل الطلب.
+    $whatsAppNumber = orange_storefront_country_whatsapp_digits($pdo, $orderCountryId);
+    $whatsAppUrl = '';
+    if ($whatsAppNumber !== '') {
+        $whatsAppUrl = 'https://wa.me/' . $whatsAppNumber . '?text=' . rawurlencode(implode("\n", $messageLines));
+    }
 
-    return [
-        'order_id' => $orderId,
-        'order_number' => $orderNumber,
-        'total' => $orderTotal,
-        'delivery_fee' => $deliveryFee,
-        'delivery_fee_base' => $deliveryFeeBase,
-        'delivery_fee_discount' => $deliveryFeeDiscount,
-        'delivery_promotion_id' => $deliveryPromotionId > 0 ? $deliveryPromotionId : null,
-        'whatsapp_number' => $whatsAppNumber,
-        'whatsapp_url' => $whatsAppUrl,
-    ];
+        return [
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'total' => $orderTotal,
+            'delivery_fee' => $deliveryFee,
+            'delivery_fee_base' => $deliveryFeeBase,
+            'delivery_fee_discount' => $deliveryFeeDiscount,
+            'delivery_promotion_id' => $deliveryPromotionId > 0 ? $deliveryPromotionId : null,
+            'whatsapp_number' => $whatsAppNumber,
+            'whatsapp_url' => $whatsAppUrl,
+        ];
+    } finally {
+        // استعادة سياق الدولة بين مهام الطابور حتى لا يتسرب override لمهمة تالية.
+        if (is_string($prevOverride) && $prevOverride !== '') {
+            orange_storefront_set_country_override($prevOverride);
+        } else {
+            orange_storefront_set_country_override(null);
+        }
+    }
 }
 
 /**
@@ -877,6 +924,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
  */
 function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = false): bool
 {
+    require_once __DIR__ . '/order_intake_control.php';
+    if (orange_order_intake_is_paused()) {
+        // إيقاف العامل فعلياً: لا انتقاء صفوف pending ولا تغيير حالتها.
+        return false;
+    }
     require_once __DIR__ . '/backup/restore/restore_maintenance_enforcement.php';
     orange_restore_maint_enforcement_library_mutation_guard('scheduled_business_write');
 
@@ -955,6 +1007,10 @@ function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = 
  */
 function orange_order_intake_enqueue(PDO $pdo, array $data): array
 {
+    require_once __DIR__ . '/order_intake_control.php';
+    if (orange_order_intake_is_paused()) {
+        throw new RuntimeException('order_intake_paused');
+    }
     require_once __DIR__ . '/backup/restore/restore_maintenance_enforcement.php';
     orange_restore_maint_enforcement_library_mutation_guard('order_create');
 

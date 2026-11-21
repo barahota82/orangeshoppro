@@ -10,187 +10,187 @@ return array (
     'de' => 
     array (
       'file' => 'storefront_ui_packs/de.php',
-      'sha256' => 'af2181ff7c9f61736254013d4bd983e08f0f801a0bb18c3b490da9eafc3cfff9',
+      'sha256' => '4956f62ceadaa7b972d8e8f4c83b1d6462edf53d878b98dde06339af8b552bab',
     ),
     'es' => 
     array (
       'file' => 'storefront_ui_packs/es.php',
-      'sha256' => '4ddb29f28e6eb7708f4ce9cb0595a52a86896bb0bebc9aa44e55f8b8c870340b',
+      'sha256' => '1fb1665ba8764e003d079d9e33cdc4e1da0b15b933a46a56dbc184ff8526478c',
     ),
     'fa' => 
     array (
       'file' => 'storefront_ui_packs/fa.php',
-      'sha256' => '6f0f750f666db3c3c2a3fdee912085e1357a7a14a14642e5f975d2336d81ff4f',
+      'sha256' => '9b91bc9def42c95daee555c9d663fd2b788e5d1475836d75031f71bccd707e3e',
     ),
     'fr' => 
     array (
       'file' => 'storefront_ui_packs/fr.php',
-      'sha256' => '7f3d46a8edfeb956050f619593b372c8cf5a6c797bd7324517e46455ff08f186',
+      'sha256' => '71831819d9ee09accfea96d1815e7391a0e7ccd3d4db99e3e0dff8a3805dd104',
     ),
     'he' => 
     array (
       'file' => 'storefront_ui_packs/he.php',
-      'sha256' => 'c34e326a22eafc463fb5484299660eb9af952a70b5d983fb4c471f371839e050',
+      'sha256' => '9a026a9e58597443a85639db970cda6137928ac019c8a99e7061ce90daa5ed7a',
     ),
     'ru' => 
     array (
       'file' => 'storefront_ui_packs/ru.php',
-      'sha256' => '17a0d549b4810dd813b587bde9ff6c0a6184747d63d58710e0d260c1e6144518',
+      'sha256' => '7f0f6c4ad31903fffe2e498dec871eca1e73d5d0677bb7374dd7a8433fa187d6',
     ),
     'tr' => 
     array (
       'file' => 'storefront_ui_packs/tr.php',
-      'sha256' => 'b8cf00ac240e470482dda9858b94be7f2d4f2dc3af5bf6f619292141497e5702',
+      'sha256' => 'a2403ca8433241f684855cfc73ba6ea49bc74ca48d2877cdd88b1d588ca2ee13',
     ),
     'ur' => 
     array (
       'file' => 'storefront_ui_packs/ur.php',
-      'sha256' => 'd18fa895336827646921a1925d023c0265233d5890e4c9993fdeb0fe1e216b01',
+      'sha256' => '6e323f05f3bfd40341ce2375fa416a0363048ceb6bd4f1b83701c1c1e49c8e6d',
     ),
     'zh' => 
     array (
       'file' => 'storefront_ui_packs/zh.php',
-      'sha256' => '2bd190897635d7ce2b67e523e5a9b2a861fe9f44d4d731b1d11fe99bebd6c5e9',
+      'sha256' => '357f400b6d2f1a2e2158d3629c100eea79d38aa51788f58468b87a832b751904',
     ),
     'be' => 
     array (
       'file' => 'storefront_ui_packs/be.php',
-      'sha256' => '7729c1328fce8c9e65bb7b6886f8ea6bb29c98c9f55d096e4ce6a6bfebc651a6',
+      'sha256' => '449d1911225d9e38f6897da552b88d01605b03c243dd217784a26f71810bf68f',
     ),
     'bg' => 
     array (
       'file' => 'storefront_ui_packs/bg.php',
-      'sha256' => 'ab1013714478a9aca6fad5310efc9c74462a3d809257588ef7884e9f92c2658a',
+      'sha256' => '577622f0b256e92b8724c54880b1a9def93a8df98173a81f4ab87e03704b86ea',
     ),
     'bn' => 
     array (
       'file' => 'storefront_ui_packs/bn.php',
-      'sha256' => '90326f2cf56d71c9f5298e4e585e3714009b1a0623e5df8002e4dae98b33f84e',
+      'sha256' => 'ef1759b9dccb47fb3e94cab525cea8205386e304407464119478d963ed7b5233',
     ),
     'cs' => 
     array (
       'file' => 'storefront_ui_packs/cs.php',
-      'sha256' => 'd2e72434380b3fda4ad075acdbe31fa676a27d1eacebce37b3a5231d9c16d30d',
+      'sha256' => '1773088001d34702da2755cbdd0a61aa8638068d907ee73d066197d2666be462',
     ),
     'da' => 
     array (
       'file' => 'storefront_ui_packs/da.php',
-      'sha256' => '388ba4e8ded4e87e8622ac38dff660c669cfc081ea553ca5d2af3ecf5b309c4c',
+      'sha256' => '49d157dcd979449d67d8f52e36c05efa31da6425fdf0dd760b8712d34b1ceb30',
     ),
     'el' => 
     array (
       'file' => 'storefront_ui_packs/el.php',
-      'sha256' => '180560fe48ed8b31bbb913a7a127108c86b02258861f8a9099bf8ed096936364',
+      'sha256' => 'cb2c003a8c7ee023a04e640c4da52cb86a837d216a4e0d18e438d604efdb7c76',
     ),
     'ga' => 
     array (
       'file' => 'storefront_ui_packs/ga.php',
-      'sha256' => '1b04b6392c3d47c522f33afca822b73703cde66e1e0b13749d911b8428febbbe',
+      'sha256' => '3b79cfb5d01444b03ae95138855296c5e1ccdc0c8e3e67cfff9b069b5ee65d5c',
     ),
     'hr' => 
     array (
       'file' => 'storefront_ui_packs/hr.php',
-      'sha256' => 'befa5577bf50c04ad39ef368da0b3693f656771088e35eb217bdbbe71c2a7a12',
+      'sha256' => 'f4b4ea1efd0e20c97dd3a0c8ceb39ed484df965b8f6ae97065fd4eda2940dc89',
     ),
     'hy' => 
     array (
       'file' => 'storefront_ui_packs/hy.php',
-      'sha256' => 'e92ff1d61b54741f8bf6cef5afcfea785e921648b98aaa22e823f22993c897ac',
+      'sha256' => 'e0893d408e8401d0ab5ad25a9888496a84519f5634792f4b31a56ce6a47b6fc3',
     ),
     'id' => 
     array (
       'file' => 'storefront_ui_packs/id.php',
-      'sha256' => 'fc84c876ae41c2cc933026313a68d85e6d71489bfec090f93e1bd9b9c09b266d',
+      'sha256' => 'b0a9775219cb41b8a21e8aba291e63b2651e81810798424ebb238ad415775cf8',
     ),
     'is' => 
     array (
       'file' => 'storefront_ui_packs/is.php',
-      'sha256' => '7656159c105111ac78d6d887b1a51309998ac6403fb8f6f70468cab6a87853cb',
+      'sha256' => 'd66a6a200dbef4019140b2e80efe228742dbeb586cad0d6f29b3f89a58714e85',
     ),
     'it' => 
     array (
       'file' => 'storefront_ui_packs/it.php',
-      'sha256' => '7b9d99655f31a5ec99e38613b004d101afd206902763841dc2a9d12cf0e0085d',
+      'sha256' => 'fc3608457eeb520395fa9e2d76b5c49a3b63c9771f3c5e16350b7b961ff2dc95',
     ),
     'ja' => 
     array (
       'file' => 'storefront_ui_packs/ja.php',
-      'sha256' => 'f548567d43b8a9ca9acc0bc5158f9d15ddb754626861cd82eefb47bde5bd2e81',
+      'sha256' => '00cef11aa66d36175bade511cc09b27c1048c6d2026f483868ce209b1cc22d3d',
     ),
     'ka' => 
     array (
       'file' => 'storefront_ui_packs/ka.php',
-      'sha256' => '0ab142093e470d02d18e94abafddcbc3a9d710bcdb976e30ea03f3dfe3045eab',
+      'sha256' => 'a404c74edea95d545d52c16176d15d22f4c82985271302ae07e7e48f4602a3cb',
     ),
     'kn' => 
     array (
       'file' => 'storefront_ui_packs/kn.php',
-      'sha256' => '3b70bc205785731d8212cd15d4a5006e8a1592f7ff8e0f62ac4c3b537782d822',
+      'sha256' => 'f53f2696fde742f58965cf9825da41de7f4840d40f21cd16c57df16f6363c5fe',
     ),
     'ko' => 
     array (
       'file' => 'storefront_ui_packs/ko.php',
-      'sha256' => 'fd80978cb41f8f85fe477f8ccb5c9286641cb3092a9216e9c2f15168303c8fbc',
+      'sha256' => '05af0e0ac17c8dfa74c4c92d7ca24c2f20f1db489173f86681687f8912b71ce5',
     ),
     'ne' => 
     array (
       'file' => 'storefront_ui_packs/ne.php',
-      'sha256' => '403eec18caf8ea01d096c2a6117bab572f9910ede99ed507b3a3a1315df8b476',
+      'sha256' => 'f41b0914bb85c256e89ed5957426cd666d717687d1f158156a21de335cc524ba',
     ),
     'nl' => 
     array (
       'file' => 'storefront_ui_packs/nl.php',
-      'sha256' => '3202c929646fbee92304e0c3b563d2d56d53f22447a7c44df72c6787ebfc205b',
+      'sha256' => 'eb703a3b8bbd9986a6c4aae9c300b3c395e89167570d8fc8eb0b692dd7a6f045',
     ),
     'no' => 
     array (
       'file' => 'storefront_ui_packs/no.php',
-      'sha256' => '7bb6c20f4044526311b86e7f81964658b3010d55569f3257657953b2fb15aeb4',
+      'sha256' => 'c63228c108b1f151f7c20a0d756d2ae140da2388f4aaaf972aa73bda05e7fc9c',
     ),
     'pl' => 
     array (
       'file' => 'storefront_ui_packs/pl.php',
-      'sha256' => '01623ecf8ffe66626174e3b62c139c97b03feaa12381276f9f881262a6936316',
+      'sha256' => '24e740a5d4074b1ea63d0e09c3bab5baddace5355d12385a4456a61ad173e0b2',
     ),
     'pt' => 
     array (
       'file' => 'storefront_ui_packs/pt.php',
-      'sha256' => '58d5083590aebf96c422b4c1b53a3773c5e2efd6db7ef7f1656ffe0b7c4ec6d7',
+      'sha256' => '24232c195dd4a78e3e2271bb2e8db5988b5f1d14dde6b4aeb4e73b06d23fbded',
     ),
     'ro' => 
     array (
       'file' => 'storefront_ui_packs/ro.php',
-      'sha256' => '399ef91cefa55e214c610e571fce04df55194deae0eca3d2b2725b7e12a3ef3e',
+      'sha256' => '8eb16a9502939d41040f80cc968cb053203a6a05e85575b4ec87d3beb006746e',
     ),
     'si' => 
     array (
       'file' => 'storefront_ui_packs/si.php',
-      'sha256' => '5a18e44a910673842c4e7fd77676bd5e891fa33ddc67e24407aaab89b9d4e223',
+      'sha256' => 'af72a0bf0ec5f33660df0253bf85dbb31b17ff794c9f4c92e91d301fda47381e',
     ),
     'so' => 
     array (
       'file' => 'storefront_ui_packs/so.php',
-      'sha256' => '5ba74f632267843e8c6e343720b83e2167477a03a05a987d49c91cf401130065',
+      'sha256' => 'e8d14bb4c451c94dd5b1176f03e8e0cad9e9240625b2090a3c4f0f80eb5eda91',
     ),
     'sv' => 
     array (
       'file' => 'storefront_ui_packs/sv.php',
-      'sha256' => '297ed6bf3bc5e66c5974836f14ceba8675ed88122d4a6a84bd73efbf75238dc4',
+      'sha256' => '473ec40e82f0de933de6ed0c3f1ce1de2ed6fca1d0f8c4309dcdb7846150445b',
     ),
     'th' => 
     array (
       'file' => 'storefront_ui_packs/th.php',
-      'sha256' => 'a5e0047a7ea5e223a3de3d0e862e6464150bfd0c5bba457ccd6c5bd3ef123181',
+      'sha256' => '3b046892abee30e5631a4c66b14bfe21ea5fc2f634a39a11359a42febbeafa0d',
     ),
     'uk' => 
     array (
       'file' => 'storefront_ui_packs/uk.php',
-      'sha256' => 'affd1a52432a39e09d8eb56d185bc1a2572b99c0df14de820800c8a041c5af56',
+      'sha256' => '4789aab5d05f77d0b43f7838330fed67f39c866be1304234e86228b2147d40bd',
     ),
     'vi' => 
     array (
       'file' => 'storefront_ui_packs/vi.php',
-      'sha256' => '7e0291119b8ac422a7136181be6306fc1ab0ba9bdf33cf1226f0a150f2d279bd',
+      'sha256' => 'b1aac57e2378adaeb73bd6a970b6fb69734b5bf1b244ae3810162bbddfb6beae',
     ),
   ),
 );

@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'توصیه می کنیم با ایمیل خود ثبت نام کنید تا همه سفارشات خود را در یک مکان پیگیری کنید و از پیشنهادات و تخفیفات به روز دریافت کنید. روی دکمه زیر ضربه بزنید تا ثبت نام در بالای این صفحه باز شود.',
     'track_signup_nudge_open_btn' => 'ثبت نام را در بالا باز کنید',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'your@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'نام شما همانطور که می خواهید ذخیره شود',
     'register_placeholder_phone' => 'شماره تلفن خود را وارد کنید (فقط ارقام ملی)',
     'register_placeholder_area' => 'منطقه یا منطقه',

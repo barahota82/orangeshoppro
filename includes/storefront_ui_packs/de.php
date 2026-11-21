@@ -109,7 +109,7 @@ return [
     'track_signup_nudge_after_track' => 'Wir empfehlen Ihnen, sich mit Ihrer E-Mail-Adresse zu registrieren, um alle Ihre Bestellungen an einem Ort zu verfolgen und Updates zu Angeboten und Rabatten zu erhalten. Tippen Sie auf die Schaltfläche unten, um die Anmeldung oben auf dieser Seite zu öffnen.',
     'track_signup_nudge_open_btn' => 'Öffnen Sie die Anmeldung oben',
     'track_signup_nudge_merge' => '',
-    'register_placeholder_email' => 'your@email.com',
+    'register_placeholder_email' => 'name@example.com',
     'register_placeholder_name' => 'Ihr Name wird so gespeichert, wie Sie es möchten',
     'register_placeholder_phone' => 'Geben Sie Ihre Telefonnummer ein (nur nationale Ziffern)',
     'register_placeholder_area' => 'Gebiet oder Region',
