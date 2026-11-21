@@ -32,6 +32,7 @@ if ($packagePath === '') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_schema_contract.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_crp_verify.php';
 
 $result = orange_crp_verify_run($packagePath, [

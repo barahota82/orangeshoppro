@@ -27,6 +27,7 @@ if ($packagePath === '') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_schema_contract.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'recovery_validation.php';
 
 $report = orange_recovery_validate_package($packagePath);

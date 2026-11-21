@@ -1187,11 +1187,15 @@ function orange_backup_admin_log_category(string $fileName): string
  * }|null $preloaded Reuse list.php package rows to avoid duplicate disk/JSON work.
  * @return array<string, mixed>
  */
+/**
+ * @param array{defer_environment_probes?:bool} $options
+ */
 function orange_backup_admin_collect_overview(
     PDO $pdo,
     string $projectRoot,
     ?array $viewCtx = null,
-    ?array $preloaded = null
+    ?array $preloaded = null,
+    array $options = []
 ): array {
     $viewCtx = $viewCtx ?? orange_backup_admin_context_for_view($projectRoot);
     $backupRoot = $viewCtx['backup_root'];
@@ -1215,8 +1219,18 @@ function orange_backup_admin_collect_overview(
     $discovery = orange_crp_batch_discover_countries($pdo);
     $recoverableCount = count($discovery['selected'] ?? []);
 
-    $report = orange_backup_collect_environment_report($projectRoot);
+    // List/startup must not wait on mysqldump/powershell probes (OR-CURSOR-022 / OR-PERF-016 Backup Center).
+    $deferProbes = array_key_exists('defer_environment_probes', $options)
+        ? (bool) $options['defer_environment_probes']
+        : true;
+    $report = orange_backup_collect_environment_report($projectRoot, [
+        'skip_tool_probes' => $deferProbes,
+    ]);
     $backend = (string) ($report['selected_backend'] ?? '');
+    if ($deferProbes || !empty($report['tool_probes_deferred'])) {
+        // Honest label — not php_pdo / powershell until runtime diagnostic runs full probes.
+        $backend = 'unknown_deferred';
+    }
 
     $countryPackages = isset($preloaded['country_packages']) && is_array($preloaded['country_packages'])
         ? $preloaded['country_packages']

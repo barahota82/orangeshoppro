@@ -776,22 +776,47 @@ function orange_backup_process_alive(int $pid): bool
 /**
  * @return array<string, mixed>
  */
-function orange_backup_collect_environment_report(string $projectRoot): array
+/**
+ * @param array{skip_tool_probes?:bool} $options
+ *   skip_tool_probes: Backup Center list path — skip where.exe/mysqldump/powershell probes (OR-CURSOR-022).
+ * @return array<string, mixed>
+ */
+function orange_backup_collect_environment_report(string $projectRoot, array $options = []): array
 {
     static $requestCache = [];
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
-    if (isset($requestCache[$projectRoot]) && is_array($requestCache[$projectRoot])) {
-        return $requestCache[$projectRoot];
+    $skipToolProbes = !empty($options['skip_tool_probes']);
+    $cacheKey = $projectRoot . '|' . ($skipToolProbes ? 'fast' : 'full');
+    if (isset($requestCache[$cacheKey]) && is_array($requestCache[$cacheKey])) {
+        return $requestCache[$cacheKey];
     }
     $env = orange_backup_load_env_array($projectRoot);
     $uploadsPath = $projectRoot . DIRECTORY_SEPARATOR . 'uploads';
     $rootConfigured = orange_backup_root_configured($env);
     $rootCandidate = orange_backup_backup_root_candidate($env, $projectRoot);
 
-    $mysqldumpDetected = orange_backup_detect_mysqldump($env);
-    $powershellDetected = orange_backup_detect_powershell($env);
-    $mysqldumpPath = $mysqldumpDetected['path'];
-    $powershellPath = $powershellDetected['path'];
+    if ($skipToolProbes) {
+        $mysqldumpDetected = [
+            'path' => null,
+            'source' => 'list_deferred',
+            'error' => null,
+            'attempted' => [],
+            'suggested_env_path' => null,
+        ];
+        $powershellDetected = [
+            'path' => null,
+            'source' => 'list_deferred',
+            'error' => null,
+            'attempted' => [],
+        ];
+        $mysqldumpPath = null;
+        $powershellPath = null;
+    } else {
+        $mysqldumpDetected = orange_backup_detect_mysqldump($env);
+        $powershellDetected = orange_backup_detect_powershell($env);
+        $mysqldumpPath = $mysqldumpDetected['path'];
+        $powershellPath = $powershellDetected['path'];
+    }
 
     $psScript = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'orange_backup.ps1';
 
@@ -853,7 +878,10 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     }
 
     $selectedBackend = null;
-    if ($powershellReady) {
+    // LOAD-N1: when tool probes are deferred for Backup Center list, do not claim a discovered writer backend.
+    if ($skipToolProbes) {
+        $selectedBackend = null;
+    } elseif ($powershellReady) {
         $selectedBackend = 'powershell';
     } elseif ($phpMysqldumpReady) {
         $selectedBackend = 'php_mysqldump';
@@ -953,8 +981,9 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'can_run_full_backup' => $canRun,
         'warnings' => $warnings,
         'blockers' => $blockers,
+        'tool_probes_deferred' => $skipToolProbes,
     ];
-    $requestCache[$projectRoot] = $report;
+    $requestCache[$cacheKey] = $report;
 
     return $report;
 }

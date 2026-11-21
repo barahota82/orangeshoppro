@@ -7,8 +7,25 @@ require_once __DIR__ . '/backup_validate.php';
 
 const ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION = '1.1';
 const ORANGE_RECOVERY_VALIDATION_REPORT_FILE = 'recovery_validation.json';
-const ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION = 124;
+/**
+ * Exact schema contract for Verify/DRV/eligibility (OR-CURSOR-022).
+ * Must match ORANGE_CATALOG_SCHEMA_PHP_REVISION (125). Historical schema=124 packages
+ * are rejected as schema_incompatible — no auto-accept and no mutation of old packages.
+ */
+const ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION = 125;
 const ORANGE_RECOVERY_VALIDATION_EXPECTED_REGISTRY_VERSION = '1.0';
+
+/**
+ * Runtime expected revision — prefers live catalog constant when loaded.
+ */
+function orange_recovery_validation_expected_schema_revision(): int
+{
+    if (!function_exists('orange_backup_expected_schema_revision')) {
+        require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_schema_contract.php';
+    }
+
+    return orange_backup_expected_schema_revision();
+}
 const ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_FULL = 'full_disaster';
 const ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_CRP = 'country_recovery';
 const ORANGE_RECOVERY_VALIDATION_GZIP_HEAD_BYTES = 65536;
@@ -714,10 +731,11 @@ function orange_recovery_validate_package(string $packagePath): array
     }
 
     $schemaRevision = (int) ($manifest['schema_revision'] ?? 0);
+    $expectedSchema = orange_recovery_validation_expected_schema_revision();
     if ($schemaRevision <= 0) {
         $errors[] = 'manifest.schema_revision missing or invalid';
-    } elseif ($schemaRevision !== ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION) {
-        $errors[] = 'Schema revision mismatch (expected ' . ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION . ', got ' . $schemaRevision . ')';
+    } elseif ($schemaRevision !== $expectedSchema) {
+        $errors[] = 'Schema revision mismatch (expected ' . $expectedSchema . ', got ' . $schemaRevision . ')';
     }
     $packageVersion = trim((string) ($manifest['package_version'] ?? ''));
     if ($packageVersion === '') {

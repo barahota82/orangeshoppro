@@ -115,11 +115,11 @@ function orange_crp_verify_run(string $packageRoot, array $options = []): array
     }
 
     // --- Boundary matrix ---
-    $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 124;
+    if (!function_exists('orange_backup_expected_schema_revision')) {
+        require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_schema_contract.php';
+    }
+    $expectedSchema = orange_backup_expected_schema_revision();
     try {
-        if (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-            $expectedSchema = (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION;
-        }
         $matrix = orange_country_boundary_matrix_load($projectRoot);
         if ((int) ($matrix['schema_revision'] ?? 0) > 0) {
             $expectedSchema = (int) $matrix['schema_revision'];

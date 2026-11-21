@@ -302,12 +302,18 @@ function orange_country_drv_run(string $packageRoot, array $options = []): array
         $add('country_id', 'PASS', null, 'country_id=' . (string) $countryId);
     }
 
+    if (!function_exists('orange_backup_expected_schema_revision')) {
+        require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_schema_contract.php';
+    }
     $matrix = null;
+    $expectedSchema = orange_backup_expected_schema_revision();
     try {
         $matrix = orange_country_boundary_matrix_load($projectRoot);
-        $expectedSchema = (int) ($matrix['schema_revision'] ?? (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? ORANGE_CATALOG_SCHEMA_PHP_REVISION : 124));
+        if ((int) ($matrix['schema_revision'] ?? 0) > 0) {
+            $expectedSchema = (int) $matrix['schema_revision'];
+        }
     } catch (Throwable $e) {
-        $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 124;
+        $expectedSchema = orange_backup_expected_schema_revision();
         $add('matrix', 'FAIL', 'boundary_matrix_unreadable', 'Boundary matrix unreadable', true);
     }
     $schemaRev = (int) ($manifest['schema_revision'] ?? 0);

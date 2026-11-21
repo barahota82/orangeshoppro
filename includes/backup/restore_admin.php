@@ -260,7 +260,12 @@ function orange_restore_admin_package_eligibility(array $package, string $packag
     }
 
     $schemaRevision = (int) ($package['schema_revision'] ?? 0);
-    if ($schemaRevision !== ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION) {
+    $expectedSchema = function_exists('orange_recovery_validation_expected_schema_revision')
+        ? orange_recovery_validation_expected_schema_revision()
+        : (defined('ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION')
+            ? (int) ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION
+            : 125);
+    if ($schemaRevision !== $expectedSchema) {
         $reasons[] = 'schema_incompatible';
     }
 

@@ -494,6 +494,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         archiveMode: { full: false, country: false }
     };
     let bcDiagnosticRequestInFlight = false;
+    let bcRunRequestInFlight = false;
+    let bcLocksUnknown = false;
     let manualActionsAvailable = true;
     let recoveryCheckRequiresWrite = true;
     let rootHealthWarning = '';
@@ -1401,13 +1403,16 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         return '<span class="bc-badge bc-badge--' + tone + '">' + esc(label) + '</span>';
     };
     const applyActionAvailability = () => {
-        const runDisabled = !manualActionsAvailable || state.busy;
+        // LOAD-B1: unknown locks block new writer starts (does not clear bcRunRequestInFlight).
+        const runDisabled = !manualActionsAvailable || state.busy || !!bcLocksUnknown || !!bcRunRequestInFlight;
         ['bc_run_full_btn', 'bc_run_countries_btn'].forEach((id) => {
             const b = el(id);
             if (!b) return;
             b.disabled = runDisabled;
             if (!manualActionsAvailable) {
                 b.title = rootHealthWarning || 'التشغيل اليدوي غير متاح';
+            } else if (bcLocksUnknown) {
+                b.title = 'حالة الأقفال غير معروفة — لن يُعاد إرسال عملية كاتبة تلقائياً';
             } else {
                 b.removeAttribute('title');
             }
@@ -1483,6 +1488,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (node) {
             node.className = 'bc-badge bc-badge--' + tone;
             node.textContent = label;
+            node.removeAttribute('data-bc-status-stale');
         }
     }
 
@@ -1499,11 +1505,32 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             throw new Error('\u0627\u0633\u062a\u062c\u0627\u0628 \u0627\u0644\u062e\u0627\u062f\u0645 \u0628\u0635\u064a\u063a\u0629 \u063a\u064a\u0631 \u0645\u062a\u0648\u0642\u0639\u0629. \u0631\u0627\u062c\u0639 \u0633\u062c\u0644 \u0627\u0644\u0623\u062e\u0637\u0627\u0621.');
         }
     }
-    async function apiGet(path) {
-        const r = await fetch(API_BASE + '/' + path, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
-        const j = await parseApiJsonResponse(r);
-        if (!j.success && r.status >= 400) throw new Error(j.message || 'Request failed');
-        return j;
+    const BC_LIST_TIMEOUT_MS = 45000;
+    const BC_LOCKS_TIMEOUT_MS = 15000;
+    async function apiGet(path, timeoutMs) {
+        const ms = (typeof timeoutMs === 'number' && timeoutMs > 0) ? timeoutMs : 60000;
+        const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        let timer = null;
+        if (ctrl) {
+            timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, ms);
+        }
+        try {
+            const r = await fetch(API_BASE + '/' + path, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+                signal: ctrl ? ctrl.signal : undefined
+            });
+            const j = await parseApiJsonResponse(r);
+            if (!j.success && r.status >= 400) throw new Error(j.message || 'Request failed');
+            return j;
+        } catch (e) {
+            if (e && (e.name === 'AbortError' || String(e.message || '').toLowerCase().indexOf('abort') !== -1)) {
+                throw new Error('انتهت مهلة تحميل البيانات (' + Math.round(ms / 1000) + 'ث). القائمة لم تُعرض من استجابة ناقصة — أعد المحاولة أو شغّل التشخيص.');
+            }
+            throw e;
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
     }
     async function apiPost(path, body) {
         const r = await fetch(API_BASE + '/' + path, {
@@ -2455,14 +2482,67 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         applyActionAvailability();
     }
 
+    // OR-R2-LOADB1-BEGIN
+    function invalidateVisibleListState(reason) {
+        // LOAD-B1 R2: clear lists + overview/root caches so archive cannot revive stale ready UI.
+        state.full = [];
+        state.country = [];
+        state.overview = null;
+        lastOverview = null;
+        lastRootHealth = null;
+        if (typeof qualCache !== 'undefined' && qualCache && typeof qualCache.clear === 'function') {
+            qualCache.clear();
+        }
+        qualHashCountThisPage = 0;
+        const msg = reason || 'تعذر تحميل قائمة النسخ.';
+        try {
+            if (el('bc_full_list')) el('bc_full_list').innerHTML = '';
+            if (el('bc_country_list')) el('bc_country_list').innerHTML = '';
+            if (el('bc_full_table')) {
+                el('bc_full_table').querySelector('tbody').innerHTML =
+                    '<tr><td colspan="8" class="bc-muted">' + esc(msg) + '</td></tr>';
+            }
+            if (el('bc_country_table')) {
+                el('bc_country_table').querySelector('tbody').innerHTML =
+                    '<tr><td colspan="8" class="bc-muted">' + esc(msg) + '</td></tr>';
+            }
+            if (el('bc_overview')) {
+                el('bc_overview').innerHTML = '<div class="bc-muted">' + esc('ملخص غير معتمد: ' + msg) + '</div>';
+            }
+            if (el('bc_overview_flat')) el('bc_overview_flat').innerHTML = '';
+            if (el('bc_root_health')) {
+                el('bc_root_health').innerHTML = '<div class="bc-muted">' + esc('صحة المسار غير معتمدة بعد فشل التحميل.') + '</div>';
+            }
+            // LOAD-B1 R3: header overall badge must not stay green "سليم" after failed/partial load.
+            const overall = el('bc_overall_status');
+            if (overall) {
+                overall.className = 'bc-badge bc-badge--muted';
+                overall.textContent = 'غير معتمدة';
+                overall.setAttribute('data-bc-status-stale', '1');
+            }
+        } catch (ignore) {}
+        applyActionAvailability();
+    }
+
     async function loadAll(opts) {
         opts = opts || {};
         const scrollY = window.scrollY;
         const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
             .map((d) => d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type'));
+        // List load busy is independent of an in-flight writer (bcRunRequestInFlight).
+        // Timeout here does NOT cancel a server-side Backup/Verify/DRV already started.
         setBusy(true, 'جاري تحميل البيانات…');
+        let listOk = false;
+        // R2: do NOT clear bcLocksUnknown here — only a successful locks read proves known state.
         try {
-            const data = await apiGet('list.php');
+            const data = await apiGet('list.php', BC_LIST_TIMEOUT_MS);
+            if (!data || data.success !== true
+                || !Array.isArray(data.full_snapshots)
+                || !Array.isArray(data.country_packages)
+                || typeof data.overview !== 'object' || data.overview === null) {
+                throw new Error('استجابة قائمة النسخ غير صالحة أو ناقصة — لم تُعرض حزم جاهزة.');
+            }
+            listOk = true;
             // Broad list must not resolve/hash qualification for every package (Stage 4B performance).
             qualHashCountThisPage = 0;
             renderRootHealth(data);
@@ -2474,18 +2554,39 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             });
             window.scrollTo(0, scrollY);
             qualScheduleVisibleLoads();
-            const locks = await apiGet('status.php?action=locks');
-            // After a run-result dialog, do not replace the terminal result with a lock notice.
-            if (!opts.preserveOpenDialog
-                && ((locks.full_lock || {}).held || (locks.country_lock || {}).held)) {
-                showSystemDialog({
-                    title: 'رسالة النظام',
-                    message: 'هناك عملية نسخ احتياطي قيد التشغيل حالياً.',
-                    success: false
-                });
+            try {
+                const locks = await apiGet('status.php?action=locks', BC_LOCKS_TIMEOUT_MS);
+                bcLocksUnknown = false;
+                applyActionAvailability();
+                // After a run-result dialog, do not replace the terminal result with a lock notice.
+                if (!opts.preserveOpenDialog
+                    && ((locks.full_lock || {}).held || (locks.country_lock || {}).held)) {
+                    showSystemDialog({
+                        title: 'رسالة النظام',
+                        message: 'هناك عملية نسخ احتياطي قيد التشغيل حالياً. مهلة تحميل القائمة لا تلغي العملية على السيرفر.',
+                        success: false
+                    });
+                }
+            } catch (lockErr) {
+                bcLocksUnknown = true;
+                applyActionAvailability();
+                if (!opts.preserveOpenDialog) {
+                    showSystemDialog({
+                        title: 'رسالة النظام',
+                        message: 'تم تحميل القائمة، وحالة الأقفال غير معروفة: ' + (lockErr.message || 'فشل')
+                            + ' — لن يُعاد إرسال عملية كاتبة تلقائياً.',
+                        success: false
+                    });
+                }
+                // Do not clear bcRunRequestInFlight; do not auto-retry writer POSTs.
             }
         } catch (e) {
             el('bc_root_warning').style.display = 'none';
+            if (!listOk) {
+                invalidateVisibleListState(e.message || 'تعذر تحميل قائمة النسخ.');
+            }
+            // Keep prior bcLocksUnknown; list failure is not proof that locks are free.
+            applyActionAvailability();
             if (!opts.preserveOpenDialog) {
                 showSystemDialog({
                     title: 'رسالة النظام',
@@ -2494,9 +2595,11 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 });
             }
         } finally {
+            // Never clear writer-in-flight guard here; only UI list busy.
             setBusy(false);
         }
     }
+    // OR-R2-LOADB1-END
 
     function confirmAction(title, text, fn) {
         el('bc_confirm_title').textContent = title;
@@ -2556,7 +2659,6 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     const RUN_FULL_FAIL_MSG = 'تعذر إكمال إنشاء النسخة الاحتياطية الكاملة.\nيرجى مراجعة حالة النظام والمحاولة مرة أخرى.';
     const RUN_COUNTRIES_OK_MSG = 'اكتمل إنشاء النسخ الاحتياطية للدول القابلة للاسترداد بنجاح.';
     const RUN_COUNTRIES_FAIL_MSG = 'تعذر إكمال إنشاء النسخ الاحتياطية للدول القابلة للاسترداد.\nيرجى مراجعة حالة النظام والمحاولة مرة أخرى.';
-    let bcRunRequestInFlight = false;
     async function runBackupRuntimeDiagnostic() {
         const btn = el('bc_runtime_diagnostic_btn');
         if (!btn || bcDiagnosticRequestInFlight || state.busy || bcRunRequestInFlight) {
@@ -2642,8 +2744,10 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 sourceBtn: btn
             });
         } finally {
-            setBusy(false);
+            // R2: clear writer guard before setBusy(false) so applyActionAvailability re-enables Run buttons.
             bcRunRequestInFlight = false;
+            setBusy(false);
+            applyActionAvailability();
             try { window.scrollTo(0, scrollY); } catch (err) { /* ignore */ }
         }
     }

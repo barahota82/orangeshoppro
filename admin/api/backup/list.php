@@ -227,6 +227,8 @@ try {
         'country_packages' => $countryPackages,
         'inventory' => $inventoryScoped,
         'storage' => $storage,
+    ], [
+        'defer_environment_probes' => true,
     ]);
     $overview['country_context_code'] = orange_countries_display_code($countryContextCode);
     $manualAvailable = !empty($rootHealth['manual_actions_available']);

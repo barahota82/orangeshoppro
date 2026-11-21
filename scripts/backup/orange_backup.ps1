@@ -38,7 +38,12 @@ param(
     [string]$MysqldumpPath = '',
     [int]$RetentionDaily = 7,
     [int]$RetentionWeekly = 4,
-    [int]$RetentionMonthly = 6
+    [int]$RetentionMonthly = 6,
+    # Local self-test only: run Invoke-RetentionCleanup against an explicit BackupRoot then exit (no dump).
+    [switch]$RetentionTestOnly,
+    [int]$SleepMsWhileLocked = 0,
+    # Declared local inject: force pin-store artifact enumeration failure (OR-CURSOR-022-R4).
+    [switch]$SimulatePinArtifactEnumerateFail
 )
 
 Set-StrictMode -Version Latest
@@ -445,7 +450,9 @@ function Invoke-RetentionCleanup {
         [string]$CurrentSnapshotName,
         [int]$RetentionDaily,
         [int]$RetentionWeekly,
-        [int]$RetentionMonthly
+        [int]$RetentionMonthly,
+        [int]$SleepMsWhileLocked = 0,
+        [switch]$SimulatePinArtifactEnumerateFail
     )
 
     $allDirs = @(Get-ChildItem -LiteralPath $SnapshotsDir -Directory -ErrorAction SilentlyContinue |
@@ -459,57 +466,159 @@ function Invoke-RetentionCleanup {
     $keep = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
     [void]$keep.Add($CurrentSnapshotName)
 
-    $now = Get-Date
-    $dailyCutoff = $now.Date.AddDays(-1 * [Math]::Max(1, $RetentionDaily))
-    foreach ($dir in $allDirs) {
-        if ($dir.LastWriteTime -ge $dailyCutoff) {
-            [void]$keep.Add($dir.Name)
+    # OR-CURSOR-022-R3 A2: hold shared pin lock through pin read, keep decision, and deletes.
+    # Missing primary with no bak/tmp = empty pins OK. Incomplete swap / corrupt / invalid shape = refuse deletes.
+    $pinStore = Join-Path $BackupRoot 'locks\retention_pins.json'
+    $pinLockPath = Join-Path $BackupRoot 'locks\retention_pins.lock'
+    $pinLockStream = $null
+    try {
+        $lockDir = Split-Path -Parent $pinLockPath
+        if (-not (Test-Path -LiteralPath $lockDir)) {
+            New-Item -ItemType Directory -Path $lockDir -Force | Out-Null
+        }
+        $pinLockStream = [System.IO.File]::Open($pinLockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+
+        $pinStoreDir = Split-Path -Parent $pinStore
+        $pinBase = Split-Path -Leaf $pinStore
+        $incompleteArtifacts = @()
+        if (Test-Path -LiteralPath $pinStoreDir) {
+            # OR-CURSOR-022-R4: enumeration failure must reach refuse-deletes path (not Silent empty list).
+            if ($SimulatePinArtifactEnumerateFail) {
+                throw 'pin store artifact enumeration failed (simulated)'
+            }
+            try {
+                $incompleteArtifacts = @(Get-ChildItem -LiteralPath $pinStoreDir -Force -ErrorAction Stop |
+                    Where-Object { -not $_.PSIsContainer -and ($_.Name.StartsWith($pinBase + '.bak.') -or $_.Name.StartsWith($pinBase + '.tmp.')) })
+            } catch {
+                throw ('pin store artifact enumeration failed: {0}' -f $_.Exception.Message)
+            }
+        }
+
+        if (Test-Path -LiteralPath $pinStore) {
+            $pinItem = Get-Item -LiteralPath $pinStore -Force -ErrorAction Stop
+            if ($pinItem.PSIsContainer) {
+                throw 'pin store path is a directory'
+            }
+            $pinRaw = Get-Content -LiteralPath $pinStore -Raw -ErrorAction Stop
+            if ([string]::IsNullOrWhiteSpace($pinRaw)) {
+                throw 'pin store empty'
+            }
+            $pinObj = $pinRaw | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $pinObj) {
+                throw 'pin store JSON null'
+            }
+            if (-not ($pinObj.PSObject.Properties.Name -contains 'pins')) {
+                throw 'pin store missing pins property'
+            }
+            if ($null -eq $pinObj.pins) {
+                throw 'pin store pins is null'
+            }
+            # pins must be a JSON object/map — not array/string/number/bool
+            if ($pinObj.pins -is [System.Collections.IList] -or $pinObj.pins -is [string] -or $pinObj.pins -is [ValueType]) {
+                throw 'pin store pins must be an object map'
+            }
+            $pinProps = @($pinObj.pins.PSObject.Properties)
+            if ($pinProps.Count -eq 0 -and ($pinObj.pins.GetType().FullName -eq 'System.Object[]')) {
+                throw 'pin store pins invalid empty array shape'
+            }
+            foreach ($prop in $pinProps) {
+                if ($null -eq $prop.Value -or ($prop.Value -is [string]) -or ($prop.Value -is [ValueType]) -or ($prop.Value -is [System.Collections.IList])) {
+                    throw ("pin entry for {0} is scalar/invalid" -f $prop.Name)
+                }
+                if (-not ($prop.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}$')) {
+                    throw ("pin entry package id invalid: {0}" -f $prop.Name)
+                }
+                [void]$keep.Add([string]$prop.Name)
+                Write-Log ("Retention keep pinned package {0}" -f $prop.Name)
+            }
+        } elseif ($incompleteArtifacts.Count -gt 0) {
+            throw 'pin store replace incomplete (bak/tmp present without primary)'
+        }
+
+        $now = Get-Date
+        $dailyCutoff = $now.Date.AddDays(-1 * [Math]::Max(1, $RetentionDaily))
+        foreach ($dir in $allDirs) {
+            if ($dir.LastWriteTime -ge $dailyCutoff) {
+                [void]$keep.Add($dir.Name)
+            }
+        }
+
+        for ($weekOffset = 0; $weekOffset -lt [Math]::Max(1, $RetentionWeekly); $weekOffset++) {
+            $weekStart = $now.Date.AddDays(-7 * $weekOffset)
+            while ($weekStart.DayOfWeek -ne [DayOfWeek]::Monday) {
+                $weekStart = $weekStart.AddDays(-1)
+            }
+            $weekEnd = $weekStart.AddDays(7)
+            $newest = $allDirs |
+                Where-Object { $_.LastWriteTime -ge $weekStart -and $_.LastWriteTime -lt $weekEnd } |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+            if ($newest) {
+                [void]$keep.Add($newest.Name)
+            }
+        }
+
+        for ($monthOffset = 0; $monthOffset -lt [Math]::Max(1, $RetentionMonthly); $monthOffset++) {
+            $monthStart = (New-Object DateTime($now.Year, $now.Month, 1)).AddMonths(-1 * $monthOffset)
+            $monthEnd = $monthStart.AddMonths(1)
+            $newest = $allDirs |
+                Where-Object { $_.LastWriteTime -ge $monthStart -and $_.LastWriteTime -lt $monthEnd } |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+            if ($newest) {
+                [void]$keep.Add($newest.Name)
+            }
+        }
+
+        if ($SleepMsWhileLocked -gt 0) {
+            Write-Log ("Retention holding exclusive pin lock for {0}ms (test inject)" -f $SleepMsWhileLocked)
+            Start-Sleep -Milliseconds $SleepMsWhileLocked
+        }
+
+        # Re-check pins under the same lock before each delete (pin that landed before this locked decision is honored).
+        foreach ($dir in $allDirs) {
+            if ($keep.Contains($dir.Name)) {
+                continue
+            }
+            if (Test-Path -LiteralPath $pinStore) {
+                $liveRaw = Get-Content -LiteralPath $pinStore -Raw -ErrorAction Stop
+                $liveObj = $liveRaw | ConvertFrom-Json -ErrorAction Stop
+                if ($null -ne $liveObj -and $null -ne $liveObj.pins) {
+                    $livePinned = $false
+                    foreach ($lp in @($liveObj.pins.PSObject.Properties)) {
+                        if ([string]$lp.Name -eq [string]$dir.Name) {
+                            $livePinned = $true
+                            break
+                        }
+                    }
+                    if ($livePinned) {
+                        [void]$keep.Add($dir.Name)
+                        Write-Log ("Retention keep newly pinned package {0}" -f $dir.Name)
+                        continue
+                    }
+                }
+            }
+
+            $fullPath = $dir.FullName
+            $rootNorm = [System.IO.Path]::GetFullPath($BackupRoot)
+            if (-not $fullPath.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Retention safety check failed; refusing to delete: $fullPath"
+            }
+
+            Write-Log ("Retention: removing expired snapshot {0}" -f $dir.Name)
+            Remove-Item -LiteralPath $fullPath -Recurse -Force
+        }
+
+        Write-Log ("Retention complete. Protected snapshots: {0}" -f $keep.Count)
+    } catch {
+        Write-Log ("Retention aborted: pin store unreadable/corrupt ({0}); refusing deletes." -f $_.Exception.Message)
+        return
+    } finally {
+        if ($null -ne $pinLockStream) {
+            $pinLockStream.Close()
+            $pinLockStream.Dispose()
         }
     }
-
-    for ($weekOffset = 0; $weekOffset -lt [Math]::Max(1, $RetentionWeekly); $weekOffset++) {
-        $weekStart = $now.Date.AddDays(-7 * $weekOffset)
-        while ($weekStart.DayOfWeek -ne [DayOfWeek]::Monday) {
-            $weekStart = $weekStart.AddDays(-1)
-        }
-        $weekEnd = $weekStart.AddDays(7)
-        $newest = $allDirs |
-            Where-Object { $_.LastWriteTime -ge $weekStart -and $_.LastWriteTime -lt $weekEnd } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-        if ($newest) {
-            [void]$keep.Add($newest.Name)
-        }
-    }
-
-    for ($monthOffset = 0; $monthOffset -lt [Math]::Max(1, $RetentionMonthly); $monthOffset++) {
-        $monthStart = (New-Object DateTime($now.Year, $now.Month, 1)).AddMonths(-1 * $monthOffset)
-        $monthEnd = $monthStart.AddMonths(1)
-        $newest = $allDirs |
-            Where-Object { $_.LastWriteTime -ge $monthStart -and $_.LastWriteTime -lt $monthEnd } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-        if ($newest) {
-            [void]$keep.Add($newest.Name)
-        }
-    }
-
-    foreach ($dir in $allDirs) {
-        if ($keep.Contains($dir.Name)) {
-            continue
-        }
-
-        $fullPath = $dir.FullName
-        $rootNorm = [System.IO.Path]::GetFullPath($BackupRoot)
-        if (-not $fullPath.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Retention safety check failed; refusing to delete: $fullPath"
-        }
-
-        Write-Log ("Retention: removing expired snapshot {0}" -f $dir.Name)
-        Remove-Item -LiteralPath $fullPath -Recurse -Force
-    }
-
-    Write-Log ("Retention complete. Protected snapshots: {0}" -f $keep.Count)
 }
 
 $exitCode = 0
@@ -517,6 +626,35 @@ $tempWorkDir = $null
 $clientDefaultsFile = $null
 
 try {
+    if ($RetentionTestOnly) {
+        if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
+            throw 'RetentionTestOnly requires -BackupRoot'
+        }
+        $BackupRoot = [System.IO.Path]::GetFullPath($BackupRoot)
+        if (-not (Test-Path -LiteralPath $BackupRoot -PathType Container)) {
+            throw "RetentionTestOnly BackupRoot missing: $BackupRoot"
+        }
+        $snapshotsDir = Join-Path $BackupRoot 'snapshots'
+        if (-not (Test-Path -LiteralPath $snapshotsDir -PathType Container)) {
+            throw "RetentionTestOnly snapshots dir missing: $snapshotsDir"
+        }
+        $newest = Get-ChildItem -LiteralPath $snapshotsDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}$' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if (-not $newest) {
+            throw 'RetentionTestOnly: no snapshot directories to evaluate'
+        }
+        $script:LogFilePath = Join-Path $BackupRoot ('retention_test_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+        Write-Log ('RetentionTestOnly: invoking Invoke-RetentionCleanup current={0} sleep_ms={1} enum_fail={2}' -f $newest.Name, $SleepMsWhileLocked, [bool]$SimulatePinArtifactEnumerateFail)
+        Invoke-RetentionCleanup -BackupRoot $BackupRoot -SnapshotsDir $snapshotsDir -CurrentSnapshotName $newest.Name `
+            -RetentionDaily $RetentionDaily -RetentionWeekly $RetentionWeekly -RetentionMonthly $RetentionMonthly `
+            -SleepMsWhileLocked $SleepMsWhileLocked `
+            -SimulatePinArtifactEnumerateFail:$SimulatePinArtifactEnumerateFail
+        Write-Log 'RetentionTestOnly: done'
+        exit 0
+    }
+
     if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
         $ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
     }
