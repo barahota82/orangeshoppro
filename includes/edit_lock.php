@@ -193,8 +193,11 @@ function orange_edit_lock_resolve_period_bounds(PDO $pdo, string $dateFromRaw, s
  */
 function orange_edit_lock_register(PDO $pdo, array $row): void
 {
-    orange_catalog_ensure_schema($pdo);
-    orange_catalog_ensure_edit_lock_schema($pdo);
+    // TX-01: لا DDL أثناء معاملة الكتابة — يُجهَّز المخطط مسبقاً من المستدعي عند الحاجة.
+    if (!$pdo->inTransaction()) {
+        orange_catalog_ensure_schema($pdo);
+        orange_catalog_ensure_edit_lock_schema($pdo);
+    }
     if (!orange_table_exists($pdo, 'orange_edit_lock_registry')) {
         return;
     }

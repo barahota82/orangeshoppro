@@ -1076,7 +1076,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             + '<td><span class="ov2-extra-account-label"></span>'
             + '<input type="hidden" class="ov2-extra-account-id" value="">'
             + '<input type="hidden" class="ov2-extra-line-kind" value="">'
-            + '<input type="hidden" class="ov2-extra-preset-id" value="0"></td>'
+            + '<input type="hidden" class="ov2-extra-preset-id" value="0">'
+            + '<input type="hidden" class="ov2-extra-show-on-print" value="0"></td>'
             + '<td><input type="number" class="ov2-extra-amount admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>'
             + '<td><input type="text" class="ov2-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
             + '<td class="jv-print-hide"><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
@@ -1096,6 +1097,12 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         tr.querySelector('.ov2-extra-account-id').value = String(parseInt(String(row.account_id || '0'), 10) || 0);
         tr.querySelector('.ov2-extra-line-kind').value = String(row.line_kind || '');
         tr.querySelector('.ov2-extra-preset-id').value = String(parseInt(String(row.preset_id || '0'), 10) || 0);
+        var showPrint = tr.querySelector('.ov2-extra-show-on-print');
+        if (showPrint) {
+            // OR-CURSOR-019-R2: احفظ 0 أو 1 كما ورد من الخادم/المُدخل — لا تفرض 1.
+            var sp = row.show_on_print;
+            showPrint.value = (sp === true || sp === 1 || sp === '1') ? '1' : '0';
+        }
         var lbl = tr.querySelector('.ov2-extra-account-label');
         if (lbl) lbl.textContent = ov2ExtraAccountLabel(row);
         var amt = tr.querySelector('.ov2-extra-amount');
@@ -1141,12 +1148,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             var lineKind = (tr.querySelector('.ov2-extra-line-kind').value || '').trim();
             var amount = parseFloat(tr.querySelector('.ov2-extra-amount').value) || 0;
             if (accountId <= 0 || !lineKind || amount <= 0) return;
+            var showEl = tr.querySelector('.ov2-extra-show-on-print');
+            var showOnPrint = showEl && String(showEl.value) === '1' ? 1 : 0;
             out.push({
                 account_id: accountId,
                 line_kind: lineKind,
                 amount: amount,
                 label_ar: (tr.querySelector('.ov2-extra-label').value || '').trim(),
-                show_on_print: 1,
+                show_on_print: showOnPrint,
                 preset_id: parseInt(tr.querySelector('.ov2-extra-preset-id').value, 10) || 0
             });
         });

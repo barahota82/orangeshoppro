@@ -6,10 +6,19 @@ require_once __DIR__ . '/document_sequences.php';
 require_once __DIR__ . '/sales_doc_channel.php';
 
 /**
- * مصدر الفاتورة المرجعية: company | online | ''.
+ * مصدر الفاتورة المرجعية: company | website | online | ''.
+ * س32 / OR-CH-018-03: order_source=website يتقدّم على بادئة INV-O حتى لا يُنسب المتجر لقناة online.
  */
 function orange_sales_return_source_kind_from_order(array $order): string
 {
+    $src = trim((string) ($order['order_source'] ?? ''));
+    if ($src === 'company') {
+        return 'company';
+    }
+    if ($src === 'website') {
+        return 'website';
+    }
+
     $inv = trim((string) ($order['invoice_number'] ?? ''));
     if (str_starts_with($inv, 'INV-O-')) {
         return 'online';
@@ -106,7 +115,7 @@ function orange_sales_return_persist_analytics(PDO $pdo, int $returnId, array $d
 
     if (orange_table_has_column($pdo, 'sales_returns', 'source_kind')) {
         $sk = trim((string) ($dims['source_kind'] ?? ''));
-        if (!in_array($sk, ['company', 'online'], true)) {
+        if (!in_array($sk, ['company', 'online', 'website'], true)) {
             $sk = '';
         }
         $sets[] = 'source_kind = ?';
@@ -174,6 +183,7 @@ function orange_sales_return_source_kind_label(string $kind): string
     return match (trim($kind)) {
         'company' => 'فاتورة شركة',
         'online' => 'فاتورة أونلاين',
+        'website' => 'فاتورة المتجر',
         default => '—',
     };
 }
@@ -337,50 +347,117 @@ function orange_channel_analytics_returns_date_sql(
 }
 
 /**
- * قناة التسويق للمردود: >0 معرّف قناة، 0 = شركة مباشرة، -1 = لم يُعرف.
+ * قناة التسويق للمردود: >0 معرّف قناة، 0 = شركة مباشرة، -2 = متجر website بلا قناة، -1 = لم يُعرف.
+ * OR-CURSOR-019-R1: مصدر الطلب المرتبط (order_source) له الأولوية على snapshot source_kind عند التعارض.
+ * لا تُعتبر INV-O / source_kind=online وحدهما دليلاً على website.
  *
  * @param array<string, mixed> $row
  */
 function orange_sales_return_resolve_marketing_channel_id(PDO $pdo, array $row, int $countryId): int
 {
+    $primary = orange_sales_return_primary_source_membership($row);
+
+    // قناة صريحة (سجل المردود أو الطلب) — تحليل تسويقي؛ عضوية website تُحسب منفصلة في التجميع.
     if (isset($row['channel_id']) && (int) $row['channel_id'] > 0) {
         return (int) $row['channel_id'];
     }
     if (isset($row['order_channel_id']) && (int) $row['order_channel_id'] > 0) {
         return (int) $row['order_channel_id'];
     }
-    if (orange_sales_return_is_company_marketing_bucket($row)) {
-        return 0;
-    }
-    $sk = trim((string) ($row['source_kind'] ?? ''));
-    if ($sk === 'company') {
-        return 0;
-    }
-    if ($sk === 'online') {
-        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
 
-        return $onlineId > 0 ? $onlineId : -1;
-    }
-    $invRef = strtoupper(trim((string) ($row['invoice_reference'] ?? '')));
-    if (str_starts_with($invRef, 'INV-O-')) {
-        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
-
-        return $onlineId > 0 ? $onlineId : -1;
-    }
-    if (str_starts_with($invRef, 'INV-C-')) {
+    if ($primary === 'company' || orange_sales_return_is_company_marketing_bucket($row)) {
         return 0;
     }
-    $orderInv = strtoupper(trim((string) ($row['order_invoice_number'] ?? '')));
-    if (str_starts_with($orderInv, 'INV-O-')) {
-        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
 
-        return $onlineId > 0 ? $onlineId : -1;
+    // website بلا قناة فقط → دلو المتجر (-2). website مع قناة يُعالَج أعلاه عبر channel_id.
+    if ($primary === 'website') {
+        return -2;
     }
-    if (str_starts_with($orderInv, 'INV-C-')) {
-        return 0;
-    }
+
+    // online صريح / legacy INV-O / غير معروف → orphan (−1)؛ ليس website.
+    unset($pdo, $countryId);
 
     return -1;
+}
+
+/**
+ * مصدر الطلب الفعّال للمردود: order_source المرتبط الصريح يتقدّم على snapshot.
+ * يُحفظ online صريحاً (لا يُفرَّغ) حتى لا تتغلب عليه لقطة website.
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_sales_return_effective_order_source(array $row): string
+{
+    $orderSource = strtolower(trim((string) ($row['order_source'] ?? '')));
+    if ($orderSource === 'company' || $orderSource === 'website' || $orderSource === 'online') {
+        return $orderSource;
+    }
+
+    return '';
+}
+
+/**
+ * عضوية مصدر الصافي الموحّدة: website | company | online | ''.
+ * OR-CURSOR-019-R2: قرار واحد للـ resolver وعضوية website/company؛ ممنوع نسب نفس الصف لـ company وwebsite معاً.
+ * المصدر المرتبط الصريح أولاً؛ عند الفراغ تُحسم اللقطة/مرجع الفاتورة مع تقدّم إشارات الشركة على snapshot=website المتعارض.
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_sales_return_primary_source_membership(array $row): string
+{
+    $eff = orange_sales_return_effective_order_source($row);
+    if ($eff === 'website' || $eff === 'company' || $eff === 'online') {
+        return $eff;
+    }
+
+    $sk = trim((string) ($row['source_kind'] ?? ''));
+    $invRef = strtoupper(trim((string) ($row['invoice_reference'] ?? '')));
+    $orderInv = strtoupper(trim((string) ($row['order_invoice_number'] ?? '')));
+    $isInvC = ($invRef !== '' && str_starts_with($invRef, 'INV-C-'))
+        || ($orderInv !== '' && str_starts_with($orderInv, 'INV-C-'));
+    $isInvO = ($invRef !== '' && str_starts_with($invRef, 'INV-O-'))
+        || ($orderInv !== '' && str_starts_with($orderInv, 'INV-O-'));
+
+    // تعارض snapshot=website مع INV-C / company → شركة فقط (لا ازدواج مع website).
+    if ($sk === 'company' || $isInvC) {
+        return 'company';
+    }
+    if ($sk === 'website') {
+        return 'website';
+    }
+    // INV-O / online وحدهما ليسا website.
+    if ($sk === 'online' || $isInvO) {
+        return 'online';
+    }
+
+    return '';
+}
+
+/**
+ * هل المردود ينتمي لصافي بطاقة المتجر (كل طلبات order_source=website)؟
+ * يشمل ذات القناة؛ التحليل التسويقي by_channel منفصل وقد يتزامن دون إسقاط من صافي website.
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_sales_return_counts_toward_website_net(array $row): bool
+{
+    return orange_sales_return_primary_source_membership($row) === 'website';
+}
+
+/**
+ * مردود متجر website بلا قناة تسويق (س32).
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_sales_return_is_website_storefront_bucket(array $row): bool
+{
+    if (orange_sales_return_primary_source_membership($row) !== 'website') {
+        return false;
+    }
+    $srCh = isset($row['channel_id']) ? (int) $row['channel_id'] : 0;
+    $orderCh = isset($row['order_channel_id']) ? (int) $row['order_channel_id'] : 0;
+
+    return $srCh <= 0 && $orderCh <= 0;
 }
 
 /**
@@ -390,29 +467,14 @@ function orange_sales_return_resolve_marketing_channel_id(PDO $pdo, array $row, 
  */
 function orange_sales_return_is_company_marketing_bucket(array $row): bool
 {
+    if (orange_sales_return_primary_source_membership($row) !== 'company') {
+        return false;
+    }
     $srCh = isset($row['channel_id']) ? (int) $row['channel_id'] : 0;
-    if ($srCh > 0) {
-        return false;
-    }
-    $sk = trim((string) ($row['source_kind'] ?? ''));
-    if ($sk === 'company') {
-        return true;
-    }
     $orderCh = isset($row['order_channel_id']) ? (int) $row['order_channel_id'] : 0;
-    if ($orderCh > 0) {
-        return false;
-    }
-    $orderSource = trim((string) ($row['order_source'] ?? ''));
-    if ($orderSource === 'company') {
-        return true;
-    }
-    $invRef = trim((string) ($row['invoice_reference'] ?? ''));
-    if ($invRef !== '' && str_starts_with(strtoupper($invRef), 'INV-C-')) {
-        return true;
-    }
-    $orderInv = trim((string) ($row['order_invoice_number'] ?? ''));
 
-    return $orderInv !== '' && str_starts_with(strtoupper($orderInv), 'INV-C-');
+    // شركة مع قناة اختيارية → ليست «مباشرة» لصافي الشركة بلا قناة؛ تُحسب في by_channel.
+    return $srCh <= 0 && $orderCh <= 0;
 }
 
 /**
@@ -421,6 +483,7 @@ function orange_sales_return_is_company_marketing_bucket(array $row): bool
  * @return array{
  *   by_channel: array<int, array{cnt: int, total: float}>,
  *   company: array{cnt: int, total: float},
+ *   website: array{cnt: int, total: float},
  *   orphan: array{cnt: int, total: float}
  * }
  */
@@ -434,6 +497,7 @@ function orange_channel_analytics_aggregate_returns(
     $out = [
         'by_channel' => [],
         'company' => ['cnt' => 0, 'total' => 0.0],
+        'website' => ['cnt' => 0, 'total' => 0.0],
         'orphan' => ['cnt' => 0, 'total' => 0.0],
     ];
     if (!orange_table_exists($pdo, 'sales_returns')) {
@@ -513,6 +577,11 @@ function orange_channel_analytics_aggregate_returns(
             continue;
         }
         $mktCh = orange_sales_return_resolve_marketing_channel_id($pdo, $row, $countryId);
+        // صافي بطاقة website = كل مردودات طلبات website (بما فيها ذات القناة) ليطابق نطاق مبيعات البطاقة.
+        if (orange_sales_return_counts_toward_website_net($row)) {
+            $out['website']['cnt']++;
+            $out['website']['total'] += $total;
+        }
         if ($mktCh > 0) {
             if (!isset($out['by_channel'][$mktCh])) {
                 $out['by_channel'][$mktCh] = ['cnt' => 0, 'total' => 0.0];
@@ -528,8 +597,14 @@ function orange_channel_analytics_aggregate_returns(
 
             continue;
         }
-        $out['orphan']['cnt']++;
-        $out['orphan']['total'] += $total;
+        // -2 بلا عضوية website (لا يجب أن يحدث بعد R1) أو orphan
+        if ($mktCh === -2) {
+            continue;
+        }
+        if (!orange_sales_return_counts_toward_website_net($row)) {
+            $out['orphan']['cnt']++;
+            $out['orphan']['total'] += $total;
+        }
     }
 
     return $out;

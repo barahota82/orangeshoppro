@@ -275,6 +275,62 @@ function orange_sales_invoice_online_register_edit_lock(PDO $pdo, int $orderId, 
 }
 
 /**
+ * خريطة كميات حسب المتغير من بنود الطلب المحفوظة.
+ *
+ * @return array<int, int>
+ */
+function orange_sales_invoice_online_variant_qty_map_from_order(PDO $pdo, int $orderId): array
+{
+    $map = [];
+    if ($orderId <= 0 || !orange_table_exists($pdo, 'order_items')) {
+        return $map;
+    }
+    if (!orange_table_has_column($pdo, 'order_items', 'variant_id')) {
+        return $map;
+    }
+    $st = $pdo->prepare(
+        'SELECT variant_id, qty FROM order_items WHERE order_id = ? AND variant_id IS NOT NULL AND variant_id > 0'
+    );
+    $st->execute([$orderId]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $vid = (int) ($row['variant_id'] ?? 0);
+        $qty = (int) ($row['qty'] ?? 0);
+        if ($vid > 0 && $qty > 0) {
+            $map[$vid] = ($map[$vid] ?? 0) + $qty;
+        }
+    }
+    ksort($map);
+
+    return $map;
+}
+
+/**
+ * خريطة كميات حسب المتغير من حمولة الطلب (قبل التحقق الكامل).
+ *
+ * @param list<array<string,mixed>> $itemsIn
+ * @return array<int, int>
+ */
+function orange_sales_invoice_online_variant_qty_map_from_items(array $itemsIn): array
+{
+    $map = [];
+    foreach ($itemsIn as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $vid = (int) ($item['variant_id'] ?? 0);
+        $qty = max(0, (int) ($item['qty'] ?? 0));
+        if ($vid <= 0 || $qty <= 0) {
+            // بدون متغير صريح لا نعتبر التركيبة قابلة لمطابقة ائتمان STOCK-01.
+            return [];
+        }
+        $map[$vid] = ($map[$vid] ?? 0) + $qty;
+    }
+    ksort($map);
+
+    return $map;
+}
+
+/**
  * تحديث INV-O — ترويسة + بنود في الطلب فقط؛ **لا** إعادة ترحيل GL ولا مسار final-posting.
  *
  * @param array<string, mixed> $data
@@ -349,10 +405,8 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         throw new RuntimeException('رقم الهاتف غير صالح');
     }
 
-    $channelId = (int) ($order['channel_id'] ?? 0);
-    if ($channelId <= 0) {
-        throw new RuntimeException('الطلب بلا قناة — راجع مسار الطلب الأونلاين أو القناة في المتجر');
-    }
+    // س32 / OR-CH-018-01: فاتورة INV-O (website) قد تكون بلا channel_id — لا ترفض التعديل ولا تنشئ قناة صورية.
+    // القناة الحالية في الطلب تُترك كما هي؛ المصدر والدولة من الصف؛ البنود/المخزون/الصلاحيات أدناه دون تغيير.
 
     $itemsIn = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     if ($itemsIn === []) {
@@ -365,7 +419,20 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
 
     $glPosted = orange_sales_invoice_online_gl_posted($pdo, $order);
 
-    $validated = orange_sales_invoice_company_validate_items($pdo, $itemsIn, $orderCountryId);
+    // STOCK-01 / OR-CURSOR-019-R3: ائتمان المخزون لتعديل الملاحظة/الإضافات فقط عند ثبات تركيب وكميات الأصناف.
+    // لا يوسّع مسار زيادة الكمية أو الصف المكرر أو استبدال المتغير.
+    $stockCreditByVariantId = [];
+    $existingQtyMap = orange_sales_invoice_online_variant_qty_map_from_order($pdo, $orderId);
+    $requestQtyMap = orange_sales_invoice_online_variant_qty_map_from_items($itemsIn);
+    if ($existingQtyMap !== [] && $existingQtyMap === $requestQtyMap) {
+        $stockCreditByVariantId = $existingQtyMap;
+    }
+    $validated = orange_sales_invoice_company_validate_items(
+        $pdo,
+        $itemsIn,
+        $orderCountryId,
+        $stockCreditByVariantId
+    );
     $deliveryFee = orange_table_has_column($pdo, 'orders', 'delivery_fee')
         ? (float) ($order['delivery_fee'] ?? 0)
         : 0.0;
@@ -390,100 +457,125 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         orange_invoice_ancillary_doc_kind_sales()
     );
 
+    // TX-01: جهّز المخطط قبل المعاملة — ممنوع DDL أثناء الكتابة.
+    orange_catalog_ensure_schema($pdo);
+    require_once __DIR__ . '/invoice_ancillary_lines.php';
+    orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    orange_catalog_ensure_edit_lock_schema($pdo);
+    $ancillaryReady = orange_invoice_ancillary_tables_ready($pdo, false);
+
     $pdo->beginTransaction();
+    try {
+        $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$orderId]);
 
-    $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$orderId]);
+        $sets = [
+            'customer_name = ?',
+            'phone = ?',
+            'area = ?',
+            'address = ?',
+            'notes = ?',
+            'total = ?',
+        ];
+        $params = [$customerName, $phoneNorm, $area, $address, $notes, $total];
 
-    $sets = [
-        'customer_name = ?',
-        'phone = ?',
-        'area = ?',
-        'address = ?',
-        'notes = ?',
-        'total = ?',
-    ];
-    $params = [$customerName, $phoneNorm, $area, $address, $notes, $total];
+        if (orange_table_has_column($pdo, 'orders', 'phone_country_dial')) {
+            $sets[] = 'phone_country_dial = ?';
+            $params[] = $dialForNational !== '' ? $dialForNational : null;
+        }
+        if (orange_table_has_column($pdo, 'orders', 'phone_national')) {
+            $sets[] = 'phone_national = ?';
+            $params[] = $phoneRawIn !== '' ? $phoneRawIn : null;
+        }
+        if (orange_table_has_column($pdo, 'orders', 'updated_at')) {
+            $sets[] = 'updated_at = ?';
+            $params[] = orange_admin_time_utc_now_mysql();
+        }
 
-    if (orange_table_has_column($pdo, 'orders', 'phone_country_dial')) {
-        $sets[] = 'phone_country_dial = ?';
-        $params[] = $dialForNational !== '' ? $dialForNational : null;
-    }
-    if (orange_table_has_column($pdo, 'orders', 'phone_national')) {
-        $sets[] = 'phone_national = ?';
-        $params[] = $phoneRawIn !== '' ? $phoneRawIn : null;
-    }
-    if (orange_table_has_column($pdo, 'orders', 'updated_at')) {
-        $sets[] = 'updated_at = ?';
-        $params[] = orange_admin_time_utc_now_mysql();
-    }
+        $params[] = $orderId;
+        $pdo->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
 
-    $params[] = $orderId;
-    $pdo->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
-
-    $profile = [
-        'area' => $area,
-        'address' => $address,
-        'phone_country_dial' => $dialForNational !== '' ? $dialForNational : null,
-        'phone_national' => $phoneRawIn !== '' ? $phoneRawIn : null,
-    ];
-    if (orange_table_has_column($pdo, 'orders', 'delivery_area_id')) {
-        $profile['delivery_area_id'] = isset($data['delivery_area_id'])
-            ? (int) $data['delivery_area_id']
-            : (int) ($order['delivery_area_id'] ?? 0);
-    }
-    $customerIdIn = (int) ($data['customer_id'] ?? $order['customer_id'] ?? 0);
-    $customerId = orange_ensure_customer_with_profile(
-        $pdo,
-        $customerName,
-        $phoneNorm,
-        $profile,
-        $orderCountryId > 0 ? $orderCountryId : null
-    );
-    if ($customerId > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
-        $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$customerId, $orderId]);
-    } elseif ($customerIdIn > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
-        $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$customerIdIn, $orderId]);
-    }
-
-    orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
-
-    if (orange_invoice_ancillary_tables_ready($pdo)) {
-        $extraInput = orange_invoice_ancillary_merge_auto_delivery_lines(
+        $profile = [
+            'area' => $area,
+            'address' => $address,
+            'phone_country_dial' => $dialForNational !== '' ? $dialForNational : null,
+            'phone_national' => $phoneRawIn !== '' ? $phoneRawIn : null,
+        ];
+        if (orange_table_has_column($pdo, 'orders', 'delivery_area_id')) {
+            $profile['delivery_area_id'] = isset($data['delivery_area_id'])
+                ? (int) $data['delivery_area_id']
+                : (int) ($order['delivery_area_id'] ?? 0);
+        }
+        $customerIdIn = (int) ($data['customer_id'] ?? $order['customer_id'] ?? 0);
+        $customerId = orange_ensure_customer_with_profile(
             $pdo,
-            $orderCountryId,
-            [
-                'delivery_fee' => $deliveryFee,
-                'delivery_fee_base' => $deliveryFeeBase,
-                'delivery_fee_discount' => $deliveryFeeDiscount,
-            ],
-            $extraInput
+            $customerName,
+            $phoneNorm,
+            $profile,
+            $orderCountryId > 0 ? $orderCountryId : null
         );
-        $extraInput = orange_invoice_ancillary_merge_auto_vat(
-            $pdo,
-            orange_invoice_ancillary_doc_kind_sales(),
-            $orderCountryId,
-            (float) $total,
-            $extraInput
-        );
-        orange_invoice_ancillary_extra_lines_replace_for_doc(
-            $pdo,
-            orange_invoice_ancillary_doc_kind_sales(),
-            $orderId,
-            $orderCountryId,
-            $extraInput
-        );
+        if ($customerId > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
+            $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$customerId, $orderId]);
+        } elseif ($customerIdIn > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
+            $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$customerIdIn, $orderId]);
+        }
+
+        orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
+
+        if ($ancillaryReady) {
+            $extraInput = orange_invoice_ancillary_merge_auto_delivery_lines(
+                $pdo,
+                $orderCountryId,
+                [
+                    'delivery_fee' => $deliveryFee,
+                    'delivery_fee_base' => $deliveryFeeBase,
+                    'delivery_fee_discount' => $deliveryFeeDiscount,
+                ],
+                $extraInput
+            );
+            $extraInput = orange_invoice_ancillary_merge_auto_vat(
+                $pdo,
+                orange_invoice_ancillary_doc_kind_sales(),
+                $orderCountryId,
+                (float) $total,
+                $extraInput
+            );
+            orange_invoice_ancillary_extra_lines_replace_for_doc(
+                $pdo,
+                orange_invoice_ancillary_doc_kind_sales(),
+                $orderId,
+                $orderCountryId,
+                $extraInput,
+                false
+            );
+        }
+
+        $ordSt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+        $ordSt->execute([$orderId]);
+        $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
+        orange_sales_invoice_online_register_edit_lock($pdo, $orderId, $orderRow);
+
+        if ($adminRow) {
+            orange_edit_lock_log_mutation($pdo, 'online_sales_invoice', $orderId, 'edit');
+        }
+
+        // مختبر فقط: فشل محقون بعد كتابة فعلية وقبل commit لإثبات الرجوع الكامل.
+        if (function_exists('orange_lab_runtime_is_active')
+            && orange_lab_runtime_is_active()
+            && !empty($data['__orange_test_fail_before_commit'])) {
+            throw new RuntimeException('ORANGE_TEST_INJECTED_FAIL');
+        }
+
+        // TX-01: فقدان المعاملة (مثلاً DDL ضمني) ليس نجاحاً.
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException('انتهت معاملة الحفظ بشكل غير متوقع قبل التثبيت — لم يُعتمد الحفظ.');
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-
-    $ordSt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
-    $ordSt->execute([$orderId]);
-    $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
-    orange_sales_invoice_online_register_edit_lock($pdo, $orderId, $orderRow);
-
-    if ($adminRow) {
-        orange_edit_lock_log_mutation($pdo, 'online_sales_invoice', $orderId, 'edit');
-    }
-
-    $pdo->commit();
 
     $itemsNote = $glPosted
         ? 'تم حفظ التعديل على الطلب/الفاتورة. القيود المرحّلة سابقاً **لم** تُعاد حساباً — راجع المحاسبة أو مردود المبيعات إن لزم.'

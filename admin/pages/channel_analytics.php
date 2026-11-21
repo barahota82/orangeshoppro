@@ -174,6 +174,7 @@ $returnsAgg = orange_channel_analytics_aggregate_returns(
 );
 $returnsByChannelId = $returnsAgg['by_channel'];
 $companyReturns = $returnsAgg['company'];
+$websiteReturns = $returnsAgg['website'] ?? ['cnt' => 0, 'total' => 0.0];
 $orphanReturns = $returnsAgg['orphan'];
 
 $topSql = '
@@ -376,14 +377,22 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <?php endif; ?>
 </div>
 
-<?php if ((int) ($websiteStorefront['cnt_all'] ?? 0) > 0): ?>
+<?php
+$webSalesRev = (float) ($websiteStorefront['revenue_completed'] ?? 0);
+$webRetTotal = (float) ($websiteReturns['total'] ?? 0);
+$webRetCnt = (int) ($websiteReturns['cnt'] ?? 0);
+$webShow = ((int) ($websiteStorefront['cnt_all'] ?? 0) > 0) || $webRetCnt > 0;
+?>
+<?php if ($webShow): ?>
 <div class="card">
     <h3 class="card-title">طلبات المتجر (website)</h3>
-    <p class="card-hint">س32: <code>order_source = website</code> — ليست شركة حتى لو غاب <code>channel_id</code>.</p>
+    <p class="card-hint">س32 / OR-CH-018-03: <code>order_source = website</code> — البيع والمردود والصافي لنفس المصدر؛ ليست شركة ولا قناة online افتراضية عند غياب <code>channel_id</code>.</p>
     <ul style="line-height:1.7;">
         <li>إجمالي الطلبات: <strong><?php echo (int) $websiteStorefront['cnt_all']; ?></strong></li>
         <li>مكتملة: <strong><?php echo (int) $websiteStorefront['cnt_completed']; ?></strong></li>
-        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) $websiteStorefront['revenue_completed']); ?></strong></li>
+        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, $webSalesRev); ?></strong></li>
+        <li>مردودات (مبلغ / عدد): <strong><?php echo orange_format_money_for_context($caMoney, $webRetTotal); ?></strong> / <strong><?php echo $webRetCnt; ?></strong></li>
+        <li>صافي: <strong><?php echo orange_format_money_for_context($caMoney, round($webSalesRev - $webRetTotal, 4)); ?></strong></li>
     </ul>
 </div>
 <?php endif; ?>

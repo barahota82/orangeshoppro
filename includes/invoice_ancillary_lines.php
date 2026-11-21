@@ -227,9 +227,12 @@ function orange_invoice_ancillary_auto_delivery_system_keys(): array
     return ['delivery_fee_charge', 'delivery_fee_discount'];
 }
 
-function orange_invoice_ancillary_tables_ready(PDO $pdo): bool
+function orange_invoice_ancillary_tables_ready(PDO $pdo, bool $allowEnsure = true): bool
 {
-    orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    // TX-01: لا تُشغّل DDL أثناء معاملة كتابة نشطة.
+    if ($allowEnsure && !$pdo->inTransaction()) {
+        orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    }
 
     return orange_table_exists($pdo, 'orange_invoice_line_presets')
         && orange_table_exists($pdo, 'orange_invoice_extra_lines');
@@ -702,10 +705,12 @@ function orange_invoice_ancillary_merge_auto_delivery_lines(
     array $documentTotals,
     array $extraInput
 ): array {
+    // OR-CURSOR-019-R2: استبدال عائلة التوصيل فقط — لا تُحذف presets العروض/الولاء.
     $systemKeys = orange_invoice_ancillary_auto_delivery_system_keys();
     $presetMapAny = orange_invoice_ancillary_system_key_presets_map($pdo, $countryId, false);
     $autoPresetIds = [];
-    foreach ($presetMapAny as $row) {
+    foreach ($systemKeys as $deliveryKey) {
+        $row = $presetMapAny[$deliveryKey] ?? null;
         if (!is_array($row)) {
             continue;
         }
@@ -905,9 +910,14 @@ function orange_invoice_ancillary_extra_lines_replace_for_doc(
     string $docKind,
     int $docId,
     int $countryId,
-    array $lines
+    array $lines,
+    bool $allowEnsure = true
 ): void {
-    orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    if ($allowEnsure && !$pdo->inTransaction()) {
+        orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    } elseif (!orange_invoice_ancillary_tables_ready($pdo, false)) {
+        throw new RuntimeException('مخطط البنود الإضافية غير جاهز.');
+    }
     if ($docId <= 0) {
         throw new RuntimeException('معرف المستند غير صالح.');
     }

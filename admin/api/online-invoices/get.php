@@ -20,9 +20,13 @@ try {
         'success' => true,
         'invoice' => $payload['order'],
         'items' => $payload['items'],
+        'extra_lines' => $payload['extra_lines'] ?? [],
         'customer' => $payload['customer'],
     ]);
 } catch (RuntimeException $e) {
+    if ($e->getMessage() === 'ORANGE_LAB_JSON_CAPTURE') {
+        throw $e;
+    }
     $code = (int) $e->getCode();
     if ($code < 400 || $code > 599) {
         $code = 422;

@@ -31,6 +31,7 @@ try {
         'order_id' => $orderId,
         'invoice' => $payload['order'],
         'items' => $payload['items'],
+        'extra_lines' => $payload['extra_lines'] ?? [],
         'customer' => $payload['customer'],
     ];
     if ($note !== null) {
@@ -39,6 +40,9 @@ try {
 
     json_response($response);
 } catch (RuntimeException $e) {
+    if ($e->getMessage() === 'ORANGE_LAB_JSON_CAPTURE') {
+        throw $e;
+    }
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }

@@ -316,8 +316,15 @@ function orange_sales_invoice_company_document_payload(PDO $pdo, int $orderId): 
  * @param list<array<string,mixed>> $itemsIn
  * @return array{total:float,items:list<array<string,mixed>>}
  */
-function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, int $countryId): array
-{
+/**
+ * @param array<int, int> $stockCreditByVariantId ائتمان لمرة واحدة لكل متغير (يُستهلك ولا يُعاد استخدامه بين الصفوف).
+ */
+function orange_sales_invoice_company_validate_items(
+    PDO $pdo,
+    array $itemsIn,
+    int $countryId,
+    array $stockCreditByVariantId = []
+): array {
     require_once __DIR__ . '/catalog_unified_product_helpers.php';
 
     if ($itemsIn === []) {
@@ -326,6 +333,15 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
 
     $total = 0.0;
     $validated = [];
+    /** @var array<int, int> */
+    $creditRemaining = [];
+    foreach ($stockCreditByVariantId as $vidKey => $cqty) {
+        $vidKey = (int) $vidKey;
+        $cqty = (int) $cqty;
+        if ($vidKey > 0 && $cqty > 0) {
+            $creditRemaining[$vidKey] = ($creditRemaining[$vidKey] ?? 0) + $cqty;
+        }
+    }
 
     foreach ($itemsIn as $item) {
         if (!is_array($item)) {
@@ -395,9 +411,16 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
                 throw new RuntimeException('اختر المتغير (لون/مقاس) للمنتج: ' . ($product['name'] ?? $pid));
             }
             $variantIdIn = (int) ($variant['id'] ?? 0);
-            $available = orange_warehouse_effective_variant_stock($pdo, $variantIdIn, $countryId);
+            $physical = orange_warehouse_effective_variant_stock($pdo, $variantIdIn, $countryId);
+            $credit = (int) ($creditRemaining[$variantIdIn] ?? 0);
+            $available = $physical + $credit;
             if ($available < $qty) {
                 throw new RuntimeException('مخزون غير كافٍ: ' . ($product['name'] ?? $pid));
+            }
+            // استهلك الائتمان مرة واحدة: ما يتجاوز الرصيد الفعلي فقط.
+            $needCredit = max(0, $qty - $physical);
+            if ($needCredit > 0) {
+                $creditRemaining[$variantIdIn] = max(0, $credit - $needCredit);
             }
         }
 

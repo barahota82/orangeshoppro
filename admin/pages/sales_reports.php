@@ -440,14 +440,22 @@ $applyReturnSourceFilter = static function (string &$sql, array &$params) use ($
         return;
     }
     if ($hasSrSourceKind) {
+        // س32 / OR-CURSOR-019-R1: فلتر «أونلاين» في الواجهة يشمل website + online (المبيعات تستخدم <> company).
+        if ($source === 'online') {
+            $sql .= " AND sr.source_kind IN ('online','website')";
+
+            return;
+        }
         $sql .= ' AND sr.source_kind = ?';
         $params[] = $source;
+
         return;
     }
     if ($hasSrInvoiceRef) {
         $sql .= $source === 'company'
             ? " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-C-%'"
             : " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-O-%'";
+
         return;
     }
     $sql .= ' AND 1=0';
@@ -573,7 +581,8 @@ try {
             if ($orderIdForLink > 0) {
                 if ($src === 'company') {
                     $docUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice&order_id=' . $orderIdForLink);
-                } elseif ($src === 'online') {
+                } elseif ($src === 'online' || $src === 'website') {
+                    // س32 / OR-CH-018-02: order_source=website → شاشة فاتورة الموقع (ليست sales_invoices العامة).
                     $docUrl = storefront_public_path('/admin/index.php?page=online_sales_invoice&order_id=' . $orderIdForLink);
                 } else {
                     $docUrl = storefront_public_path('/admin/index.php?page=sales_invoices&order_id=' . $orderIdForLink);
@@ -788,7 +797,8 @@ try {
                     if ($orderIdForLink > 0) {
                         if ($src === 'company') {
                             $docUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice&order_id=' . $orderIdForLink);
-                        } elseif ($src === 'online') {
+                        } elseif ($src === 'online' || $src === 'website') {
+                            // س32 / OR-CH-018-02: تفصيل العميل — website → online_sales_invoice.
                             $docUrl = storefront_public_path('/admin/index.php?page=online_sales_invoice&order_id=' . $orderIdForLink);
                         } else {
                             $docUrl = storefront_public_path('/admin/index.php?page=sales_invoices&order_id=' . $orderIdForLink);
